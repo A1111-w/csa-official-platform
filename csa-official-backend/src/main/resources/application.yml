@@ -1,0 +1,62 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: csa-official-backend
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 动态读取环境变量
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  data:
+    redis:
+      # 动态读取 Redis 环境变量
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+      database: 0
+      ssl:
+        enabled: true
+  # 邮件配置 
+  mail:
+    host: smtp.qq.com
+    username: ${MAIL_USERNAME:3331283195@qq.com} 
+    password: ${MAIL_PASSWORD}         
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+  
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 500MB
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+
+csa:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration: ${JWT_EXPIRATION:604800000} 
+  
+  # 本地路径暂时保留，部署 Render 时虽然会重置，但能跑通
+  upload-path: ${UPLOAD_PATH:${user.home}/csa-upload/}
+  
+  allow-types: jpg,jpeg,png,gif,pdf,zip,rar,7z,tar,gz,doc,docx,ppt,pptx
+
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+

@@ -1,0 +1,31 @@
+{
+  "output": {
+    "filePath": "packed-project.xml",
+    "style": "xml"
+  },
+  "ignore": {
+    "useGitignore": true,
+    "customPatterns": [
+
+      ".git",
+      ".idea",
+      ".vscode",
+      
+
+      "backend/target/**",
+      "backend/.mvn/**",
+      "backend/mvnw",
+      "backend/mvnw.cmd",
+      "**/*.class",
+      "**/*.jar",
+
+
+      "frontend/node_modules/**",
+      "frontend/dist/**",
+      "frontend/build/**",
+      "frontend/.next/**",
+      "frontend/package-lock.json",
+      "frontend/yarn.lock"
+    ]
+  }
+}
