@@ -37,8 +37,13 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-# 用非 root 用户运行
-RUN addgroup -g 1001 -S nodejs && adduser -u 1001 -S nextjs -G nodejs
+# Runner 不需要 npm/npx：构建已经结束，Next.js 可由 node 直接启动。
+# 移除基础镜像中未使用的全局 npm 可避免把其传递依赖带入生产攻击面。
+RUN apk upgrade --no-cache \
+    && rm -rf /usr/local/lib/node_modules/npm \
+    && rm -f /usr/local/bin/npm /usr/local/bin/npx \
+    && addgroup -g 1001 -S nodejs \
+    && adduser -u 1001 -S nextjs -G nodejs
 
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
@@ -49,4 +54,4 @@ COPY --from=builder /app/package.json ./package.json
 USER nextjs
 
 EXPOSE 3000
-CMD ["npm", "run", "start"]
+CMD ["node", "node_modules/next/dist/bin/next", "start"]

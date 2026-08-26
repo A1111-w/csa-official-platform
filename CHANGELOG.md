@@ -29,6 +29,7 @@
 
 ### Changed
 
+- 2026-08-26：前端 runner 镜像在构建完成后执行 `apk upgrade --no-cache`，并移除运行时不需要的全局 `npm`/`npx`，改由 `node node_modules/next/dist/bin/next start` 启动 Next.js。该改动针对 GitHub Actions `#33009147368` 中前端镜像全局 npm 自带的 `node-tar` 漏洞；不修改应用 `package-lock.json`、数据库或业务行为。回退时仅需 revert 本提交并重新构建镜像。
 - 2026-08-26 GitHub Actions 安全门禁修复：Spring Boot 从 `3.5.12` 升级到 `3.5.14`，并以受控 patch-level 覆盖 Spring Framework `6.2.19`、Spring Data `2025.0.12`、Tomcat `10.1.55`、Micrometer `1.15.12`、Netty `4.1.136.Final`、Jackson BOM `2.21.4` 和 Commons IO `2.20.0`。后端 runner 镜像在创建运行用户前执行 `apk upgrade --no-cache`，以取得基础镜像可用的安全补丁；不引入迁移或运行时行为变更。
 - CI 移除仅在启用 GitHub Advanced Security 的私有仓库可用的 `actions/dependency-review-action`；保留并继续强制 Trivy 文件系统/镜像扫描、`npm audit`、后端测试、Testcontainers、Compose fail-fast 和 Playwright E2E。
 - 2026-08-26 CI 修复 checkpoint 将 Spring Boot 从 `3.5.8` 升级到 `3.5.12`，将 Next.js 与 `eslint-config-next` 升级到 `16.3.3`；前端 lockfile 同步更新受影响的传递依赖，完整与 production `npm audit` 均为 0 vulnerabilities。
@@ -67,6 +68,7 @@
 
 ### Verification
 
+- 2026-08-26：GitHub Actions `#33009147368` 已通过后端单测、MySQL/Redis/Flyway Testcontainers、前端 lint/build/test/audit、Compose fail-fast 和关键 Playwright E2E；Docker job 仅在前端镜像 Trivy 扫描失败。报告显示 `node:20-alpine` 最终镜像中的全局 npm `node-tar` 有 19 个高危/严重项，另有 4 个 Alpine 高危项；本提交移除运行时不需要的全局 npm 并升级 Alpine 包，新运行结果待推送后确认。
 - 2026-08-26：GitHub Actions `#33006154587` 在 `5b5457a` 上通过后端单测、MySQL/Redis/Flyway Testcontainers、前端 lint/build/test/audit、Compose fail-fast 和关键 Playwright E2E。失败的两项已定位：私有仓库未启用 GitHub Advanced Security，导致 `dependency-review-action` 不可运行；后端镜像 Trivy 检出均有修复版本的 Alpine 与 Java 依赖漏洞。当前提交应用相应修复；其远端扫描结果以新运行记录为准。
 - 2026-08-26：本提交在本地通过 `csa-official-backend\\mvnw.cmd test`（174 tests，0 failures，0 errors，1 个 Docker Testcontainers skipped）、`npm run test`（6 files / 12 tests）、`npm run lint`（0 errors，1 条既有 warning）、`npm run build`（25/25）和 `npm audit --omit=dev --audit-level=high`（0 vulnerabilities）；开发 Compose 可解析，生产 Compose 对缺少必填秘密按预期 fail-fast，临时占位值可展开。
 - 2026-08-26：在无 `.env`、空 `REDIS_HOST` 的等价 CI 配置下，`mvnw.cmd test` 为 174 tests、0 failures、0 errors、1 Docker Testcontainers skipped；`npm ci`、`npm run test`（6 files / 12 tests）、`npm run lint`（0 errors、1 既有 warning）、`npm run build`（Next.js 16.3.3，25/25）及完整/production `npm audit` 均通过。GitHub Actions 远端结果待本 checkpoint 推送后确认。

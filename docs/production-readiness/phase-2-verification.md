@@ -21,11 +21,11 @@
 | 当前 Docker 镜像构建 | 本机环境阻断；GitHub Actions 构建通过 | Docker 数据盘 I/O 错误，EXT4 journal aborted，dockerd SIGBUS；远端已完成前后端镜像构建 |
 | 当前 Playwright | 本机环境阻断；GitHub Actions 通过 | Chromium 151 已安装；本机等待 Next.js dev server 120 秒超时；远端关键 E2E 已使用一次性 MySQL/Redis 和运行时 seed 验证 |
 | 当前备份恢复复演 | 未完成 | Docker 数据盘故障后停止，保护已有卷 |
-| Trivy / GitHub Actions 远端运行 | 首轮已定位失败；本提交待确认 | 首轮六个业务/配置/E2E job 通过；`dependency-review-action` 因私有仓库未启用 GHAS 失败，后端镜像 Trivy 检出可修复漏洞。当前提交移除不适用 Action 并升级相关依赖与 Alpine 包 |
+| Trivy / GitHub Actions 远端运行 | 已定位前端镜像失败；本提交待确认 | `#33009147368` 的后端、测试、Compose 与 Playwright job 均通过；Docker job 仅在前端镜像 Trivy 失败。最终 `node:20-alpine` 镜像的全局 npm `node-tar` 报告 19 项高危/严重漏洞，Alpine 报告 4 项高危漏洞；当前提交移除运行时不需要的 npm/npx、用 `node` 直接启动 Next.js，并执行 Alpine 升级 |
 
 默认后端全测跳过的 1 项就是 Testcontainers。历史记录曾在 V2 版本链上通过；当前测试已更新到 V5，并断言 V3 审核索引、V4 `sys_file_usage` 和 V5 贡献来源列，必须在健康 Docker/staging 重跑，不能把旧结果当作当前源码证据。
 
-CI Redis 根因已复核：GitHub Actions 日志中 `test` profile 实际已经激活；空 `REDIS_HOST` 时，Redis 自动配置仍尝试创建连接工厂并失败。本 checkpoint 只在测试 profile 排除 Redis 自动配置，并在应用上下文测试中断言没有 `RedisConnectionFactory`。首轮远端工作流已通过后端单测、Testcontainers、前端检查、Compose 与 Playwright E2E；它还确认私有仓库未启用 GHAS 时不能使用 `dependency-review-action`，并从 Trivy 报告提取了有修复版本的镜像依赖。当前修复将 Spring Boot 提升至 3.5.14，并以 patch-level 覆盖 Spring Framework、Spring Data、Tomcat、Micrometer、Netty、Jackson、Commons IO，同时在 runner stage 执行 Alpine 包升级。没有新增 Flyway migration、生产配置或数据库影响。
+CI Redis 根因已复核：GitHub Actions 日志中 `test` profile 实际已经激活；空 `REDIS_HOST` 时，Redis 自动配置仍尝试创建连接工厂并失败。本 checkpoint 只在测试 profile 排除 Redis 自动配置，并在应用上下文测试中断言没有 `RedisConnectionFactory`。首轮远端工作流已通过后端单测、Testcontainers、前端检查、Compose 与 Playwright E2E；它还确认私有仓库未启用 GHAS 时不能使用 `dependency-review-action`，并从 Trivy 报告提取了有修复版本的镜像依赖。后端修复将 Spring Boot 提升至 3.5.14，并以 patch-level 覆盖 Spring Framework、Spring Data、Tomcat、Micrometer、Netty、Jackson、Commons IO，同时在 runner stage 执行 Alpine 包升级。随后 `#33009147368` 只剩前端镜像扫描失败：漏洞来自最终镜像全局 npm 的 `node-tar`，而非应用 `node_modules`。当前前端 runner 移除构建后不需要的 npm/npx、用 `node` 直接启动 Next.js，并执行 Alpine 升级。没有新增 Flyway migration、生产配置或数据库影响。
 
 Playwright 当前共有 5 个用例。缺少 `E2E_USERNAME/E2E_PASSWORD` 时，3 个认证用例会按设计跳过，但公开隐私页和未登录跳转仍应运行。本轮在测试开始前就因 Next.js dev server 120 秒未就绪而终止，所以不能把“理论上会跳过”写成“匿名用例已通过”。
 
@@ -91,7 +91,7 @@ Playwright 当前共有 5 个用例。缺少 `E2E_USERNAME/E2E_PASSWORD` 时，3
 1. 到期匿名化已有代码和单元测试，但当前 Docker/staging 尚未执行真实定时任务、失败恢复和备份保留演练；当前不做不可恢复的物理删除，运营审批/豁免流程仍需明确。
 2. 原子上传配额依赖 V4 `sys_file_usage` 的初始回填和后续释放一致性；真实 MySQL 并发上传、孤儿清理和备份恢复仍需在 staging 验证并监控计数漂移。
 3. 邮件补偿依赖 Redis 中有 TTL 的短期恢复载荷；停机超过 TTL、验证码过期或载荷不匹配会把投递标记失败，需要用户重新申请验证码，不能无限重试。
-4. 本机 Docker VHD 发生文件系统 I/O 故障，当前源码的本地镜像、备份恢复和 Trivy 复验仍被阻断。首轮 GitHub Actions 已通过镜像构建和关键 Playwright E2E，但安全扫描修复后的新远端运行尚未完成；只有该运行全绿后，才可解除 CI 相关发布阻断项。
+4. 本机 Docker VHD 发生文件系统 I/O 故障，当前源码的本地镜像、备份恢复和 Trivy 复验仍被阻断。GitHub Actions `#33009147368` 已通过镜像构建和关键 Playwright E2E，但前端镜像 Trivy 仍检出基础镜像全局 npm 的 `node-tar` 漏洞；当前修复的远端运行尚未完成。只有该运行全绿后，才可解除 CI 相关发布阻断项。
 5. Windows 上前端构建耗时明显波动；CI 应以 Linux runner 的稳定耗时和缓存命中为准。
 6. Phase 3 仅有 SaaS ADR 和迁移方案，没有实施 tenant 隔离；当前仍是单学校系统。
 

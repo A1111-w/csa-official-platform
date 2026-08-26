@@ -603,7 +603,7 @@ cd D:\CSA-Project\csa-official-backend
 - 统一 HTTP status、`errorCode`、`traceId` 和 `X-Request-ID`，补齐 JSON 日志、指标、readiness/liveness、优雅停机、备份恢复和回滚 Runbook。
 - Phase 2 已加入账号生命周期、到期匿名化、密码找回/修改、会话吊销、审计、个人数据导出、原子上传配额、邮件有限重试/崩溃补偿和定时任务幂等。
 - Phase 3 只完成多学校 SaaS ADR 与迁移方案，当前仍是单学校系统，没有直接实现 tenant 隔离或支付。
-- 2026-08-26 GitHub Actions 的首轮验证已通过后端单测、MySQL/Redis/Flyway Testcontainers、前端 lint/build/test、Compose fail-fast 和关键 Playwright E2E；失败项是私有仓库不支持的 `dependency-review-action`，以及 Trivy 检出的可修复后端/Alpine 依赖漏洞。当前提交移除了不可用 Action，并将 Spring Boot 与相关依赖提升到修复版本；远端最终结论以本次推送后的 Actions 为准。
+- 2026-08-26 GitHub Actions `#33009147368` 已通过后端单测、MySQL/Redis/Flyway Testcontainers、前端 lint/build/test、Compose fail-fast 和关键 Playwright E2E；Docker job 仅在前端镜像 Trivy 扫描失败。根因是最终 `node:20-alpine` 镜像带有运行时不需要的全局 npm，其 `node-tar` 传递依赖存在可修复漏洞，另有可通过 Alpine 包升级修复的基础镜像项。当前提交让 runner 用 `node` 直接启动 Next.js、移除全局 npm 并执行 Alpine 升级；远端最终结论以新 Actions 运行结果为准。
 
 发布前仍需完成：
 
