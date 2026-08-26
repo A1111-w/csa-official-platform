@@ -4,7 +4,10 @@ import com.csa.official.common.result.R;
 import com.csa.official.common.util.PageUtils;
 import com.csa.official.modules.sys.entity.ContributionLog;
 import com.csa.official.modules.sys.mapper.ContributionLogMapper;
+import com.csa.official.modules.sys.service.ContributionQueryService;
 import com.csa.official.modules.sys.vo.ContributionWallVO;
+import com.csa.official.modules.sys.vo.ContributionRankVO;
+import org.springframework.cache.annotation.CacheEvict;
 import lombok.Data;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -23,9 +25,12 @@ import java.util.List;
 public class ContributionController {
 
     private final ContributionLogMapper logMapper;
+    private final ContributionQueryService contributionQueryService;
 
-    public ContributionController(ContributionLogMapper logMapper) {
+    public ContributionController(ContributionLogMapper logMapper,
+                                  ContributionQueryService contributionQueryService) {
         this.logMapper = logMapper;
+        this.contributionQueryService = contributionQueryService;
     }
 
     @GetMapping("/public/contribution/wall")
@@ -36,11 +41,13 @@ public class ContributionController {
     }
 
     @GetMapping("/public/contribution/rank")
-    public R<List<RankVo>> getRank() {
-        return R.ok(new ArrayList<>());
+    public R<List<ContributionRankVO>> getRank(@RequestParam(required = false) Integer limit) {
+        int safeLimit = PageUtils.clampLimit(limit, 10);
+        return R.ok(contributionQueryService.getRank(safeLimit));
     }
 
     @PreAuthorize("hasRole('LEVEL_4')")
+    @CacheEvict(value = "public_contribution_rank", allEntries = true)
     @PostMapping("/sys/contribution/award")
     public R<String> award(@RequestBody AwardDto dto) {
         ContributionLog log = new ContributionLog();
@@ -60,9 +67,4 @@ public class ContributionController {
         private String reason;
     }
 
-    @Data
-    static class RankVo {
-        private String username;
-        private BigDecimal score;
-    }
 }

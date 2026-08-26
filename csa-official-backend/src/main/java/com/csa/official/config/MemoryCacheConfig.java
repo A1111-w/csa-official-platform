@@ -29,6 +29,7 @@ public class MemoryCacheConfig {
                 "auth_user",
                 "public_about",
                 "public_contributors",
-                "public_carousel");
+                "public_carousel",
+                "public_contribution_rank");
     }
 }

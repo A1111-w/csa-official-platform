@@ -4,6 +4,7 @@ import com.csa.official.modules.sys.entity.ContributionLog;
 import com.csa.official.modules.sys.mapper.ContributionLogMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -32,6 +33,7 @@ public class ContributionLogWriter {
     }
 
     @Async("contributionTaskExecutor")
+    @CacheEvict(value = "public_contribution_rank", allEntries = true)
     public void write(Long userId, String type, String detail) {
         try {
             ContributionLog record = new ContributionLog();

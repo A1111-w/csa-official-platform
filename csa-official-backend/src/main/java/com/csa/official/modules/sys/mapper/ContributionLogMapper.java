@@ -3,6 +3,7 @@ package com.csa.official.modules.sys.mapper;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.csa.official.modules.sys.entity.ContributionLog;
 import com.csa.official.modules.sys.vo.ContributionWallVO;
+import com.csa.official.modules.sys.vo.ContributionRankVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -30,4 +31,24 @@ public interface ContributionLogMapper extends BaseMapper<ContributionLog> {
             LIMIT #{limit}
             """)
     List<ContributionWallVO> selectWall(@Param("limit") int limit);
+
+    @Select("""
+            SELECT u.id AS userId,
+                   COALESCE(NULLIF(u.real_name, ''), u.username) AS username,
+                   u.real_name AS realName,
+                   u.avatar AS avatar,
+                   COALESCE(d.name, '') AS deptName,
+                   COALESCE(SUM(l.score), 0) AS score,
+                   COUNT(l.id) AS contributionCount
+            FROM sys_contribution_log l
+            JOIN sys_user u ON u.id = l.user_id
+                AND (u.deleted = 0 OR u.deleted IS NULL)
+                AND (u.account_status IS NULL OR u.account_status <> 'ANONYMIZED')
+            LEFT JOIN sys_dept d ON d.id = u.department_id
+                AND (d.deleted = 0 OR d.deleted IS NULL)
+            GROUP BY u.id, u.username, u.real_name, u.avatar, d.name
+            ORDER BY score DESC, contributionCount DESC, u.id ASC
+            LIMIT #{limit}
+            """)
+    List<ContributionRankVO> selectRank(@Param("limit") int limit);
 }

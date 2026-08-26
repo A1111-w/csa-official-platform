@@ -97,7 +97,8 @@ public class RedisConfig {
                 "auth_user", config.entryTtl(Duration.ofMinutes(5)),
                 "public_about", config.entryTtl(Duration.ofMinutes(30)),
                 "public_contributors", config.entryTtl(Duration.ofMinutes(10)),
-                "public_carousel", config.entryTtl(Duration.ofMinutes(10)));
+                "public_carousel", config.entryTtl(Duration.ofMinutes(10)),
+                "public_contribution_rank", config.entryTtl(Duration.ofMinutes(10)));
 
         return RedisCacheManager.builder(factory)
                 .cacheDefaults(config)
