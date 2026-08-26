@@ -15,6 +15,9 @@
 
 ### Added
 
+- 完成此前模块审计列出的产品缺口：到期账号匿名化、贡献排行、邮件崩溃补偿、上传配额原子计数、简历 Git 同步、首页轮播、审计日志页面和成员导出页面。
+- 新增 `/dashboard/audit` 与 `/dashboard/member-export`，并在工作台按 Level 4 权限显示入口。
+- 新增 `docs/feature-completion-learning-guide.md`，记录调用链、测试方法、独立 commit 和非破坏性回退方式。
 - 引入 Flyway V1 结构迁移、生产/开发 Compose 分离、Caddy 同源反向代理、非 Root 后端镜像和生产环境变量示例。
 - 增加请求 ID/MDC、`X-Request-ID`、Prometheus 指标、liveness/readiness 探针、graceful shutdown、生产 JSON 日志与基础告警规则示例。
 - 增加 `deploy/backup.ps1` 与 `deploy/restore.ps1`，覆盖 MySQL、上传文件、SHA-256 校验、保留策略和恢复确认。
@@ -52,6 +55,7 @@
 
 ### Verification
 
+- 2026-08-26：后端全量 163 个测试通过、0 失败、0 错误，1 个 Testcontainers 测试因 Docker 不可用跳过；前端 5 个测试文件、10 个测试通过，`npm run lint` 和 `npm run build` 通过；Playwright 公开边界 2 个通过，3 个真实账号场景因未配置 E2E 凭据跳过。
 - `csa-official-backend\\mvnw.cmd test`：本轮 Redis 修复后的全量测试通过，最终计数见 `phase-1-verification.md`。
 - 前端 `npm run test`：3/3 通过；`npm run lint` 和 `npm run build` 通过。
 - 开发 Compose config 通过；生产 Compose 缺少必需秘密时 exit 1，使用临时假值展开通过，只有 Caddy 发布 80/443。

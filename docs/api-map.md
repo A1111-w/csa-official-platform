@@ -293,17 +293,18 @@ limit 默认 100
 ### 2.7 贡献排行
 
 ```http
-GET /api/public/contribution/rank
+GET /api/public/contribution/rank?limit=10
 ```
 
-当前返回空列表，接口保留。
+当前实现为总排行：
 
-这类接口可以后续改成：
+- `limit` 默认 10，统一限制到 1-200。
+- 按贡献 `score` 总和降序，再按贡献记录数降序、用户 ID 升序。
+- 排除已删除或已匿名化账号。
+- 按 `limit` 缓存 10 分钟；新增贡献时清空排行缓存。
+- 首页调用 `limit=5` 展示前五名。
 
-- 周榜。
-- 月榜。
-- 总榜。
-- 按贡献类型排行榜。
+返回字段：`userId`、`username`、`realName`、`avatar`、`deptName`、`score`、`contributionCount`。
 
 ## 3. 登录注册接口
 
@@ -1025,6 +1026,37 @@ Content-Type: application/json
 | 驳回但没有原因 | 400 |
 | 简历已经被其他人审核 | 409 |
 
+### 9.7 查询我的 Git 同步状态
+
+```http
+GET /api/resume/git-sync
+```
+
+权限：`LEVEL_2`。
+
+返回 `configured`、`status`、`startedAt`、`completedAt`、`errorCode`、`branch`、`commit` 和 `sizeBytes`。状态为 `NOT_SYNCED`、`SYNCING`、`SUCCEEDED` 或 `FAILED`。
+
+### 9.8 启动 Git 仓库同步
+
+```http
+POST /api/resume/git-sync
+```
+
+权限：`LEVEL_2`，需要 CSRF。
+
+流程：
+
+```text
+校验简历中的 HTTPS 仓库地址和允许主机
+→ 数据库原子 claim 为 SYNCING，并写入 runId
+→ 事务提交后投入独立 gitSyncTaskExecutor
+→ shallow clone / pull
+→ 校验仓库大小、读取 branch 和 HEAD commit
+→ 按 runId 原子写入 SUCCEEDED 或 FAILED
+```
+
+重复同步返回 409；仓库超限返回 413；远程仓库异常记录为 `UPSTREAM_ERROR`。前端 `/dashboard/resume` 在同步期间每 2 秒轮询，部长审核详情也会展示同步结果。
+
 ## 10. 投票接口
 
 ### 10.1 提案列表
@@ -1189,7 +1221,10 @@ POST /api/sys/export/members
 Content-Type: application/json
 
 {
-  "fields": ["username", "realName", "email"]
+  "columns": ["realName", "studentId", "college", "className"],
+  "startTime": "2026-08-01 00:00:00",
+  "endTime": "2026-08-31 23:59:59",
+  "roleLevel": 2
 }
 ```
 
@@ -1203,6 +1238,8 @@ LEVEL_4 或 ADMIN
 
 这个接口不是 `R<T>`，而是直接写 `HttpServletResponse`。
 
+前端入口：`/dashboard/member-export`。支持日期、学院、班级、姓名、学号、角色、邀请码筛选和列选择；导出动作写入审计日志。
+
 ### 12.3 查询审计日志
 
 ```http
@@ -1210,6 +1247,8 @@ GET /api/sys/audit/list?page=1&size=20&action=LOGIN_FAILURE&result=FAILURE&reque
 ```
 
 权限：`LEVEL_4`。分页 `size` 收敛到 1-100，可按 action、result 和 request ID 精确筛选。审计写入前会递归剔除密码、Token、Cookie、Authorization 和验证码等敏感键；查询接口用于通过 request ID 关联安全事件与服务日志。
+
+前端入口：`/dashboard/audit`，可查看执行人、目标、IP、User Agent、Request ID 和结构化详情。
 
 ## 13. 调试接口
 
@@ -1230,14 +1269,15 @@ GET /api/test/password
 | --- | --- | --- |
 | `src/services/auth.ts` | `/api/auth/**` | 登录、注册、验证码、退出、找回/重置密码 |
 | `src/services/account.ts` | `/api/account/**` | 改密、会话吊销、停用、删除申请、个人数据导出 |
-| `src/services/user.ts` | `/api/sys/user/**` | 当前用户、成员目录 |
+| `src/services/user.ts` | `/api/sys/user/**`、`/api/sys/export/members` | 当前用户、成员目录、成员导出 |
 | `src/services/resource.ts` | `/api/sys/resource/**` | 资源列表、分类、保存、删除、下载计数 |
 | `src/services/file.ts` | `/api/common/file/upload` | 文件上传 |
 | `src/services/competition.ts` | `/api/biz/comp/**`、`/api/public/competitions` | 竞赛 |
-| `src/services/resume.ts` | `/api/resume/**` | 简历 |
+| `src/services/resume.ts` | `/api/resume/**` | 简历、审核和 Git 同步 |
 | `src/services/dept.ts` | `/api/sys/dept/**` | 部门 |
 | `src/services/vote.ts` | `/api/sys/vote/**` | 提案投票 |
 | `src/services/public.ts` | `/api/public/**`、`/api/sys/config/update-about` | 公开内容 |
+| `src/services/audit.ts` | `/api/sys/audit/**` | 管理审计查询 |
 
 ## 15. 推荐调试顺序
 
