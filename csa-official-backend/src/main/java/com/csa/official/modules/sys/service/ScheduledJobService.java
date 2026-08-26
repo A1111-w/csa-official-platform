@@ -65,6 +65,22 @@ public class ScheduledJobService {
         }
     }
 
+    public boolean runWithLock(String jobName, Runnable work) {
+        String lockKey = LOCK_PREFIX + jobName;
+        String lockToken = UUID.randomUUID().toString();
+        if (!keyValueStore.setIfAbsent(lockKey, lockToken, lockSeconds, TimeUnit.SECONDS)) {
+            log.info("Scheduled job is already running: job={}", jobName);
+            return false;
+        }
+
+        try {
+            work.run();
+            return true;
+        } finally {
+            keyValueStore.deleteIfValue(lockKey, lockToken);
+        }
+    }
+
     private ScheduledJobExecution claim(String jobName, String idempotencyKey) {
         ScheduledJobExecution existing = executionMapper.find(jobName, idempotencyKey);
         if (existing != null) {

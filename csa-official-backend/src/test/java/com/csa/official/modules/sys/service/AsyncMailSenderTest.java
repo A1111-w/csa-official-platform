@@ -23,7 +23,7 @@ class AsyncMailSenderTest {
         JavaMailSender mailSender = mock(JavaMailSender.class);
         MailDeliveryMapper mapper = mock(MailDeliveryMapper.class);
         AsyncMailSender sender = new AsyncMailSender(mailSender, mock(com.csa.official.common.cache.KeyValueStore.class),
-                mapper, "noreply@example.invalid", 3);
+                mapper, mock(MailRecoveryStore.class), "noreply@example.invalid", 3);
 
         sender.sendVerifyCode("student@example.invalid", "verification-placeholder",
                 MailService.PASSWORD_RESET, "code-key", "limit-key", 7L);
@@ -45,7 +45,7 @@ class AsyncMailSenderTest {
                 .doThrow(new IllegalStateException("temporary smtp failure"))
                 .doNothing().when(mailSender).send(any(SimpleMailMessage.class));
         AsyncMailSender sender = new AsyncMailSender(mailSender, mock(com.csa.official.common.cache.KeyValueStore.class),
-                mapper, "noreply@example.invalid", 3);
+                mapper, mock(MailRecoveryStore.class), "noreply@example.invalid", 3);
 
         sender.sendVerifyCode("student@example.invalid", "verification-placeholder",
                 MailService.REGISTRATION, "code-key", "limit-key", 8L);
@@ -67,7 +67,7 @@ class AsyncMailSenderTest {
         doThrow(new IllegalStateException("permanent smtp failure"))
                 .when(mailSender).send(any(SimpleMailMessage.class));
         AsyncMailSender sender = new AsyncMailSender(mailSender, keyValueStore, mapper,
-                "noreply@example.invalid", 3);
+                mock(MailRecoveryStore.class), "noreply@example.invalid", 3);
 
         sender.sendVerifyCode("student@example.invalid", "verification-placeholder",
                 MailService.REGISTRATION, "code-key", "limit-key", 9L);

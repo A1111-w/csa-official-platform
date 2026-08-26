@@ -19,14 +19,20 @@ class MailServiceTest {
     void storesOnlyRecipientHashAndMaskAndKeepsCodeOutOfDeliveryRecord() {
         KeyValueStore keyValueStore = mock(KeyValueStore.class);
         AsyncMailSender asyncMailSender = mock(AsyncMailSender.class);
+        MailRecoveryStore recoveryStore = mock(MailRecoveryStore.class);
         MailDeliveryMapper mapper = mock(MailDeliveryMapper.class);
         when(keyValueStore.hasKey(any())).thenReturn(false);
-        when(mapper.insert(any(MailDelivery.class))).thenReturn(1);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            MailDelivery delivery = invocation.getArgument(0);
+            delivery.setId(11L);
+            return 1;
+        }).when(mapper).insert(any(MailDelivery.class));
 
         MailService mailService = new MailService();
         ReflectionTestUtils.setField(mailService, "keyValueStore", keyValueStore);
         ReflectionTestUtils.setField(mailService, "asyncMailSender", asyncMailSender);
         ReflectionTestUtils.setField(mailService, "mailDeliveryMapper", mapper);
+        ReflectionTestUtils.setField(mailService, "mailRecoveryStore", recoveryStore);
 
         mailService.sendCode(" Student@Example.EDU ");
 

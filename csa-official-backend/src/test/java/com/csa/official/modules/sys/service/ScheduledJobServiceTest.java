@@ -40,6 +40,23 @@ class ScheduledJobServiceTest {
     }
 
     @Test
+    void lockOnlyExecutionDoesNotCreateDatabaseHistory() {
+        KeyValueStore keyValueStore = mock(KeyValueStore.class);
+        ScheduledJobExecutionMapper mapper = mock(ScheduledJobExecutionMapper.class);
+        TransactionTemplate transactionTemplate = mock(TransactionTemplate.class);
+        when(keyValueStore.setIfAbsent(any(), any(), any(Long.class), eq(TimeUnit.SECONDS))).thenReturn(true);
+        ScheduledJobService service = new ScheduledJobService(keyValueStore, mapper, transactionTemplate, 60);
+        AtomicInteger executions = new AtomicInteger();
+
+        boolean ran = service.runWithLock("mail-recovery", executions::incrementAndGet);
+
+        assertThat(ran).isTrue();
+        assertThat(executions).hasValue(1);
+        verify(mapper, never()).insert(any());
+        verify(keyValueStore).deleteIfValue(any(), any());
+    }
+
+    @Test
     void successfulIdempotencyKeyPreventsDuplicateWork() {
         KeyValueStore keyValueStore = mock(KeyValueStore.class);
         ScheduledJobExecutionMapper mapper = mock(ScheduledJobExecutionMapper.class);

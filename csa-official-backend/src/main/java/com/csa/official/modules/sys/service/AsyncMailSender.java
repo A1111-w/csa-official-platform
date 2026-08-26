@@ -22,33 +22,50 @@ public class AsyncMailSender {
     private final JavaMailSender mailSender;
     private final KeyValueStore keyValueStore;
     private final MailDeliveryMapper mailDeliveryMapper;
+    private final MailRecoveryStore mailRecoveryStore;
     private final String from;
     private final int maxAttempts;
 
     public AsyncMailSender(JavaMailSender mailSender,
                            KeyValueStore keyValueStore,
                            MailDeliveryMapper mailDeliveryMapper,
+                           MailRecoveryStore mailRecoveryStore,
                            @Value("${spring.mail.username}") String from,
                            @Value("${csa.mail.max-attempts:3}") int maxAttempts) {
         this.mailSender = mailSender;
         this.keyValueStore = keyValueStore;
         this.mailDeliveryMapper = mailDeliveryMapper;
+        this.mailRecoveryStore = mailRecoveryStore;
         this.from = from;
         this.maxAttempts = Math.max(1, Math.min(maxAttempts, 5));
     }
 
     @Async("mailTaskExecutor")
     public void sendVerifyCode(String to, String code) {
-        sendVerifyCode(to, code, MailService.REGISTRATION,
+        sendVerifyCodeInternal(to, code, MailService.REGISTRATION,
                 "verify:code:" + MailService.REGISTRATION + ":" + to,
-                "verify:limit:" + MailService.REGISTRATION + ":" + to, null);
+                "verify:limit:" + MailService.REGISTRATION + ":" + to, null, 0);
     }
 
     @Async("mailTaskExecutor")
     public void sendVerifyCode(String to, String code, String messageType,
                                String codeKey, String limitKey, Long deliveryId) {
+        sendVerifyCodeInternal(to, code, messageType, codeKey, limitKey, deliveryId, 0);
+    }
+
+    @Async("mailTaskExecutor")
+    public void resumeVerifyCode(String to, String code, String messageType,
+                                 String codeKey, String limitKey, Long deliveryId,
+                                 int previousAttempts) {
+        sendVerifyCodeInternal(
+                to, code, messageType, codeKey, limitKey, deliveryId, Math.max(0, previousAttempts));
+    }
+
+    private void sendVerifyCodeInternal(String to, String code, String messageType,
+                                        String codeKey, String limitKey, Long deliveryId,
+                                        int previousAttempts) {
         Exception lastFailure = null;
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+        for (int attempt = previousAttempts + 1; attempt <= maxAttempts; attempt++) {
             markAttempt(deliveryId, attempt);
             try {
                 SimpleMailMessage message = new SimpleMailMessage();
@@ -59,6 +76,7 @@ public class AsyncMailSender {
                         + ". It expires in 5 minutes. If you did not request it, ignore this message.");
                 mailSender.send(message);
                 markSent(deliveryId, attempt);
+                mailRecoveryStore.delete(deliveryId);
                 log.info("Mail sent: type={}, attempt={}", messageType, attempt);
                 return;
             } catch (Exception e) {
@@ -72,6 +90,7 @@ public class AsyncMailSender {
         keyValueStore.delete(codeKey);
         keyValueStore.delete(limitKey);
         markFailed(deliveryId, maxAttempts, lastFailure);
+        mailRecoveryStore.delete(deliveryId);
         log.error("Mail send failed after {} attempts: type={}", maxAttempts, messageType, lastFailure);
     }
 

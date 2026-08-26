@@ -35,6 +35,9 @@ public class MailService {
     @Resource
     private MailDeliveryMapper mailDeliveryMapper;
 
+    @Resource
+    private MailRecoveryStore mailRecoveryStore;
+
     public void sendCode(String to) {
         sendCode(to, REGISTRATION);
     }
@@ -66,13 +69,33 @@ public class MailService {
         delivery.setAttemptCount(0);
         try {
             mailDeliveryMapper.insert(delivery);
+            mailRecoveryStore.save(
+                    delivery.getId(), normalizedTo, messageType, codeKey, limitKey, code);
         } catch (RuntimeException e) {
             keyValueStore.delete(codeKey);
             keyValueStore.delete(limitKey);
+            markRecoveryUnavailable(delivery.getId());
             throw new CsaException(ApiErrorCode.SERVICE_UNAVAILABLE, "邮件服务暂时不可用", e);
         }
 
         asyncMailSender.sendVerifyCode(normalizedTo, code, messageType, codeKey, limitKey, delivery.getId());
+    }
+
+    private void markRecoveryUnavailable(Long deliveryId) {
+        if (deliveryId == null) {
+            return;
+        }
+        try {
+            MailDelivery failed = new MailDelivery();
+            failed.setId(deliveryId);
+            failed.setStatus("FAILED");
+            failed.setLastErrorCode("RECOVERY_STATE_UNAVAILABLE");
+            failed.setLastErrorMessage("Temporary recovery state could not be persisted");
+            mailDeliveryMapper.updateById(failed);
+        } catch (RuntimeException updateFailure) {
+            log.error("Mail recovery state failure could not be recorded: deliveryId={}", deliveryId,
+                    updateFailure);
+        }
     }
 
     public void verifyCode(String email, String inputCode) {

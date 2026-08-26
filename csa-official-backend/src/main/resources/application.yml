@@ -50,6 +50,9 @@ spring:
           starttls:
             enable: true
             required: true
+          connectiontimeout: ${MAIL_CONNECTION_TIMEOUT_MS:10000}
+          timeout: ${MAIL_READ_TIMEOUT_MS:10000}
+          writetimeout: ${MAIL_WRITE_TIMEOUT_MS:10000}
   servlet:
     multipart:
       max-file-size: ${MAX_FILE_SIZE:50MB}
@@ -126,6 +129,10 @@ csa:
     account-retention-days: ${ACCOUNT_DELETION_RETENTION_DAYS:30}
   mail:
     max-attempts: ${MAIL_MAX_ATTEMPTS:3}
+    recovery-ttl-seconds: ${MAIL_RECOVERY_TTL_SECONDS:360}
+    recovery-stale-seconds: ${MAIL_RECOVERY_STALE_SECONDS:90}
+    recovery-batch-size: ${MAIL_RECOVERY_BATCH_SIZE:100}
+    recovery-cron: ${MAIL_RECOVERY_CRON:0 * * * * ?}
   scheduling:
     lock-seconds: ${SCHEDULED_JOB_LOCK_SECONDS:900}
   upload-path: ${UPLOAD_PATH:${user.home}/csa-upload/}
