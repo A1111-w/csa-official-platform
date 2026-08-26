@@ -39,6 +39,7 @@ db/seed.sql     仅 dev/test 演示种子
 | `biz_resume` | 简历投递与审核 | resume | `Resume` |
 | `sys_audit_log` | 管理与安全审计事件 | sys | `AuditLog` |
 | `sys_stored_file` | 上传文件元数据、配额和孤儿清理依据 | sys | `StoredFile` |
+| `sys_file_usage` | 个人与全站上传配额的原子计数器 | sys | `FileUsageMapper`（无 Entity） |
 | `sys_mail_delivery` | 邮件发送状态与有限重试记录 | sys | `MailDelivery` |
 | `sys_scheduled_job_execution` | 定时任务幂等键与执行状态 | sys | `ScheduledJobExecution` |
 
@@ -137,6 +138,7 @@ erDiagram
 | `biz_comp_editor` | `uk_editor_comp_user (competition_id, user_id)` | UNIQUE | `CompetitionService.addEditor` 用 `exists(competition_id, user_id)` 查重，唯一约束把“同一竞赛不重复授权同一人”下沉到 DB |
 | `sys_contribution_log` | `idx_contrib_user_type (user_id, type)` | 普通 | 贡献墙 `selectWall` 按 `user_id` 分组、对 `type` 做条件聚合 |
 | `sys_contribution_log` | `idx_contribution_admin_history (source, create_time, id)` | 普通 | `/api/sys/contribution/awards` 按来源和时间分页查询管理流水 |
+| `sys_file_usage` | `uk_file_usage_scope (scope_type, scope_id)` | UNIQUE | `FileAccountingService` 为个人/全站配额创建和定位唯一计数行 |
 | `sys_vote_record` | `uk_vote_proposal_voter (proposal_id, voter_id)` | UNIQUE | 防重复投票，见下方 5.1 |
 | `biz_resume` | `uk_resume_user (user_id)` | UNIQUE | `ResumeService.getMyResume` 用 `selectOne(user_id)`，唯一避免多行导致 `TooManyResultsException` |
 | `sys_config` | `uk_config_key (config_key)` | UNIQUE | 按键取配置 `selectOne(config_key)`（如 `CSA_INTRO`），保证一键一值 |

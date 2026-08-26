@@ -89,7 +89,7 @@ class FlywayMySqlRedisIntegrationTest {
             try (ResultSet history = statement.executeQuery(
                     "SELECT version FROM flyway_schema_history WHERE success = 1 ORDER BY installed_rank DESC LIMIT 1")) {
                 assertThat(history.next()).isTrue();
-                assertThat(history.getString(1)).isEqualTo("3");
+                assertThat(history.getString(1)).isEqualTo("5");
             }
             try (ResultSet reviewIndex = statement.executeQuery("""
                     SELECT COUNT(*)
@@ -100,6 +100,22 @@ class FlywayMySqlRedisIntegrationTest {
                     """)) {
                 assertThat(reviewIndex.next()).isTrue();
                 assertThat(reviewIndex.getInt(1)).isEqualTo(2);
+            }
+            try (ResultSet fileUsageTable = statement.executeQuery(
+                    "SELECT COUNT(*) FROM information_schema.tables "
+                            + "WHERE table_schema = DATABASE() AND table_name = 'sys_file_usage'")) {
+                assertThat(fileUsageTable.next()).isTrue();
+                assertThat(fileUsageTable.getInt(1)).isEqualTo(1);
+            }
+            try (ResultSet contributionColumns = statement.executeQuery("""
+                    SELECT COUNT(*)
+                    FROM information_schema.columns
+                    WHERE table_schema = DATABASE()
+                      AND table_name = 'sys_contribution_log'
+                      AND column_name IN ('source', 'awarded_by')
+                    """)) {
+                assertThat(contributionColumns.next()).isTrue();
+                assertThat(contributionColumns.getInt(1)).isEqualTo(2);
             }
             try (ResultSet migratedUser = statement.executeQuery("""
                     SELECT email, student_id, account_status, session_version

@@ -25,6 +25,8 @@ jobs:
           cache: maven
       - name: Run Maven tests
         working-directory: csa-official-backend
+        env:
+          SPRING_PROFILES_ACTIVE: test
         run: |
           chmod +x mvnw
           ./mvnw test
@@ -42,6 +44,8 @@ jobs:
           cache: maven
       - name: Run Testcontainers integration test
         working-directory: csa-official-backend
+        env:
+          SPRING_PROFILES_ACTIVE: test
         run: |
           chmod +x mvnw
           ./mvnw -Dit.containers=true test

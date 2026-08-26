@@ -32,18 +32,20 @@
 - 开发 Compose 仅将基础设施绑定到回环地址，并使用独立应用数据库用户；生产 Compose 不发布 MySQL、Redis、backend、frontend 端口。
 - 生产部署强制 `production` profile、HTTPS origin、Secure Cookie、Redis、CSRF 和可信代理配置；Caddy 增加 HSTS。
 - 测试配置改为 `test` profile + H2，不再以同名 `application.yml` 遮蔽主配置；Surefire 自动激活 test profile。
-- 同步根 README、项目学习指南、部署手册、接口地图和安全说明：生产结构以 Flyway 为准，`db/schema.sql` 只作学习快照，补齐 Phase 2 账号/审计/导出/邮件/任务口径，并标明当前 Docker 故障和未完成的删除执行器。
+- 同步根 README、项目学习指南、部署手册、接口地图和安全说明：生产结构以 Flyway V1-V5 为准，`db/schema.sql` 只作学习快照，补齐 Phase 2 账号匿名化、审计、导出、原子配额、邮件补偿和任务口径，并标明当前 Docker 故障。
 - 简历审核列表使用轻量 `ResumeReviewListVO`，详情使用白名单 `ResumeReviewDetailVO`；申请人和部门按页批量加载，避免审核队列 N+1 查询。
 - 贡献管理历史使用 `ContributionAwardVO` 和批量成员/部门加载，人工记录不再直接绑定完整实体；贡献类型、分值、说明和目标账号状态均在后端校验。
 
 ### Fixed
 
+- 修复 Linux CI 中 Maven 测试未实际激活 `test` profile、进而因空 Redis host 导致 Spring 上下文连锁失败的问题；测试资源和 CI 均显式激活该 profile，并在上下文测试中断言。当前工作区复验为后端 174 tests、前端 6 files / 12 tests，lint 与 production build 通过。
 - 修复 GitHub Actions 引用不存在的 `aquasecurity/trivy-action@0.28.0` 导致扫描任务在下载 Action 阶段失败的问题；改为固定到官方 `v0.36.0` 对应的不可变 commit SHA。
 - 修复 Flyway 引入后 Spring Boot 测试上下文因测试资源同名遮蔽主配置而缺失 DataSource 的回归。
 - 修复生产 MySQL JDBC URL 使用明文连接且关闭公钥回取导致 MySQL 8 默认认证插件无法登录的问题；生产改为强制 TLS。
 - 修复 Redis 缓存反序列化 `User.balance` 的 `BigDecimal` 被安全类型白名单拒绝而导致登录 500 的问题，并增加序列化回归测试。
 - 修复简历审核此前只有按 ID 手工调用接口、没有队列和网页入口的问题；补上草稿隐私、审核中禁止编辑、驳回原因校验和并发审核冲突处理。
 - 修复人工贡献接口缺少事务、来源和操作人追踪的问题；旧贡献流水不猜测来源，统一标记为 `LEGACY`。
+- 修正文档、公开隐私说明与账户设置页面仍把已实现的到期匿名化、原子上传配额和邮件崩溃补偿描述为“未实现”的问题；同时把集成测试的迁移验收从 V3 更新到 V5。
 
 ### Security
 
@@ -55,6 +57,7 @@
 - 空数据库执行 `db/migration/V1__initial_schema.sql`；已有数据库 baseline/升级和失败迁移处理见 `docs/production-readiness/flyway.md`。
 - 生产不执行 `db/seed.sql`；演示 seed 仅允许 `dev`/`test` profile 且显式开启。
 - 新增 Flyway `V3__resume_review_queue_index.sql`，为 `biz_resume(status, update_time)` 增加审核队列索引；回滚应用时保留该向前兼容索引，不原地修改已执行 migration。
+- 新增 Flyway `V4__account_storage_and_git_sync.sql`，为账号匿名化、上传配额计数、邮件恢复索引和简历 Git 同步补齐结构；已执行后回滚应用代码时保留结构。
 - 新增 Flyway `V5__contribution_award_audit.sql`，为 `sys_contribution_log` 增加 `source`、`awarded_by` 和管理历史索引；已有记录标记为 `LEGACY`，回退应用代码前不得删除已执行的 V5，结构回退需另写补偿 migration。
 
 ### Verification
@@ -65,9 +68,9 @@
 - 开发 Compose config 通过；生产 Compose 缺少必需秘密时 exit 1，使用临时假值展开通过，只有 Caddy 发布 80/443。
 - 2026-07-29 的 Docker 隔离栈已完成空库、已有库、失败迁移、备份恢复和 HTTPS E2E；本机 80 端口冲突使 HTTPS 验收使用 `8443` 映射，生产定义仍为 80/443。2026-07-30 当前源码的单测、Testcontainers、前端和 Compose 静态检查通过，但 Docker VHD 发生 I/O/EXT4 journal 故障，当前镜像、Playwright、备份恢复和 Trivy 复验仍是发布阻断项。
 - V2 迁移新增账号状态/会话版本、邮箱和学号唯一约束、审计、文件元数据、邮件投递状态和定时任务幂等表；旧库升级必须先查规范化后的重复值。
-- 修正隐私说明：删除申请当前只进入保留和人工审核流程，最终匿名化/删除执行器尚未实现，不再对外承诺系统自动在 N 天内完成删除。
+- 修正隐私说明：删除申请先进入保留期，符合条件的账号由计划任务自动匿名化；该能力不等同于物理删除，备份副本仍按备份保留策略到期处理。
 - 2026-08-26：本轮定向简历测试 8/8 通过；后端全量测试 133 个通过、0 失败、1 个因 Docker 不可用跳过；前端测试 6/6、`npm run lint` 和 `npm run build` 通过。浏览器级简历审核 E2E 仍需在具备真实数据库、Redis 和部长测试账号的环境补跑。
-- 文档更正：V3 已加入当前 Flyway 版本链，旧文档中“最新版本为 V2”和“125 个测试”的内容均保留为历史证据或已改为当前验证口径；当前 V3 真实 MySQL/Testcontainers 结果仍待健康 Docker/staging 重跑。
+- 文档更正：V4/V5 已加入当前 Flyway 版本链，旧文档中“最新版本为 V2/V3”和旧测试计数均保留为历史证据或已改为当前验证口径；当前 V1-V5 真实 MySQL/Testcontainers 结果仍待健康 Docker/staging 重跑。
 - 2026-08-26：人工贡献专项后端 `11/11` 通过；后端全量共 `174` 个测试，0 失败、0 错误、1 个 Docker Testcontainers 测试跳过；前端 Vitest `6` 个文件/`12` 个测试通过，`npm run lint` 和 `npm run build` 通过。
 
 ## [2026-07-27] Opus 5 优化基线（尚未提交）

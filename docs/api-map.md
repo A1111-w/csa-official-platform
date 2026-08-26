@@ -583,7 +583,7 @@ GET  /api/account/export
 
 `GET /api/account/export` 返回当前用户的账号资料、简历、上传文件元数据和安全事件摘要白名单，不包含密码哈希、Token、验证码、文件 `storageKey` 或完整审计详情。
 
-注意：`deletion-request` 只进入 `DELETION_PENDING` 和保留/审核流程。当前尚未实现最终匿名化/物理删除执行器，接口成功不代表数据已经完成删除。
+注意：`deletion-request` 会先进入 `DELETION_PENDING` 和保留期；到期后计划任务会自动匿名化符合条件的账号。接口成功不代表数据立即被物理删除，备份副本仍按备份保留策略到期处理。
 
 ## 5. 部门接口
 

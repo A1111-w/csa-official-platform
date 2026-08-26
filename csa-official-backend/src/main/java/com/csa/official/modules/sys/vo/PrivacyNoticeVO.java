@@ -29,9 +29,9 @@ public class PrivacyNoticeVO {
                         "security", "Prevent abuse, investigate incidents and protect accounts"),
                 Map.of(
                         "activeAccount", "Retained while the account is active",
-                        "deletionRequest", "Deletion requests are reviewed during the "
+                        "deletionRequest", "Deletion requests are retained during the "
                                 + accountRetentionDays
-                                + "-day retention window; final deletion or anonymization requires a controlled operator workflow",
+                                + "-day retention window; eligible accounts are then anonymized by a scheduled controlled job",
                         "audit", "Security and management audit records follow the documented retention policy",
                         "backups", "Expired backup copies are removed by the backup retention schedule"),
                 List.of("access", "export", "correction", "sessionRevocation", "deactivation", "deletionRequest"),

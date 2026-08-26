@@ -137,7 +137,7 @@ REDIS_SSL=false
 CREATE DATABASE csa_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-启动后会按顺序执行 `V1__initial_schema.sql`、`V2__production_operations.sql` 和 `V3__resume_review_queue_index.sql`。不要在本地开发流程里手工维护一份与 migration 并行的 DDL。当前核心业务表包括：
+启动后会按顺序执行 V1-V5 migration：初始结构、生产运营结构、简历审核索引、账号/存储/Git 同步结构和贡献审计结构。不要在本地开发流程里手工维护一份与 migration 并行的 DDL。当前核心业务表包括：
 
 ```text
 user / sys_user 类用户表
@@ -150,11 +150,12 @@ vote_record 投票记录表
 contribution_log 贡献记录表
 sys_config 系统配置表
 carousel 轮播图表
- invite_code 邀请码表
+invite_code 邀请码表
 ```
 
 V2 还会增加 `sys_audit_log`、`sys_stored_file`、`sys_mail_delivery` 和
 `sys_scheduled_job_execution` 四张运营表；它们由 Flyway 迁移创建，不由本地手工 DDL 维护。
+V3 为简历审核队列增加索引，V4 新增 `sys_file_usage` 原子配额计数表并补齐账号匿名化、邮件恢复和简历 Git 同步字段，V5 补齐贡献来源和操作人字段。当前完整版本链和升级规则以 [`production-readiness/flyway.md`](production-readiness/flyway.md) 为准。
 
 如果启动时看到类似：
 

@@ -9,6 +9,8 @@
 | V1 | `V1__initial_schema.sql` | 12 张核心业务表，不创建数据库、账号或演示用户 |
 | V2 | `V2__production_operations.sql` | 账号生命周期与唯一约束、审计、文件元数据、邮件状态、定时任务幂等表 |
 | V3 | `V3__resume_review_queue_index.sql` | 为简历审核队列增加 `(status, update_time)` 联合索引 |
+| V4 | `V4__account_storage_and_git_sync.sql` | 增加账号匿名化时间、原子文件配额计数、邮件恢复索引和简历 Git 同步字段 |
+| V5 | `V5__contribution_award_audit.sql` | 为贡献流水增加来源、操作人和后台历史索引 |
 
 `db/schema.sql` 只是学习和人工核对快照，不是生产执行入口。`db/seed.sql` 只允许 dev/test 在显式注入运行时口令时加载。
 
@@ -18,7 +20,7 @@
 
 1. 在 MySQL 外部创建数据库和独立应用用户，授予目标库所需权限。
 2. 设置 `FLYWAY_BASELINE_ON_MIGRATE=false`。
-3. 启动 backend，让 Flyway 顺序执行 V1、V2、V3。
+3. 启动 backend，让 Flyway 顺序执行 V1-V5。
 4. 查询：
 
 ```sql
@@ -27,7 +29,7 @@ FROM flyway_schema_history
 ORDER BY installed_rank;
 ```
 
-预期最新成功版本为 `3 / resume review queue index`，且 `sys_user` 没有演示账号。
+预期最新成功版本为 `5 / contribution award audit`，且 `sys_user` 没有演示账号。
 
 ## V1 数据升级到当前版本
 
@@ -47,7 +49,7 @@ GROUP BY TRIM(student_id)
 HAVING COUNT(*) > 1;
 ```
 
-存在重复时先完成业务确认和数据修复，不能让生产启动时才撞唯一索引。V2 会规范化邮箱/学号、补齐账号状态和会话版本，再创建唯一索引及运营表；V3 只增加简历审核队列索引，不修改业务数据。
+存在重复时先完成业务确认和数据修复，不能让生产启动时才撞唯一索引。V2 会规范化邮箱/学号、补齐账号状态和会话版本，再创建唯一索引及运营表；V3 增加简历审核队列索引；V4 回填原子文件配额计数并增加账号匿名化、邮件恢复和简历 Git 同步结构；V5 为贡献流水增加来源和操作人字段。
 
 ## Flyway 之前的已有数据库
 
@@ -58,7 +60,7 @@ FLYWAY_BASELINE_ON_MIGRATE=true
 FLYWAY_BASELINE_VERSION=1
 ```
 
-Flyway 会把旧结构登记为 V1，然后继续执行 V2、V3。确认 history 最新成功版本为 3 后，立即恢复 `FLYWAY_BASELINE_ON_MIGRATE=false`。这个开关不能长期存在于生产环境。
+Flyway 会把旧结构登记为 V1，然后继续执行 V2-V5。确认 history 最新成功版本为 5 后，立即恢复 `FLYWAY_BASELINE_ON_MIGRATE=false`。这个开关不能长期存在于生产环境。
 
 如果旧库不等于 V1，先为实际差异编写新的兼容迁移并在副本验证；禁止用 `repair` 掩盖 SQL 或结构不一致。
 
@@ -85,4 +87,4 @@ cd D:\CSA-Project\csa-official-backend
 .\mvnw.cmd "-Dit.containers=true" "-Dtest=FlywayMySqlRedisIntegrationTest" test
 ```
 
-2026-07-30 的 Testcontainers 验证使用 MySQL 8.0.36 和 Redis 7.2：空库迁到 V1、写入旧数据、升级 V2、校验规范化和 Redis round trip，1/1 通过。2026-08-26 当前源码已把断言更新到 V3，并增加审核索引校验；由于本机 Docker 不可用，该新版真实依赖用例仍需在健康 staging 重跑。生产发布还必须先处理上面的重复数据查询。
+2026-07-30 的 Testcontainers 验证使用 MySQL 8.0.36 和 Redis 7.2：空库迁到 V1、写入旧数据、升级 V2、校验规范化和 Redis round trip，1/1 通过。2026-08-26 当前源码已把断言更新到 V5，并增加 V3 审核索引、V4 `sys_file_usage` 和 V5 贡献来源列校验；由于本机 Docker 不可用，该新版真实依赖用例仍需在健康 staging 重跑。生产发布还必须先处理上面的重复数据查询。

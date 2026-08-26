@@ -43,7 +43,9 @@ cd D:\CSA-Project\csa-official-backend
 
 ### 删除能力边界
 
-当前 `POST /api/account/deletion-request` 只把账号迁移为 `DELETION_PENDING`、吊销会话并写审计。项目还没有自动最终匿名化/物理删除执行器，因此学习和演示时不能说“系统会自动在 N 天内完成删除”。正确口径是：请求进入保留窗口，最终删除或匿名化必须经过受控的管理员流程；完成执行器、审批记录和恢复演练前，这仍是发布风险。
+`POST /api/account/deletion-request` 先把账号迁移为 `DELETION_PENDING`、吊销会话并写审计。保留期结束后，`AccountAnonymizationTask` 通过 `ScheduledJobService` 的每日幂等键执行批量匿名化：替换账号标识和密码、清理个人字段、匿名化简历与审计操作人，并清除账号缓存。
+
+该流程是自动匿名化，不是立即物理删除。备份副本按独立保留策略到期处理；生产上线前仍要演练任务失败恢复、运营审批/豁免和备份恢复，不能把“提交申请”描述成“数据已经立即删除”。
 
 ## 3. 隐私说明与个人数据导出
 
@@ -81,7 +83,7 @@ rg -n "password|token|secret|cookie|authorization|verificationcode" csa-official
 
 ## 5. 上传元数据、配额与对象存储边界
 
-上传先校验大小、扩展名和文件头，再写入 `FileStorage`，成功后写 `sys_stored_file` 元数据和 SHA-256。当前实现是本地卷 `LocalFileStorage`，接口已经隔离了未来 S3-compatible provider。文件路径按用户分区，下载还会校验资源归属或发布状态。
+上传先校验大小、扩展名和文件头，再写入 `FileStorage`，成功后写 `sys_stored_file` 元数据和 SHA-256。V4 新增 `sys_file_usage`，`FileAccountingService` 通过带配额条件的单条 `UPDATE` 原子预占个人和全站额度；元数据写入失败时事务回滚计数，删除文件时原子释放。当前实现是本地卷 `LocalFileStorage`，接口已经隔离了未来 S3-compatible provider。文件路径按用户分区，下载还会校验资源归属或发布状态。
 
 关键配置：
 
@@ -112,7 +114,7 @@ UPLOAD_CLEANUP_BATCH_SIZE
 
 运行 `AsyncMailSenderTest`，让 mock SMTP 前两次失败、第三次成功，再测试全部失败场景。观察 `PENDING -> SENDING -> SENT/FAILED` 和 `attempt_count`，确认 HTTP 请求线程没有同步等待 SMTP。
 
-没有消息队列时，进程崩溃可能留下 PENDING 记录；这属于当前边界。后续可增加数据库扫描重试，但必须使用投递幂等键，不得无限重发验证码。
+`MailRecoveryTask` 每分钟扫描超过阈值的 `PENDING` / `SENDING` 记录，先用数据库条件更新认领，再校验 Redis 中短期保存的收件人、验证码哈希和 key，最后从已有尝试次数继续有限重试。恢复载荷缺失、被替换或验证码过期时会标记失败，不会无限重发。
 
 ## 7. 定时任务幂等与分布式锁
 
@@ -154,25 +156,26 @@ npm run test:e2e
 
 `.github/workflows/ci.yml` 的顺序是后端单测、前端 lint/build/test、Testcontainers、Compose fail-fast、Docker 构建与 Trivy、关键 Playwright E2E。任何失败都应保留脱敏日志和 trace，不能上传真实环境文件。
 
-### 2026-07-30 实际结果
+### 2026-08-26 实际结果
 
-- 后端默认全测：2026-08-26 为 133 tests，0 failures，0 errors，1 skipped。
-- 显式 Testcontainers：当前测试目标为 MySQL 8.0.36、Redis 7.2 和 Flyway V1→V3；本机 Docker 不可用时必须标记为待重跑，不得引用旧 V2 结果冒充当前证据。
-- 前端：Vitest 3/3、lint、Next.js 16.2.12 build 全部通过。
+- 后端默认全测：2026-08-26 为 174 tests，0 failures，0 errors，1 skipped。
+- 显式 Testcontainers：当前测试目标为 MySQL 8.0.36、Redis 7.2 和 Flyway V1→V5；本机 Docker 不可用时必须标记为待重跑，不得引用旧 V2 结果冒充当前证据。
+- 前端：Vitest **6 files、12 tests**、lint、Next.js 16.2.12 build 全部通过；build 页面生成数据为 **25/25**。
 - Compose：缺必填变量按预期失败；临时值展开通过，只有 Caddy 发布端口。
-- 当前 Docker 镜像重建时宿主 Docker VHD 出现 I/O/EXT4 journal 故障，当前 Playwright、备份恢复和镜像扫描没有完成，不能写成“全绿”。证据和恢复门槛见 [`phase-2-verification.md`](phase-2-verification.md)。
+- 当前 Docker 镜像重建时宿主 Docker VHD 出现 I/O/EXT4 journal 故障；Playwright 已安装 Chromium 151，但等待 Next.js dev server 120 秒超时，备份恢复和镜像扫描也没有完成，不能写成“全绿”。证据和恢复门槛见 [`phase-2-verification.md`](phase-2-verification.md)。
 
 ## 9. Phase 2 验收与迁移回滚清单
 
-- [ ] 当前 V1→V3 与 `idx_resume_status_update` 需要在健康 Docker/staging 重跑；历史 V1→V2 已通过。
+- [ ] 当前 V1→V5、`idx_resume_status_update`、`sys_file_usage` 和 V5 贡献来源列需要在健康 Docker/staging 重跑；历史 V1→V2 已通过。
 - [x] 账号邮箱/学号约束、改密、会话吊销、停用和删除申请有测试。
 - [x] 导出 JSON 是白名单，负向断言没有密码、Token 和 storage key。
 - [x] 审计覆盖关键动作，敏感键会被剔除，日志可按 request ID 关联。
-- [x] 上传元数据、配额和孤儿清理有代码与单元测试。
+- [x] 上传元数据、原子配额预占/释放和孤儿清理有代码与单元测试。
 - [ ] 当前源码的上传备份和恢复需要在健康 Docker/staging 环境复演。
-- [x] 邮件异步、有限重试和失败状态有单元测试。
+- [x] 邮件异步、有限重试、失败状态和 `PENDING`/`SENDING` 崩溃补偿有单元测试。
 - [x] 定时任务 Redis 锁 + 数据库幂等键有测试。
 - [ ] 当前源码的 Playwright、Docker 镜像构建和 Trivy 扫描需要补跑。
-- [ ] 最终账号匿名化/删除执行器及其审批、审计和恢复测试仍待实现。
+- [x] 到期账号匿名化执行器、审计和单元测试已实现。
+- [ ] 匿名化任务、运营审批/豁免和备份保留仍需在健康 staging 做恢复演练。
 
-Phase 2 数据库回滚原则仍是“应用可回滚、数据库向前兼容”。如果 V2 迁移已经落地，不原地删除列或改写已执行 SQL；先停写、备份、修复并发布新的向前迁移。完整操作入口见 [`runbook.md`](runbook.md)、[`flyway.md`](flyway.md) 和 [`backup-restore.md`](backup-restore.md)。
+Phase 2 数据库回滚原则仍是“应用可回滚、数据库向前兼容”。如果 V2-V5 迁移已经落地，不原地删除列或改写已执行 SQL；先停写、备份、修复并发布新的向前迁移。完整操作入口见 [`runbook.md`](runbook.md)、[`flyway.md`](flyway.md) 和 [`backup-restore.md`](backup-restore.md)。

@@ -24,7 +24,7 @@ CSA Official 是一个面向计算机协会的官网与内部管理平台。它�
 | 安全 | 已有 Spring Security、JWT、HttpOnly Cookie、CSRF、CORS、稳定 HTTP status / `errorCode` / `traceId` |
 | 权限 | 已有 `roleLevel` 等级体系，前端菜单隐藏 + 后端 `@PreAuthorize` |
 | 数据访问 | 使用 MyBatis-Plus + MySQL |
-| 数据库迁移 | 生产使用 Flyway V1/V2/V3；`db/schema.sql` 只是当前结构快照，`db/seed.sql` 仅供 dev/test 演示，`SchemaConsistencyTest` 防止实体与 migration 漂移 |
+| 数据库迁移 | 生产使用 Flyway V1-V5；`db/schema.sql` 只是当前结构快照，`db/seed.sql` 仅供 dev/test 演示，`SchemaConsistencyTest` 防止实体与 migration 漂移 |
 | 缓存/限流 | 支持 Redis，也支持本地内存缓存降级 |
 | 文件 | 支持上传、类型限制、大小限制、受控访问 |
 | 简历审核 | 已完成“成员提交 → 部长队列 → 详情 → 通过/驳回 → 状态回写”前后端闭环；接口和竞态规则见 `docs/api-map.md` |
@@ -596,17 +596,16 @@ cd D:\CSA-Project\csa-official-backend
 
 本轮已经落地：
 
-- 生产数据库改为 Flyway V1/V2/V3 版本链；`db/schema.sql` 保留为学习快照，`db/seed.sql` 只允许 dev/test 显式注入运行时口令后加载。
+- 生产数据库改为 Flyway V1-V5 版本链；`db/schema.sql` 保留为学习快照，`db/seed.sql` 只允许 dev/test 显式注入运行时口令后加载。
 - 开发与生产 Compose 分离，生产只发布 Caddy 80/443；后端使用独立 MySQL 用户、Redis、Secure Cookie、可信代理和非 Root 容器。
 - 统一 HTTP status、`errorCode`、`traceId` 和 `X-Request-ID`，补齐 JSON 日志、指标、readiness/liveness、优雅停机、备份恢复和回滚 Runbook。
-- Phase 2 已加入账号生命周期、密码找回/修改、会话吊销、审计、个人数据导出、上传元数据、邮件有限重试和定时任务幂等。
+- Phase 2 已加入账号生命周期、到期匿名化、密码找回/修改、会话吊销、审计、个人数据导出、原子上传配额、邮件有限重试/崩溃补偿和定时任务幂等。
 - Phase 3 只完成多学校 SaaS ADR 与迁移方案，当前仍是单学校系统，没有直接实现 tenant 隔离或支付。
 
 发布前仍需完成：
 
-1. 在健康 Docker/staging 环境重跑当前源码的镜像构建、Playwright 登录/CSRF/权限/上传、备份恢复和 Trivy 扫描；本机 Docker VHD 故障期间不能拿历史镜像代替。
-2. 实现账号最终匿名化/物理删除执行器，并补审批、审计和恢复演练。
-3. 将上传配额改为并发安全的原子计数，并为 `PENDING` 邮件增加数据库补偿扫描，避免进程崩溃后遗漏投递。
-4. 按 ADR 设计 tenant、membership、租户角色和行级隔离；本轮不直接大改业务表。
+1. 在健康 Docker/staging 环境重跑当前源码的镜像构建、备份恢复和 Trivy 扫描；另行解决 Next.js dev server 120 秒未就绪后重跑 Playwright 登录/CSRF/权限/上传。不能拿历史镜像或历史 E2E 结果代替当前验收。
+2. 在 staging 演练到期匿名化、备份保留和恢复；当前已实现保留期后的自动匿名化，不做不可恢复的物理删除，审批/豁免流程仍需按运营制度补齐。
+3. 按 ADR 设计 tenant、membership、租户角色和行级隔离；本轮不直接大改业务表。
 
 详细证据、环境变量、部署步骤和回滚边界分别见 `docs/production-readiness/phase-2-verification.md`、`runbook.md`、`flyway.md` 和 `backup-restore.md`。

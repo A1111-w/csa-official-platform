@@ -154,7 +154,7 @@ CSA Official 是我做的一个计算机协会官网和内部管理平台。前�
 
 安全上，我重点做了几件事：登录成功后使用 HttpOnly Cookie 保存 JWT，降低 XSS 读取 Token 的风险；因为 Cookie 会被浏览器自动携带，所以对 Cookie 登录的非 GET 请求增加 CSRF Token 校验；退出登录时把 JWT 放入吊销缓存；Redis 不可用时本地可以切到内存缓存；文件访问不是简单静态目录，而是校验 owner 或资源发布状态；富文本内容用后端 Jsoup 和前端 DOMPurify 双层清洗，减少 XSS 风险。
 
-工程化上，项目有 .env.example、本地启动文档、接口地图、架构说明、安全说明、后端测试和前端构建验证。数据库结构由 Flyway V1/V2/V3 migration 版本化，db/seed.sql 只做 dev/test 演示；开发 Compose 会起 MySQL、Redis、前后端，生产 Compose 则由 Caddy 提供同源入口。我还写了一个一致性测试，把实体字段和全部 Flyway migration 做双向比对，改了实体忘改 DDL 会直接构建失败，而不是等到换环境时才在运行时报 Unknown column。
+工程化上，项目有 .env.example、本地启动文档、接口地图、架构说明、安全说明、后端测试和前端构建验证。数据库结构由 Flyway V1-V5 migration 版本化，db/seed.sql 只做 dev/test 演示；开发 Compose 会起 MySQL、Redis、前后端，生产 Compose 则由 Caddy 提供同源入口。我还写了一个一致性测试，把实体字段和全部 Flyway migration 做双向比对，改了实体忘改 DDL 会直接构建失败，而不是等到换环境时才在运行时报 Unknown column。
 
 我也做过几轮针对性优化：分页接口原来 size 没有上限，一个 ?size=1000000 就能把数据库和堆打满，现在统一收敛；竞赛列表原来把整段富文本正文都发给前端，而列表只显示 120 字摘要，现在列表只返回服务端截断的摘要，正文改由详情接口按需取；资源模块的业务逻辑从 Controller 抽到了 Service，这样才能加事务、才能脱离 Web 环境做单元测试。
 
@@ -1642,8 +1642,14 @@ WHERE id = ? AND status = 1
 | `@EnumValue` | 告诉 MyBatis-Plus 枚举落库时使用哪个字段。`VoteResultEnum` 用 `0` 表示反对、`1` 表示赞成。 |
 | 并发竞争 Race Condition | 两个请求几乎同时“先查后写”，都可能在查重时看到不存在，然后同时插入。数据库唯一约束用于封死这个时间窗口。 |
 | `@Valid` | 在进入 Controller 方法体前启动 DTO 字段校验。`ProposalDto` 的 `@NotBlank` 和 `@Size` 由它触发。 |
+| `@PreAuthorize` | Spring Security 的方法授权注解。表达式在方法体执行前判断当前 `Authentication` 是否具有所需角色。 |
 | `SecurityUtils.getUserId()` | 从当前请求的 `SecurityContext` 取已认证用户 ID，不是从前端 JSON 信任一个 userId。 |
 | `PageUtils.clampLimit` | 收敛不分页列表的返回条数。第二个参数是默认值；真正上限固定为 `MAX_LIST_LIMIT = 200`。 |
+| `RoleConsts` | 角色数字常量接口：核心成员 2、部长 3、会长 4、Root 99，避免业务代码散落魔法数字。 |
+| DTO / Entity / VO | DTO 接收请求字段，Entity 映射数据库表，VO 定义响应白名单；三者职责不同，不能只因字段相似就混用。 |
+| `AppointDto` | `DeptController` 的静态嵌套 DTO，只接收 `deptId` 和 `userId`；Controller 当前用手写 null 判断，不使用 Bean Validation。 |
+| `ProposalDto` / `VoteDto` | `VoteController` 的两个嵌套 DTO。前者有 `@NotBlank/@Size` 并由 `@Valid` 触发；后者当前没有字段校验注解。 |
+| `AuditService.recordBestEffort` | 尽力写审计的方法；审计失败会记录日志，但不应反向破坏主业务结果。 |
 
 #### 文件、类和方法职责
 
@@ -1867,6 +1873,13 @@ cd D:\CSA-Project\csa-official-backend
 | `Safelist` | Jsoup 的允许列表，规定哪些标签和属性可以保留。 |
 | `@Cacheable` | 方法第一次执行后把结果放进缓存；相同 key 的后续调用可直接取缓存。 |
 | `@CacheEvict` | 数据写入成功或准备写入时删除相关缓存，避免继续返回旧内容。 |
+| `@Target(METHOD)` | 限定自定义注解只能标在方法上；这里保证 `@LogContribution` 不会误贴到字段或参数。 |
+| `@Retention(RUNTIME)` | 注解保留到程序运行期，Spring AOP 才能通过反射读到它。 |
+| `@EnableAsync` | 开启 Spring 的异步方法代理能力；没有它，`@Async` 不会把调用提交到线程池。 |
+| `@Scheduled` / cron | 声明定时执行方法。cron `0 0 4 * * ?` 表示每天 04:00 触发。 |
+| `SecurityContext` / ThreadLocal | `SecurityContext` 保存当前请求认证；默认绑定请求线程，因此异步线程不能直接继承其中的用户。 |
+| 幂等 Idempotency | 同一个业务版本重复执行时，最终效果仍只有一次。定时任务用 Redis 锁和数据库唯一键共同保证。 |
+| Redis 锁 | 用带过期时间的 key 抢占执行权，减少多实例同时执行；它可能过期或失效，所以还需要数据库最终兜底。 |
 | 公开接口 | 路径在 `/api/public/**` 下，`SecurityConfig` 允许匿名访问；它仍然必须限制数据量和清洗输出。 |
 | 贡献目录 vs 贡献墙 | 目录展示 Level 2+ 成员的身份、部门、头衔；贡献墙按流水聚合 DEV/RES/COMP/OPS 数值。 |
 
@@ -1878,6 +1891,7 @@ cd D:\CSA-Project\csa-official-backend
 | `ContributionType` | 贡献类型枚举 | 给流水类型提供固定名字和说明 | 注解、Writer、定时任务使用 |
 | `csa-official-backend/src/main/java/com/csa/official/common/aspect/ContributionAspect.java` | AOP 切面 Bean | 监听标了 `@LogContribution` 且正常返回的方法；在请求线程取 userId，再提交异步写入 | Spring AOP 自动调用 |
 | `csa-official-backend/src/main/java/com/csa/official/modules/sys/service/ContributionLogWriter.java` | 异步写库 Bean | 创建 `ContributionLog`，默认 score=`1`，调用 Mapper 插入；失败只记录日志 | `ContributionAspect` 调它；`@Async` 交给专用线程池 |
+| `csa-official-backend/src/main/java/com/csa/official/modules/sys/entity/ContributionLog.java` | 贡献流水 Entity | 一条记录对应一个用户、类型、分数、说明和时间 | Writer、手动发放、定时结算创建；Mapper 落库 |
 | `csa-official-backend/src/main/java/com/csa/official/config/AsyncConfig.java` | 异步配置类 | `@EnableAsync` 开启代理；定义邮件池和贡献池、队列容量、拒绝策略 | Spring 启动时加载 |
 | `csa-official-backend/src/main/java/com/csa/official/modules/sys/controller/ResourceController.java` | 资源 Controller | `save` 标有 `@LogContribution(RES)`，成功后自动记资源贡献 | `ContributionAspect` 拦截 |
 | `csa-official-backend/src/main/java/com/csa/official/modules/biz/controller/CompetitionController.java` | 竞赛 Controller | `save` 标有 `@LogContribution(COMP)`，成功后自动记比赛贡献 | `ContributionAspect` 拦截 |
@@ -1886,6 +1900,7 @@ cd D:\CSA-Project\csa-official-backend
 | `csa-official-backend/src/main/java/com/csa/official/modules/sys/mapper/ContributionLogMapper.java` | 贡献流水 Mapper | `selectWall(limit)` 用一条 SQL 连接用户/部门并按用户聚合 | `ContributionController.getWall` 调用 |
 | `csa-official-backend/src/main/java/com/csa/official/modules/sys/vo/ContributionWallVO.java` | 贡献墙 VO | 承载用户、部门、DEV 分数、三类次数和排序总分 | Mapper SQL 直接映射 |
 | `csa-official-backend/src/main/java/com/csa/official/modules/sys/controller/PublicController.java` | 公开内容 Controller | 读取/修改协会介绍、核心成员目录、隐私说明；配置内容保存前用 Jsoup 清洗 | 前端 `publicService` 调用 |
+| `PublicController.ConfigDto` / `ContributorVo` | Controller 内嵌请求 DTO / 响应对象 | 前者接协会介绍正文；后者只返回公开成员所需的 ID、姓名、头像、部门、头衔和等级 | `updateAbout` 接收 / `getContributors` 返回 |
 | `SysConfig` / `SysConfigMapper` | 配置 Entity/Mapper | 以 `configKey` 读写 `CSA_INTRO` 等系统配置 | `PublicController`、`ContributionTask` 调用 |
 | `csa-official-backend/src/main/java/com/csa/official/modules/sys/task/ContributionTask.java` | 定时任务 Bean | 每天 04:00 检查协会介绍版本存活超过 7 天后，给最后修改者结算一次 OPS 贡献 | `@Scheduled` 自动触发；调用 `ScheduledJobService` 防重复 |
 | `ScheduledJobService` | 定时任务幂等 Service | Redis 锁先挡并发，数据库唯一幂等键再挡重复执行 | `ContributionTask` 调用 |
@@ -2050,6 +2065,7 @@ cd D:\CSA-Project\csa-official-backend
 | 测试用例 Test Case | 对一个明确行为安排输入、执行代码并断言结果。一个 `@Test` 方法通常就是一个用例。 |
 | JUnit 5 | Java 测试框架。负责发现 `@Test`、运行生命周期方法、报告通过/失败/跳过。 |
 | AssertJ | 断言库，提供 `assertThat(...).isEqualTo(...)`、`assertThatThrownBy(...)` 等可读写法。 |
+| BCrypt | 带随机盐、可调成本的单向密码哈希算法。相同密码每次生成的摘要通常不同，验证时由 `PasswordEncoder.matches(明文, 摘要)` 计算并比较，不能从摘要“解密”出原密码。 |
 | 单元测试 Unit Test | 只验证一个较小单元，依赖用假对象替代，不启动完整应用，速度快、定位清楚。 |
 | 集成测试 Integration Test | 验证多个真实组件一起工作，例如 Spring Security Filter + MVC，或 Flyway + MySQL + Redis。 |
 | Mock | 可编程的假对象。测试用 `when(...).thenReturn(...)` 规定返回，用 `verify(...)` 检查调用，不访问真实数据库/邮件等外部系统。 |
@@ -2099,7 +2115,7 @@ npm run test:e2e → playwright test
 
 | 类型 | 典型标志 | 当前代表文件 | 真正验证什么 |
 | --- | --- | --- | --- |
-| 纯 Java/工具单元测试 | 没有 Spring 类级注解，直接 `new` 被测对象 | `JwtUtilsTest`、`PageUtilsTest`、`AccountNormalizerTest`、`ProductionStartupValidatorTest` | 输入输出、边界值、异常和配置规则 |
+| 纯 Java/工具单元测试 | 没有 Spring 类级注解，直接 `new` 被测对象 | `JwtUtilsTest`、`PageUtilsTest`、`AccountNormalizerTest`、`SecurityStartupValidatorTest`、`ProductionStartupValidatorTest` | 输入输出、边界值、异常和配置规则 |
 | Mockito Service 单元测试 | `@ExtendWith(MockitoExtension.class)`、`@Mock`、`@InjectMocks` | `ResourceServiceTest`、`CompetitionServiceTest`、`DeptServiceTest`、`VoteServiceTest`、`AccountServiceTest` | Service 业务分支、传给 Mapper 的数据、依赖是否被调用 |
 | Spring MVC/Security 测试 | `@SpringBootTest` + `@AutoConfigureMockMvc`，常配 `@MockBean` | `StoredFileControllerTest`、`CompetitionControllerAuthorizationTest`、`AuthControllerRateLimitTest`、`CommonErrorResponseTest` | 请求绑定、Filter、CSRF、权限、异常 JSON、Controller 是否被拦截 |
 | 定制 Spring 安全集成测试 | `@SpringJUnitConfig`、手工 `MockMvcBuilders`、导入安全 Bean | `SecurityErrorResponseTest` | 401/403、CORS、HSTS/CSP 等 Security 组件协作 |
@@ -2124,6 +2140,8 @@ npm run test:e2e → playwright test
 | `VoteServiceTest` | `ROOT_APPLY` 创建被拒绝；历史 ROOT_APPLY 即使通过也不会自动提权 |
 | `GitServiceTest` | 仓库 URL 只允许 HTTPS 和白名单主机，拒绝 userinfo、内网 IP、非标准端口、SSH/file 等危险地址 |
 | `JwtUtilsTest` | 密钥最短 32 字节、签发解析、payload 和签名篡改必须失败 |
+| `SecurityStartupValidatorTest` | 直接构造 `SecurityStartupValidator`，验证任何环境下 `SameSite=None` 都必须配 `Secure=true`，以及 `prod/production` 不能使用不安全认证 Cookie |
+| `ProductionStartupValidatorTest` | 直接构造 `ProductionStartupValidator`，验证非生产环境不强制部署项；生产必须配置 HTTPS 公网地址、Redis、可信代理 CIDR、forwarded headers 和 CSRF |
 | `SchemaConsistencyTest` | Entity 字段与所有 Flyway migration 列做双向比较，防止新环境出现 `Unknown column` |
 | `SeedDataPasswordTest` | `seed.sql` 只能保留运行时密码占位符，不能提交固定 BCrypt 或共享明文口令 |
 | `AsyncMailSenderTest` | 邮件状态流转、最多重试、最终失败后清验证码和限流键 |
@@ -2232,7 +2250,11 @@ npm run build
 npm run test:e2e
 ```
 
-截至 **2026-08-26**，本轮在当前工作区实际执行 `mvnw.cmd test` 的结果是：**133 tests，0 failures，0 errors，1 skipped，BUILD SUCCESS**。跳过的是 `FlywayMySqlRedisIntegrationTest`：它要求显式 `-Dit.containers=true`，并且本机本轮没有可用 Docker 环境。历史上通过过不能替代当前源码的重新验证；Docker 恢复后要再跑显式命令。
+截至 **2026-08-26**，本轮在当前工作区实际执行 `mvnw.cmd test` 的结果是：**174 tests，0 failures，0 errors，1 skipped，BUILD SUCCESS**。跳过的是 `FlywayMySqlRedisIntegrationTest`：它要求显式 `-Dit.containers=true`，并且本机本轮没有可用 Docker 环境。历史上通过过不能替代当前源码的重新验证；Docker 恢复后要再跑显式命令。
+
+本机 `java -version` 和 Maven 实际使用的是 **JDK 21.0.8**，但项目 `pom.xml` 的 `<java.version>` 仍是 **17**，后端 Docker 构建阶段也使用 Temurin 17。前者表示“这次本地测试运行在 JDK 21 上”，后者才是项目声明的编译/运行目标；不能因为电脑安装了 JDK 21 就把项目版本回答成 Java 21。
+
+同一轮前端验证结果是：`npm test` **6 files、12 tests passed**，`npm run lint` exit code 0，`npm run build` 使用 Next.js 16.2.12 并完成页面生成 **25/25**。Playwright 第一次因本机缺 Chromium 失败；安装 Playwright Chromium 151 后再次执行，又在等待配置的 Next.js dev server 时达到 120 秒超时。因此当前 E2E 仍是“环境阻断、未通过”，不能写成全绿。即使 dev server 正常启动，缺少 `E2E_USERNAME/E2E_PASSWORD` 时三个认证用例也会按设计跳过，只运行公开页和未登录跳转用例。
 
 #### 常见混淆
 
@@ -2282,7 +2304,7 @@ npm run test:e2e
 
 #### 今日目标
 
-学完后，要能从当前 Flyway 版本链解释 16 张表怎么产生、Entity 如何映射列、逻辑删除和状态字段怎么设计、索引对应哪条真实查询，以及空库、旧库和演示数据分别由谁处理。数据库学习不能停在“用 MySQL”，要能说明结构如何可重复地交付到另一台机器。
+学完后，要能从当前 Flyway 版本链解释 17 张表怎么产生、Entity 如何映射列、逻辑删除和状态字段怎么设计、索引对应哪条真实查询，以及空库、旧库和演示数据分别由谁处理。数据库学习不能停在“用 MySQL”，要能说明结构如何可重复地交付到另一台机器。
 
 #### 前置名词
 
@@ -2298,9 +2320,14 @@ npm run test:e2e
 | Forward-only | 已发布数据库变更通过新版本继续向前修复，不直接改旧 migration 或依赖 MySQL 自动回滚 DDL。 |
 | DDL | 定义结构的 SQL，例如 `CREATE TABLE`、`ALTER TABLE`、`CREATE INDEX`。 |
 | DML | 修改数据的 SQL，例如 `INSERT`、`UPDATE`、`DELETE`。V2 开头先规范化旧邮箱/学号就是 DML。 |
-| Entity | Java 持久化实体。`@TableName` 指定表名，字段按 snake_case 映射到列。 |
-| snake_case | 下划线命名，例如 Java `createTime` 对应数据库 `create_time`。由 MyBatis-Plus 配置映射。 |
-| 主键 Primary Key | 唯一标识一行。本项目实体的 `@TableId(type=AUTO)` 对应 `BIGINT AUTO_INCREMENT`。 |
+| Entity | Java 持久化实体。它表达一行数据库记录在 Java 中有哪些字段，但不等于前端应该直接收到的 VO。 |
+| `@TableName` | MyBatis-Plus 的类级注解，明确 Entity 对应的表。例如 `User` 上的 `@TableName("sys_user")`。 |
+| `@TableId` | MyBatis-Plus 的主键字段注解。当前实体使用 `type = IdType.AUTO`，表示插入时由 MySQL `AUTO_INCREMENT` 生成 id，再回填到对象。 |
+| `@TableLogic` | MyBatis-Plus 的逻辑删除字段注解。对带该注解的 `deleted` 字段，常规删除会改标志，常规查询会过滤已删除行；它不会让所有表自动拥有逻辑删除。 |
+| `@EnumValue` | MyBatis-Plus 的枚举持久化注解，指定枚举用哪个字段写入/读出数据库，例如存 `code`。它只管 ORM，不控制 Jackson 返回给前端的 JSON。 |
+| `map-underscore-to-camel-case` | MyBatis 映射开关。当前为 `true`，使数据库 `create_time` 可自动映射 Java `createTime`；它不会重命名真实数据库列。 |
+| snake_case | 下划线命名，例如数据库 `create_time`；Java 通常用 camelCase 的 `createTime`。 |
+| 主键 Primary Key | 唯一标识一行。本项目多数主键是 `BIGINT AUTO_INCREMENT`，由 `@TableId(type = IdType.AUTO)` 对应。 |
 | 唯一约束 UNIQUE | 不只是加速查询，还强制一组值不能重复，例如同一提案同一用户只能一票。 |
 | 普通索引 INDEX | 主要优化特定 WHERE、ORDER BY 或 JOIN；不保证唯一。 |
 | 联合索引 Composite Index | 由多个列按顺序组成，例如 `(category, create_time)` 同时服务分类过滤和时间排序。 |
@@ -2309,6 +2336,7 @@ npm run test:e2e
 | 逻辑关联 | 表间用 ID 表示关系，但数据库不声明 FOREIGN KEY；一致性由 Service、查询条件、唯一约束和测试维护。 |
 | Seed | 为开发/测试准备的演示数据，不属于生产结构迁移。 |
 | Schema Drift | Entity、migration、结构快照或真实数据库之间出现不一致。 |
+| `flyway repair` | 修复 Flyway 历史元数据的维护命令。它不撤销已经执行的 DDL、不恢复数据、也不会自动把错误表结构改正确；本项目只允许在人工确认目标结构与 migration 一致后，用它清理/校正 history。 |
 
 #### 当前版本链
 
@@ -2317,14 +2345,16 @@ npm run test:e2e
 | V1 | `csa-official-backend/src/main/resources/db/migration/V1__initial_schema.sql` | 创建最初 12 张业务表及核心索引/唯一约束 |
 | V2 | `csa-official-backend/src/main/resources/db/migration/V2__production_operations.sql` | 规范化旧用户数据、增加账号生命周期字段与唯一约束，再创建审计、文件、邮件、定时任务 4 张运营表 |
 | V3 | `csa-official-backend/src/main/resources/db/migration/V3__resume_review_queue_index.sql` | 给现有 `biz_resume` 增加 `(status, update_time)` 索引，服务部长审核队列 |
+| V4 | `csa-official-backend/src/main/resources/db/migration/V4__account_storage_and_git_sync.sql` | 增加账号匿名化时间、`sys_file_usage` 原子配额计数表、邮件恢复索引和简历 Git 同步字段 |
+| V5 | `csa-official-backend/src/main/resources/db/migration/V5__contribution_award_audit.sql` | 为贡献流水增加 `source`、`awarded_by` 和后台历史索引 |
 
-V3 不增加新表，所以当前仍是 **16 张表**。`db/schema.sql`、Flyway 运维文档和 `FlywayMySqlRedisIntegrationTest` 已同步到 V3；真实 MySQL 验证仍要在 Docker 恢复后重跑。
+V3 和 V5 不增加新表，V4 新增 `sys_file_usage`，所以当前是 **17 张表**。其中 16 张有对应 Entity；配额计数表只由 `FileUsageMapper` 执行定向 SQL，不需要把计数行暴露成业务 Entity。`db/schema.sql`、Flyway 运维文档和 `FlywayMySqlRedisIntegrationTest` 已同步到 V5；真实 MySQL 验证仍要在 Docker 恢复后重跑。
 
-#### 16 张表怎么分类
+#### 17 张表怎么分类
 
 | 模块 | 表 | 数量 |
 | --- | --- | ---: |
-| sys | `sys_user`、`sys_dept`、`sys_carousel`、`sys_invite_code`、`sys_proposal`、`sys_resource`、`sys_config`、`sys_vote_record`、`sys_contribution_log`、`sys_audit_log`、`sys_stored_file`、`sys_mail_delivery`、`sys_scheduled_job_execution` | 13 |
+| sys | `sys_user`、`sys_dept`、`sys_carousel`、`sys_invite_code`、`sys_proposal`、`sys_resource`、`sys_config`、`sys_vote_record`、`sys_contribution_log`、`sys_audit_log`、`sys_stored_file`、`sys_file_usage`、`sys_mail_delivery`、`sys_scheduled_job_execution` | 14 |
 | biz | `biz_competition`、`biz_comp_editor` | 2 |
 | resume | `biz_resume` | 1 |
 
@@ -2339,7 +2369,8 @@ V3 不增加新表，所以当前仍是 **16 张表**。`db/schema.sql`、Flyway
 | `V1__initial_schema.sql` | 初始 migration | 建 12 张表，空库从这里开始 | Flyway 第一次迁移执行 |
 | `V2__production_operations.sql` | 运营 migration | 更新旧数据、ALTER `sys_user`、建 4 张运营表 | V1 之后执行 |
 | `V3__resume_review_queue_index.sql` | 索引 migration | 在现有表上新增审核队列索引 | V2 之后执行 |
-| `modules/**/entity/*.java` | 16 个 Entity | 定义 Java 字段、表名、主键、枚举和逻辑删除标记 | MyBatis-Plus Mapper 使用 |
+| `modules/**/entity/*.java` | 16 个 Entity | 定义 Java 字段、表名、主键、枚举和逻辑删除标记 | MyBatis-Plus Mapper 使用；`sys_file_usage` 是 mapper-only 计数表 |
+| `FileUsageMapper` | 原子配额 SQL Mapper | 创建计数行、条件预占、释放计数 | `FileAccountingService` 在文件元数据事务中调用 |
 | `db/schema.sql` | 当前结构快照 | 供学习、人工核对和本地查看；不是生产升级入口 | 人读取，不由生产 Flyway 版本链替代 |
 | `db/seed.sql` | dev/test 演示数据 | 插入角色、部门、资源等演示数据，密码保留运行时占位符 | `DevSeedDataInitializer` 读取 |
 | `DevSeedDataInitializer` | dev/test 启动器 | 只在 dev/test + 显式开启时，用 BCrypt 替换密码占位符并执行 seed | 应用启动后运行 |
@@ -2356,10 +2387,12 @@ V3 不增加新表，所以当前仍是 **16 张表**。`db/schema.sql`、Flyway
 3. 看 V2 前 23 行：先 `LOWER(TRIM(email))`、`TRIM(student_id)`，再加唯一键。理解为什么必须先清洗旧数据再收紧约束。
 4. 看 V2 后四个 `CREATE TABLE`，分别对应审计、文件元数据、邮件投递、定时任务幂等。
 5. 看 V3：它只有一次 `ALTER TABLE ... ADD INDEX`，说明 migration 不一定每版都建新表。
-6. 用 `rg -n "@TableName|@TableLogic|@EnumValue" modules` 对照 Entity，确认哪些列由注解决定。
-7. 打开 `SchemaConsistencyTest`，看它如何解析 `CREATE TABLE` 和 `ALTER TABLE ADD COLUMN`。注意它当前比较列，不验证索引、类型、默认值或外键。
-8. 打开 `db/seed.sql` 和 `DevSeedDataInitializer`，确认 seed 只在 dev/test、显式开关和至少 12 字符临时密码下执行。
-9. 最后读 `flyway.md` 的空库、baseline 和失败恢复。先理解流程，再背命令。
+6. 看 V4：它新建 `sys_file_usage`，并在已有表上增加匿名化、邮件恢复和 Git 同步字段；再追 `FileAccountingService` 的条件更新。
+7. 看 V5：它只为贡献流水增加来源和操作人字段，理解为什么旧数据统一为 `LEGACY`。
+8. 用 `rg -n "@TableName|@TableLogic|@EnumValue" modules` 对照 Entity，确认哪些列由注解决定。
+9. 打开 `SchemaConsistencyTest`，看它如何解析 `CREATE TABLE` 和 `ALTER TABLE ADD COLUMN`。注意它当前比较列，不验证索引、类型、默认值或外键。
+10. 打开 `db/seed.sql` 和 `DevSeedDataInitializer`，确认 seed 只在 dev/test、显式开关和至少 12 字符临时密码下执行。
+11. 最后读 `flyway.md` 的空库、baseline 和失败恢复。先理解流程，再背命令。
 
 #### 空库启动链路
 
@@ -2369,7 +2402,7 @@ V3 不增加新表，所以当前仍是 **16 张表**。`db/schema.sql`、Flyway
 → Spring Boot 读取 spring.flyway 配置
 → Flyway 连接目标数据库
 → 没有 flyway_schema_history：创建 history
-→ 按版本执行 V1 → V2 → V3
+→ 按版本执行 V1 → V2 → V3 → V4 → V5
 → 每个成功版本写 history 和 checksum
 → migration 全部成功后应用继续启动
 → migration 失败则 readiness 不应通过
@@ -2490,7 +2523,7 @@ Entity 仍需声明 `@TableLogic`。配置告诉框架字段名，注解告诉�
 #### Seed 与生产 migration 的边界
 
 ```text
-生产结构：Flyway V1/V2/V3
+生产结构：Flyway V1-V5
 开发/测试演示数据：db/seed.sql
 执行者：DevSeedDataInitializer
 启用条件：profile 为 dev/test 且 csa.seed.enabled=true
@@ -2498,7 +2531,7 @@ Entity 仍需声明 `@TableLogic`。配置告诉框架字段名，注解告诉�
 处理方式：运行时 BCrypt → 替换 __DEMO_PASSWORD_HASH__ → 执行 SQL
 ```
 
-生产 profile 不创建共享演示账号，seed 也不能混进 V1/V2/V3。结构迁移必须在任何环境都安全；演示数据只服务本地学习和测试。
+生产 profile 不创建共享演示账号，seed 也不能混进 V1-V5。结构迁移必须在任何环境都安全；演示数据只服务本地学习和测试。
 
 #### 迁移失败怎么处理
 
@@ -2515,7 +2548,7 @@ MySQL 的许多 DDL 不能保证像普通业务事务一样完整回滚。标准
 
 #### 动手验证
 
-1. 用 `rg "^CREATE TABLE" V1/V2` 手工数出 V1 的 12 张表和 V2 的 4 张表，再确认 V3 不建表。
+1. 用 `rg "^CREATE TABLE" V1/V2/V4` 手工数出 V1 的 12 张表、V2 的 4 张表和 V4 的 1 张配额计数表，再确认 V3/V5 不建表。
 2. 在 16 个 Entity 中统计 `@TableLogic`，与上面的 8/8 清单对照。
 3. 任选 `Resource.category/createTime`，从 Service 查询条件追到 V1 的联合索引。
 4. 任选 `VoteRecord.result`，从 Java enum 的 `@EnumValue` 追到数据库 INT。
@@ -2528,15 +2561,15 @@ FROM flyway_schema_history
 ORDER BY installed_rank;
 ```
 
-当前源码期望依次看到 1、2、3，而不是只到 2。
+当前源码期望依次看到 1、2、3、4、5，而不是只到 2 或 3。
 
 7. 只在 dev/test 开启 seed，确认缺少或短于 12 字符的 `DEMO_SEED_PASSWORD` 会拒绝启动。
-8. Docker 可用后显式跑 Testcontainers；确认最新版本断言为 V3，并验证 `idx_resume_status_update` 在真实 MySQL 中存在。
+8. Docker 可用后显式跑 Testcontainers；确认最新版本断言为 V5，并验证 `idx_resume_status_update`、`sys_file_usage` 和贡献流水的 `source` / `awarded_by` 在真实 MySQL 中存在。
 
 #### 自测题
 
 1. Flyway、migration、`flyway_schema_history`、checksum 分别是什么？
-2. 当前为什么是 V1→V2→V3？每一版分别做了什么？
+2. 当前为什么是 V1→V2→V3→V4→V5？每一版分别做了什么？
 3. 当前有多少张表？sys、biz、resume 各多少张？
 4. V2 为什么先规范化 email/studentId，再创建唯一约束？反过来有什么风险？
 5. `db/schema.sql`、`db/seed.sql`、Flyway migration 三者用途有什么区别？
@@ -2553,7 +2586,7 @@ ORDER BY installed_rank;
 
 #### 完成标准
 
-能不看答案列出 V1/V2/V3 的职责和 16 张表分类；能从一个 Entity 字段追到 migration 列、类型和索引；能解释逻辑删除、唯一约束、联合索引、无物理外键、baseline、checksum、forward-only 和 seed 边界；能在空库查询 Flyway history 并判断当前是否真正迁到 V3。
+能不看答案列出 V1-V5 的职责和 17 张表分类；能从一个 Entity 字段追到 migration 列、类型和索引；能解释逻辑删除、唯一约束、联合索引、无物理外键、baseline、checksum、forward-only 和 seed 边界；能在空库查询 Flyway history 并判断当前是否真正迁到 V5。
 
 ### Day 14：一键启动和部署
 
@@ -2585,12 +2618,27 @@ deploy/backup.ps1、deploy/restore.ps1      # 备份和恢复脚本
 | Docker Compose | 用 YAML 描述多个容器、网络、卷和依赖的编排工具 | `docker compose up` 一次启动整套系统 |
 | Service（服务） | Compose 文件中的一个可启动单元 | `mysql`、`redis`、`backend`、`frontend`、生产中的 `caddy` |
 | Dockerfile | 构建镜像的逐步说明文件 | 先编译/构建，再把产物放进较小的运行镜像 |
+| JDK | Java Development Kit，包含 Java 编译器、运行时和开发工具 | 后端 build stage 用 JDK 17 编译项目；本机装 JDK 21 不会改变 `pom.xml` 声明的 Java 17 目标 |
+| JRE | Java Runtime Environment，只提供运行 Java 程序所需环境，不含完整开发工具链 | 后端 runner stage 用 `eclipse-temurin:17-jre-alpine` 运行 jar，不带 Maven 和完整 JDK |
+| Maven | Java 依赖管理和构建工具 | 读取 `pom.xml`，下载依赖，并由 `mvn clean package -DskipTests` 生成 jar |
+| Node.js | 在服务器/构建机执行 JavaScript 的运行时 | 前端镜像用 Node 20 安装依赖、执行 Next.js build，并在容器内运行 `next start` |
+| npm | Node.js 包管理器和脚本入口 | `npm ci` 按 lock 文件安装依赖，`npm run build/start` 执行 `package.json` 中的脚本 |
 | Build context | `docker build` 能看到的目录 | backend 的 context 是 `./csa-official-backend`，frontend 的是 `./csa-official-frontend` |
 | Multi-stage build（多阶段构建） | 一个 Dockerfile 使用多个 `FROM` 阶段，最后只复制运行所需产物 | 后端不把 Maven 工具链带进运行镜像；前端把 devDependencies 和运行依赖分开 |
+| `FROM` / `AS` | `FROM` 选择基础镜像并开始新阶段，`AS` 给阶段命名 | `FROM maven:... AS build` 创建后端编译阶段，之后可用 `COPY --from=build` 取产物 |
+| `WORKDIR` | 设置后续 Dockerfile 指令和容器默认命令的工作目录 | 两个应用镜像都把工作目录设为 `/app` |
+| `COPY` | 把 build context 中的文件复制进镜像，或从前一构建阶段复制产物 | 后端把 `target/*.jar` 从 build stage 复制到 runner；前端复制 `.next`、`public` 和生产依赖 |
+| `RUN` | 在镜像构建时执行命令并生成镜像层 | 用于 Maven/npm 构建，以及创建非 root 用户和目录；它不是容器每次启动时重复执行的命令 |
+| `ARG` | 仅构建期可用的参数，可为 Dockerfile 提供默认值 | frontend 在 `next build` 前接收 `NEXT_PUBLIC_API_URL`；普通 `ARG` 不自动成为运行期环境变量，也不应用来保存秘密 |
+| `ENV` | 写入镜像或容器进程环境的变量 | 例如 `NODE_ENV`、`PORT`、`REDIS_SSL`；但客户端 `NEXT_PUBLIC_*` 已在 build 时固化，运行期同名变量不能重写已生成 bundle |
+| `USER` | 指定后续指令和容器启动进程使用的操作系统用户 | backend 用 `csa`，frontend 用 `nextjs`，避免应用默认以 root 运行 |
+| `EXPOSE` | Dockerfile 中对镜像监听端口的元数据说明 | `EXPOSE 8080/3000` 不发布宿主机端口，也不是防火墙规则；是否发布由 Compose `ports` 决定 |
+| `ENTRYPOINT` | 镜像固定的主启动程序，运行容器时通常仍会执行 | backend 固定执行 `java -jar app.jar` |
+| `CMD` | 镜像的默认命令或默认参数，运行容器时较容易被覆盖 | frontend 默认执行 `npm run start` |
 | Volume（命名卷） | 由 Docker 管理、独立于容器生命周期的持久化目录 | `mysql-data`、`redis-data`、`backend-uploads` 保存数据库、缓存和上传文件 |
 | Network（网络） | 容器之间通信的虚拟网络 | 生产 `edge` 给代理/应用，`data` 只给后端、MySQL、Redis，且 `data` 是 internal 网络 |
 | `ports` | 把容器端口发布到宿主机 | 开发发布 3000/8080/3306/6379；生产只发布 Caddy 的 80/443 |
-| `expose` | 声明容器内部端口，不发布到宿主机 | 生产 backend 的 8080、frontend 的 3000 只让 edge 网络内的 Caddy 访问 |
+| `expose` | Compose 中声明容器预期提供的内部端口，但不发布到宿主机 | 生产声明 backend 8080、frontend 3000；同一网络的服务即使没有 `expose` 也可能直接通信，真正的边界来自网络成员关系和是否配置 `ports`，不能把 `expose` 当防火墙 |
 | `depends_on` | 描述服务启动依赖 | 生产 backend 等 MySQL/Redis 健康，frontend 等 backend 健康，Caddy 等前后端健康 |
 | `healthcheck` | 容器级健康探测命令和重试规则 | 不只看进程存在，还检查 MySQL、Redis、Spring readiness、Next 页面是否可访问 |
 | `condition: service_healthy` | `depends_on` 的条件形式 | 只有依赖服务的 healthcheck 为 healthy 才继续启动依赖者 |
@@ -2598,18 +2646,31 @@ deploy/backup.ps1、deploy/restore.ps1      # 备份和恢复脚本
 | Caddy | Web server / reverse proxy（反向代理） | 自动 HTTPS，并把 `/api`、`/files` 转给 backend，其余路径转给 frontend |
 | `reverse_proxy` | Caddy 的转发指令 | `reverse_proxy backend:8080` 使用 Compose 服务名在容器网络内转发 |
 | TLS / HTTPS | 加密浏览器与服务器之间的连接 | 生产 Caddy 监听 443；后端生产 Cookie 要求 `Secure=true` |
+| Cookie `Secure` | 告诉浏览器只通过 HTTPS 发送该 Cookie | 生产认证 Cookie 必须开启；它不负责加密 Cookie 内容本身 |
+| Cookie `SameSite` | 控制跨站请求是否自动携带 Cookie，常见值有 Strict、Lax、None | 本项目默认 Lax；若设为 None，浏览器规范要求同时使用 Secure |
+| CSP | Content Security Policy，限制页面可加载/执行的脚本、连接、图片等来源 | 当前主要由前端 `proxy.ts` 按请求生成 nonce 和 CSP Header，不是 Caddy 的 API 路由规则 |
+| HSTS | Strict-Transport-Security，要求浏览器在有效期内只用 HTTPS 访问站点 | 生产 Caddy 明确添加该 Header；只能在已正确部署 HTTPS 的环境启用 |
+| CIDR | 用“网络地址/前缀长度”表示一个 IP 范围 | `172.30.0.0/24` 表示生产 edge 子网，被配置为可信代理范围；不能随意写成所有来源 |
+| Forwarded headers | 反向代理传给后端的原始协议、主机和客户端地址信息，例如 `X-Forwarded-Proto`、`X-Forwarded-For` | `server.forward-headers-strategy=framework` 让 Spring 解析这些 Header；必须和可信代理边界一起使用，不能无条件信任公网伪造值 |
 | `liveness` | “进程还活着吗”的探针 | `/actuator/health/liveness` 只包含 Spring 的存活状态 |
 | `readiness` | “现在能接流量吗”的探针 | `/actuator/health/readiness` 生产还纳入数据库和 Redis 状态 |
 | Actuator | Spring Boot 的运行状态和指标端点模块 | 提供 health、info、Prometheus；生产不直接暴露给公网 |
-| `Flyway` | 数据库版本迁移工具 | backend 启动时按 V1→V2→V3 执行未落地 SQL |
+| Prometheus | 通过定期抓取指标端点收集时间序列监控数据的系统/格式 | Actuator 可提供 Prometheus 指标给内部监控抓取；“端点能打开”不等于告警规则已经配置完成 |
+| `Flyway` | 数据库版本迁移工具 | backend 启动时按 V1→V2→V3→V4→V5 执行未落地 SQL |
 | `flyway_schema_history` | Flyway 的迁移历史表 | 记录已执行版本、checksum 和成功状态，决定下次从哪版继续 |
 | `seed` | 开发/测试演示数据 | `db/seed.sql` 不是生产结构迁移，生产 profile 不执行 |
 | `DevSeedDataInitializer` | Spring `ApplicationRunner` 实现类 | 仅在 `dev`/`test` 且 `csa.seed.enabled=true` 时，用临时密码生成 BCrypt 后执行 seed |
+| `ApplicationRunner` | Spring Boot 启动回调接口；应用上下文建好后调用一次 `run(ApplicationArguments)` | `DevSeedDataInitializer.run` 在启动阶段检查 seed 文件和临时密码，再决定是否执行演示 SQL；它不是定时任务 |
+| `@Profile` | 只有指定 Spring profile 激活时才注册 Bean | `@Profile({"dev", "test"})` 保证 seed 初始化器不会在 production profile 中创建 |
+| `@ConditionalOnProperty` | 只有配置属性满足指定条件时才注册 Bean | seed 还要求 `csa.seed.enabled=true`；profile 和属性两个条件必须同时满足 |
+| `ResourceDatabasePopulator` | Spring JDBC 提供的 SQL 资源执行器 | 将替换好 BCrypt 占位符的内存 SQL 对 `DataSource` 执行，`continueOnError=false` 表示出错即失败 |
 | `JwtUtils` | 项目的 JWT 工具 Bean | `@PostConstruct validateSecret()` 启动时检查 JWT 密钥至少 32 个 UTF-8 字节 |
+| `@PostConstruct` | Bean 完成依赖注入后执行一次的生命周期回调 | `JwtUtils.validateSecret()` 在应用接收请求前检查密钥，失败会阻止 Spring Boot 启动；它不是每次生成 Token 都运行 |
+| HS256 | HMAC-SHA-256 的 JWT 对称签名算法，签发和验证使用同一秘密密钥 | 用签名发现 Header/Payload 被篡改，不加密 JWT 内容；本项目按 UTF-8 字节检查至少 256 bit（32 字节）密钥 |
 | `SecurityStartupValidator` | Spring 启动校验 Bean | 检查 `SameSite=None` 是否同时设置 `Secure`，生产 Cookie 是否 `Secure=true` |
 | `ProductionStartupValidator` | 生产 profile 启动校验 Bean | 检查 HTTPS 公网地址、Redis、可信代理、forward headers 和 CSRF |
-| `ARG` | Docker 构建期变量 | frontend 的 `NEXT_PUBLIC_API_URL` 在 `next build` 前通过 ARG 注入 |
-| `ENV` | 镜像或容器运行期环境变量 | 例如 `NODE_ENV`、`PORT`、`REDIS_SSL`；但 `NEXT_PUBLIC_*` 客户端值已在构建时固化 |
+| `mysqldump` | MySQL 的逻辑备份工具，把表结构和数据导出为可重新执行的 SQL | `backup.ps1` 在 MySQL 容器内生成压缩的 `database.sql.gz`；它不是磁盘卷的原始块级快照 |
+| SHA-256 | 对文件内容计算 256 bit 摘要的密码学哈希算法 | 备份脚本生成 `SHA256SUMS`，恢复前检查文件是否改变；它不能加密备份，也不能证明备份业务上完整可用 |
 | `read_only: true` | 容器根文件系统只读 | 生产 backend 不能随意写镜像层，只能写挂载卷或 `/tmp` tmpfs |
 | `tmpfs` | 内存中的临时文件系统 | 给只读 backend 提供可写的 `/tmp`，容器删除后内容消失 |
 | `no-new-privileges` | Linux 安全选项 | 防止进程通过 setuid 等方式获得额外权限 |
@@ -2648,8 +2709,8 @@ docker compose up --build
 ```text
 mysql → data 网络
 redis → data 网络
-backend → edge + data 网络，只有 expose 8080
-frontend → edge 网络，只有 expose 3000
+backend → edge + data 网络，声明 expose 8080，不发布宿主机端口
+frontend → edge 网络，声明 expose 3000，不发布宿主机端口
 caddy → edge 网络，发布宿主机 80/443
 ```
 
@@ -2664,7 +2725,7 @@ mysql healthy + redis healthy
 → caddy 启动并接收公网流量
 ```
 
-生产 backend 和 frontend 没有 `ports`，因此公网不能绕过 Caddy 直连它们；Caddy 是唯一的 HTTP/HTTPS 入口。`data: internal: true` 表示该网络不直接连接外部网络，但它不是 TLS，不能把“网络隔离”误说成“链路加密”。
+生产 backend 和 frontend 没有 `ports`，因此宿主机不直接发布它们；Caddy 是生产 Compose 唯一发布的 HTTP/HTTPS 入口。容器间能否互访主要由是否加入同一 Docker 网络决定，`expose` 只是内部端口声明，不提供访问控制。`data: internal: true` 表示该网络不直接连接外部网络，但它不是 TLS，不能把“网络隔离”误说成“链路加密”。
 
 #### `healthcheck`、liveness、readiness 到底检查什么
 
@@ -2776,11 +2837,13 @@ MySQL 容器创建数据库和应用账号
 → 执行未落地的 V1__initial_schema.sql
 → V2__production_operations.sql
 → V3__resume_review_queue_index.sql
+→ V4__account_storage_and_git_sync.sql
+→ V5__contribution_award_audit.sql
 → 写入 flyway_schema_history
 → migration 成功后 readiness 才能通过
 ```
 
-MySQL 容器不负责把 `db/schema.sql` 当作生产结构入口；当前结构以 Flyway V1/V2/V3 为准。`db/seed.sql` 是演示数据，生产 Compose 不挂载它，也使用 `production` profile。只有 `DevSeedDataInitializer` 同时满足以下条件才执行 seed：
+MySQL 容器不负责把 `db/schema.sql` 当作生产结构入口；当前结构以 Flyway V1-V5 为准。`db/seed.sql` 是演示数据，生产 Compose 不挂载它，也使用 `production` profile。只有 `DevSeedDataInitializer` 同时满足以下条件才执行 seed：
 
 ```text
 profile = dev 或 test
@@ -2840,7 +2903,7 @@ docker compose --env-file C:\secure\csa-production.env -f compose.production.yml
 6. 画出“浏览器 → Caddy → backend/frontend”和“backend → mysql/redis”的两条网络路径。
 7. 在隔离开发卷中验证 `down` 保留数据、`down -v` 清空数据；不要对生产项目执行 `down -v`。
 8. 只在 dev/test 临时设置 `DEMO_SEED_ENABLED=true` 和随机 `DEMO_SEED_PASSWORD`，确认缺密码或少于 12 字符时启动器拒绝执行。
-9. 检查当前 Flyway history 应到 V3；看到旧文档只写 V2 时，以 migration 文件和真实 history 为准并记下漂移。
+9. 检查当前 Flyway history 应到 V5；看到旧文档只写 V2/V3 时，以 migration 文件和真实 history 为准并记下漂移。
 10. 在 staging/隔离环境运行一次 backup → checksum 校验 → restore → liveness/readiness 验收，记录数据库行数、上传文件和耗时。
 
 #### 自测题
@@ -2857,14 +2920,14 @@ docker compose --env-file C:\secure\csa-production.env -f compose.production.yml
 10. Caddyfile 中 `/api/*`、`/files/*` 和其它路径分别走哪条 `handle`？为什么不能把所有路径都转给 backend？
 11. liveness 和 readiness 的故障含义有什么区别？为什么生产 readiness 还包含 `db`、`redis`？
 12. `JwtUtils.validateSecret()`、`SecurityStartupValidator`、`ProductionStartupValidator` 各自在哪个启动阶段阻止什么错误？JWT 密钥检查的是字符数还是 UTF-8 字节数？
-13. 当前 V1、V2、V3 分别做什么？`flyway_schema_history` 在启动链中扮演什么角色？
+13. 当前 V1-V5 分别做什么？`flyway_schema_history` 在启动链中扮演什么角色？
 14. 为什么 `db/seed.sql` 不能混进生产 migration？`DevSeedDataInitializer` 的 profile、开关和密码条件是什么？
 15. `docker compose down`、`down -v`、应用镜像回滚、数据库恢复分别会不会删除命名卷？哪些只能在隔离环境做？
 16. backup 生成哪几个文件？SHA-256 能证明什么、不能证明什么？restore 为什么必须显式 `-ConfirmDestructiveRestore`？
 
 #### 完成标准
 
-能不看答案画出开发四服务和生产五服务的启动/网络图；能从两个 Dockerfile 指出每个阶段、构建期变量和非 root 运行点；能解释 healthcheck、liveness/readiness、Caddy 路由、`REDIS_SSL`、`NEXT_PUBLIC_API_URL`、JWT 32 字节校验、Flyway V1/V2/V3、seed 边界和备份恢复风险；能在隔离环境完成一次 `config → up → health → backup/checksum → restore` 验收，并明确说出哪些操作绝不能对生产数据卷执行。
+能不看答案画出开发四服务和生产五服务的启动/网络图；能从两个 Dockerfile 指出每个阶段、构建期变量和非 root 运行点；能解释 healthcheck、liveness/readiness、Caddy 路由、`REDIS_SSL`、`NEXT_PUBLIC_API_URL`、JWT 32 字节校验、Flyway V1-V5、seed 边界和备份恢复风险；能在隔离环境完成一次 `config → up → health → backup/checksum → restore` 验收，并明确说出哪些操作绝不能对生产数据卷执行。
 
 ## 6. 演示脚本
 
@@ -2919,13 +2982,13 @@ docker compose --env-file C:\secure\csa-production.env -f compose.production.yml
 最后讲三件事：
 
 1. 打开 `csa-official-backend/src/main/resources/db/migration/`，说明生产结构由
-   Flyway V1/V2/V3 版本链管理；`db/schema.sql` 只是学习快照，`db/seed.sql` 只给 dev/test
+   Flyway V1-V5 版本链管理；`db/schema.sql` 只是学习快照，`db/seed.sql` 只给 dev/test
    使用。再打开 SchemaConsistencyTest，说明实体和全部 migration 的列一致性是被测试守住的。
 
 2. 打开 docker-compose.yml，说明一条命令就能起 MySQL + Redis + 前后端，
    演示环境不依赖「我这台电脑的配置」。
 
-3. 跑一次 mvnw.cmd test，让当前 133 个用例在面试官面前跑绿，
+3. 跑一次 mvnw.cmd test，让当前 174 个用例（其中 1 个 Docker Testcontainers 用例按开关跳过）在面试官面前跑绿，
    顺带说一句里面有一个是我修掉的偶发失败用例（见 7.15）。
 ```
 
@@ -3038,7 +3101,7 @@ RAG 主要是检索资料并基于资料回答，解决知识更新和引用来�
 第一类是可运行性。项目早期的表结构主要依赖手工创建，
 只存在于开发机上，换台机器很难稳定复现。
 我按实体整理了 db/schema.sql 结构快照和 seed.sql 演示数据，随后把生产结构迁入
-Flyway V1/V2/V3 版本链，并用 docker-compose 把 MySQL、Redis、前端、后端串起来。
+Flyway V1-V5 版本链，并用 docker-compose 把 MySQL、Redis、前端、后端串起来。
 现在本地可以用 docker compose up 复现空库；需要演示账号时，再显式注入一次性 seed 密码。
 为了防止以后再漂移，我写了一个 SchemaConsistencyTest，
 它把实体字段转成下划线格式，和全部 Flyway migration 的列做双向 diff，对不上就构建失败。
@@ -3163,8 +3226,8 @@ JWT 里 jti 用的是随机 UUID，所以每次签名都不同 —— 随机性�
 - [ ] 我能跑 `npm run build`。
 - [ ] 我能看懂 `.env.example`。
 - [ ] 我能根据报错定位 CORS、CSRF、数据库、Redis 问题。
-- [ ] 我能用 `docker compose up --build` 一键起全套，并说清四个服务的启动顺序。
-- [ ] 我能用 Flyway V1/V2/V3 在空库初始化，并解释 `db/schema.sql` 为什么只保留为学习快照。
+- [ ] 我能用 `docker compose up --build` 启动开发四服务，并说清生产为什么增加 Caddy 形成五服务及其启动顺序。
+- [ ] 我能用 Flyway V1-V5 在空库初始化，并解释 `db/schema.sql` 为什么只保留为学习快照。
 - [ ] 我能说清 `SchemaConsistencyTest` 防的是什么事故。
 
 ### 8.7 优化与排错（面试高频）
@@ -3454,7 +3517,7 @@ CSA 协会智能管理平台
 10. 测试清单要包含 `JwtUtilsTest`、`SecurityStartupValidatorTest`、`GitServiceTest`，这些覆盖 JWT 密钥/过期、生产 Cookie 配置和 JGit 行为。
 11. `session_version` 是全会话吊销的权威版本；没有该 claim 的旧 JWT 会被拒绝，不能把旧 Token 当成版本 0。
 12. `V2__production_operations.sql` 不仅补账号字段，还建立审计、文件元数据、邮件投递和定时任务幂等表；修改已执行 SQL 不是回滚方式。
-13. 删除申请当前只进入 `DELETION_PENDING`。最终匿名化/删除仍需受控执行器和审批证据，演示时不能说成“自动在 N 天内删完”。
+13. 删除申请先进入 `DELETION_PENDING`；保留期到后由带数据库幂等键的任务自动匿名化符合条件的账号。它不等于立即物理删除，备份副本仍按备份保留策略处理。
 
 ### 12.1 本轮「可运行性 + 分层 + 性能」优化后的新口径
 
@@ -3662,8 +3725,8 @@ cd D:\CSA-Project\csa-official-backend
 这一轮改造不只是“把服务放进 Docker”。建议按下面顺序亲手跑一遍，并把每一步的输出留在自己的实验记录里：
 
 1. 读 `application.yml`、`application-production.yml` 和两个 Compose 文件，画出浏览器、Caddy、frontend、backend、MySQL、Redis 的网络边界。
-2. 用空 MySQL 卷启动 production profile，查询 `flyway_schema_history`，确认 V1/V2/V3 成功且没有演示账号。
-3. 把旧版结构导入隔离数据库，使用一次性 `FLYWAY_BASELINE_ON_MIGRATE=true` 把旧结构登记为 V1，确认随后执行 V2、V3，再恢复为 `false`。
+2. 用空 MySQL 卷启动 production profile，查询 `flyway_schema_history`，确认 V1-V5 成功且没有演示账号。
+3. 把旧版结构导入隔离数据库，使用一次性 `FLYWAY_BASELINE_ON_MIGRATE=true` 把旧结构登记为 V1，确认随后执行 V2-V5，再恢复为 `false`。
 4. 手工制造一个失败 migration，观察 MySQL DDL 的非事务特征；理解为什么恢复路径必须依赖备份，而不是盲目 `repair`。
 5. 运行 `deploy/backup.ps1` 和 `deploy/restore.ps1`，验证数据库行数、上传文件 SHA-256 和应用健康状态恢复一致；恢复失败时应用应保持停止。
 6. 查看 `X-Request-ID`、JSON 日志、`/actuator/health/readiness`、`/actuator/health/liveness` 和 Prometheus 指标，分别说明它们服务于排错、编排还是告警。

@@ -92,7 +92,7 @@ export function AccountSecurityPanel() {
   async function handleAccountAction(action: "deactivate" | "delete") {
     const message = action === "deactivate"
       ? "停用后账号将不能登录，但数据会按保留策略处理。继续吗？"
-      : "提交删除申请后账号会立即退出，管理员会按保留策略处理数据。继续吗？"
+      : "提交删除申请后账号会立即退出；保留期结束后系统会按策略匿名化账号及关联个人字段。继续吗？"
 
     if (!confirmAction(message)) {
       return
@@ -196,7 +196,7 @@ export function AccountSecurityPanel() {
           <h3 className="font-semibold">停用或删除账号</h3>
         </div>
         <p className="mt-3 text-sm leading-7 text-muted-foreground">
-          这两个操作都会立即退出当前账号。删除申请会进入人工审核和数据保留流程。
+          这两个操作都会立即退出当前账号。删除申请会进入数据保留期，期满后由后台任务匿名化账号及关联个人字段。
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Button variant="outline" onClick={() => handleAccountAction("deactivate")} disabled={pending !== null}>

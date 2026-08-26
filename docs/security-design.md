@@ -315,7 +315,7 @@ POST /api/account/deactivate
 POST /api/account/deletion-request
 ```
 
-这些 Cookie 认证的 POST 都需要 CSRF。前三类会立即退出当前会话；删除申请只进入 `DELETION_PENDING` 和保留/审核流程，当前没有自动最终匿名化或物理删除执行器，不能把“提交申请”描述成“数据已经删除”。
+这些 Cookie 认证的 POST 都需要 CSRF。前三类会立即退出当前会话；删除申请先进入 `DELETION_PENDING` 和保留期，到期后由受幂等锁保护的计划任务自动匿名化符合条件的账号。它不等于立即物理删除，备份副本仍按备份保留策略到期处理。
 
 ## 11. 文件访问控制
 

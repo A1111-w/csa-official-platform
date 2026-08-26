@@ -56,6 +56,6 @@ docker compose --env-file C:\secure\csa-production.env -f compose.production.yml
 
 2026-07-29 的隔离栈已完成空库 Flyway、已有库 baseline、失败迁移 fixture、备份恢复、backend/frontend 镜像和同源 HTTPS 最小 E2E；详细历史证据见 `phase-1-verification.md`。
 
-2026-08-26 当前源码的后端 133 tests、前端 lint/test/build 已通过；显式 MySQL/Redis/Flyway 当前测试目标已更新到 V3，但本机 Docker 数据盘发生 I/O/EXT4 journal 故障，真实依赖、最新镜像构建、Playwright 和备份恢复必须在健康 staging 重跑；不得拿历史镜像结果替代。Phase 2 证据见 `phase-2-verification.md`。
+2026-08-26 当前源码的后端 174 tests、前端 6 files / 12 tests、lint/build 已通过；显式 MySQL/Redis/Flyway 当前测试目标已更新到 V1-V5，但本机 Docker 数据盘发生 I/O/EXT4 journal 故障，真实依赖、最新镜像构建和备份恢复必须在健康 staging 重跑。Playwright 已安装 Chromium 151，但本轮等待 Next.js dev server 120 秒超时，也必须单独补跑；不得拿历史镜像或历史 E2E 结果替代。Phase 2 证据见 `phase-2-verification.md`。
 
 本机 Windows 的 80 端口被 HTTP.sys 占用，历史 E2E 使用 `8443` 映射验证同一 Caddy 配置；生产部署仍按 80/443 运行。生产发布前必须在真实域名和 staging 证书环境再次执行健康检查、备份恢复、最小用户流程和当前镜像扫描。
