@@ -1,5 +1,6 @@
 package com.csa.official.modules.biz.service;
 
+import com.csa.official.common.exception.ApiErrorCode;
 import com.csa.official.common.exception.CsaException;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.Git;
@@ -9,68 +10,107 @@ import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.IDN;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class GitService {
 
-    // 之前你在 application.yml 配置的上传路径
-    @Value("${csa.upload-path}") 
-    private String basePath;
+    private final String basePath;
+    private final Set<String> allowedHosts;
 
-    /**
-     * 同步代码仓库 (Clone 或 Pull)
-     * @param userId 用户ID
-     * @param repoUrl 仓库地址 (如 https://github.com/xxx/xxx.git)
-     */
+    public GitService(
+            @Value("${csa.upload-path}") String basePath,
+            @Value("${csa.git.allowed-hosts:github.com,gitee.com,gitlab.com}") String allowedHostsConfig) {
+        this.basePath = basePath;
+        this.allowedHosts = Arrays.stream(allowedHostsConfig.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .map(value -> IDN.toASCII(value).toLowerCase(Locale.ROOT))
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
     public void syncRepository(Long userId, String repoUrl) {
-        if (!repoUrl.startsWith("http")) {
-            throw new CsaException("仅支持 HTTP/HTTPS 协议的仓库地址");
-        }
-
-        // 存放路径: /csa-upload/git-repos/{userId}/
-        // 这样每个用户的代码都独立分开
+        URI repositoryUri = validateRepositoryUrl(repoUrl);
         File localPath = new File(basePath + File.separator + "git-repos" + File.separator + userId);
 
         try {
             if (localPath.exists() && new File(localPath, ".git").exists()) {
-                // === 情况1：仓库已存在，执行 git pull ===
-                log.info("仓库已存在，开始更新: {}", localPath.getAbsolutePath());
                 try (Git git = Git.open(localPath)) {
-                    git.pull().call(); // 相当于 git pull
-                    log.info("更新成功");
+                    git.pull().call();
                 }
-            } else {
-                // === 情况2：仓库不存在，执行 git clone ===
-                log.info("仓库不存在，开始克隆: {} -> {}", repoUrl, localPath.getAbsolutePath());
-                
-                // 为了防坑，如果目录存在但没 .git，先删干净
-                if (localPath.exists()) {
-                    deleteDir(localPath);
-                }
-                localPath.mkdirs();
-
-                Git.cloneRepository()
-                        .setURI(repoUrl)
-                        .setDirectory(localPath)
-                        .setDepth(1) // 💡 优化：只拉取最后一次提交，省流量省空间！
-                        .call();
-                log.info("克隆成功");
+                return;
             }
+
+            if (localPath.exists()) {
+                deleteDir(localPath);
+            }
+            if (!localPath.mkdirs() && !localPath.isDirectory()) {
+                throw new IOException("Unable to create repository directory");
+            }
+
+            log.info("Cloning repository from approved host {}", repositoryUri.getHost());
+            Git.cloneRepository()
+                    .setURI(repositoryUri.toASCIIString())
+                    .setDirectory(localPath)
+                    .setDepth(1)
+                    .call()
+                    .close();
         } catch (GitAPIException | IOException e) {
-            log.error("Git操作失败", e);
-            throw new CsaException("代码同步失败，请检查仓库地址是否公开，或网络是否通畅");
+            log.error("Git synchronization failed for userId={}", userId, e);
+            throw new CsaException(ApiErrorCode.UPSTREAM_ERROR, "Repository synchronization failed", e);
         }
     }
 
-    // 辅助：递归删除文件夹
+    private URI validateRepositoryUrl(String repoUrl) {
+        if (repoUrl == null || repoUrl.isBlank()) {
+            throw new CsaException(400, "Repository URL is required");
+        }
+
+        final URI uri;
+        try {
+            uri = new URI(repoUrl.trim());
+        } catch (URISyntaxException e) {
+            throw new CsaException(400, "Invalid repository URL");
+        }
+
+        String scheme = uri.getScheme();
+        if (!"https".equalsIgnoreCase(scheme) && !"http".equalsIgnoreCase(scheme)) {
+            throw new CsaException(400, "Only HTTP/HTTPS repository URLs are supported");
+        }
+        if (uri.getHost() == null || uri.getUserInfo() != null) {
+            throw new CsaException(400, "Invalid repository URL");
+        }
+
+        int port = uri.getPort();
+        if (port != -1 && port != 80 && port != 443) {
+            throw new CsaException(400, "Repository URL port is not allowed");
+        }
+
+        String host = IDN.toASCII(uri.getHost()).toLowerCase(Locale.ROOT);
+        boolean allowed = allowedHosts.stream()
+                .anyMatch(value -> host.equals(value) || host.endsWith("." + value));
+        if (!allowed) {
+            throw new CsaException(400, "Repository host is not allowed");
+        }
+        return uri;
+    }
+
     private void deleteDir(File file) {
         File[] contents = file.listFiles();
         if (contents != null) {
-            for (File f : contents) {
-                deleteDir(f);
+            for (File child : contents) {
+                deleteDir(child);
             }
         }
-        file.delete();
+        if (!file.delete() && file.exists()) {
+            log.warn("Unable to delete {}", file.getAbsolutePath());
+        }
     }
 }

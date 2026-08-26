@@ -1,179 +1,260 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Navbar } from "@/components/layout/Navbar";
-import { Footer } from "@/components/layout/Footer";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Skeleton } from "@/components/ui/skeleton";
-import { publicService, ContributorVo, CarouselItem } from "@/services/public";
-import { ArrowRight, Code, Database, Trophy, Users } from "lucide-react";
+import Link from "next/link"
+import { useEffect, useMemo, useState } from "react"
+import {
+  ArrowRight,
+  BookOpen,
+  FileText,
+  GitPullRequest,
+  HardDrive,
+  Sparkles,
+  Trophy,
+  Users,
+} from "lucide-react"
+import { toast } from "sonner"
 
-export default function Home() {
-  const [about, setAbout] = useState<string>("");
-  const [contributors, setContributors] = useState<ContributorVo[]>([]);
-  // const [carousel, setCarousel] = useState<CarouselItem[]>([]); // 暂时先不渲染轮播图，用 Hero 替代
-  const [loading, setLoading] = useState(true);
+import { ContributorWall } from "@/components/business/community/ContributorWall"
+import { Footer } from "@/components/layout/Footer"
+import { Navbar } from "@/components/layout/Navbar"
+import { Button } from "@/components/ui/button"
+import { useIsClient } from "@/hooks/use-is-client"
+import { excerptText } from "@/lib/format"
+import { publicService, type ContributorVo } from "@/services/public"
+import { useAuthStore } from "@/store/useAuthStore"
+
+const platformItems = [
+  {
+    title: "资源沉淀",
+    desc: "课程资料、工具包和协会模板集中维护。",
+    icon: HardDrive,
+  },
+  {
+    title: "比赛活动",
+    desc: "活动信息面向访客展示，管理入口留给组织成员。",
+    icon: Trophy,
+  },
+  {
+    title: "简历工作区",
+    desc: "核心成员维护项目经历，部长在审核工作台处理提交。",
+    icon: FileText,
+  },
+  {
+    title: "组织协作",
+    desc: "提案、部门和公开内容逐级授权，减少散落沟通。",
+    icon: GitPullRequest,
+  },
+]
+
+export default function HomePage() {
+  const isClient = useIsClient()
+  const { user } = useAuthStore()
+  const [loading, setLoading] = useState(true)
+  const [about, setAbout] = useState("")
+  const [contributors, setContributors] = useState<ContributorVo[]>([])
 
   useEffect(() => {
-    async function fetchData() {
+    let cancelled = false
+
+    async function loadHomeData() {
+      setLoading(true)
       try {
-        const [aboutData, contributorsData] = await Promise.all([
+        const [aboutContent, contributorList] = await Promise.all([
           publicService.getAbout(),
-          publicService.getContributors()
-        ]);
-        setAbout(aboutData || "暂无介绍");
-        setContributors(contributorsData || []);
+          publicService.getContributors(),
+        ])
+
+        if (cancelled) {
+          return
+        }
+
+        setAbout(aboutContent)
+        setContributors(contributorList)
       } catch (error) {
-        console.error("Fetch home data failed", error);
+        if (!cancelled) {
+          toast.error(error instanceof Error ? error.message : "首页数据加载失败")
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
-    fetchData();
-  }, []);
+
+    loadHomeData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const roleStats = useMemo(() => {
+    const leaderCount = contributors.filter((item) => item.roleLevel >= 3).length
+    const coreCount = contributors.filter((item) => item.roleLevel >= 2).length
+
+    return {
+      total: contributors.length,
+      leaders: leaderCount,
+      core: coreCount,
+    }
+  }, [contributors])
+
+  const aboutSummary =
+    excerptText(about, 210) ||
+    "CSA 把资源沉淀、比赛组织、简历维护和内部协作收在同一套平台里，让成员能更快找到入口，也让协会的技术资产继续留下来。"
+
+  const primaryHref = isClient && user ? "/dashboard" : "/login"
+  const primaryLabel = isClient && user ? "进入控制台" : "登录平台"
 
   return (
-    <div className="min-h-screen flex flex-col font-sans">
+    <div className="min-h-screen bg-background">
       <Navbar />
 
-      <main className="flex-1">
-        {/* 1. Hero Section - 视觉冲击区 */}
-        <section className="relative py-20 md:py-32 bg-gradient-to-b from-blue-50 to-white dark:from-slate-900 dark:to-background overflow-hidden">
-          <div className="container px-4 md:px-8 mx-auto max-w-7xl text-center relative z-10">
-            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 mb-6">
-              连接每一位 <span className="text-blue-600">开发者</span>
-            </h1>
-            <p className="text-lg md:text-xl text-slate-600 dark:text-slate-400 mb-8 max-w-2xl mx-auto leading-relaxed">
-              广州华立学院计算机协会官方平台。在这里，你可以分享资源、参与竞技、提交代码，与志同道合的伙伴共同成长。
-            </p>
-            <div className="flex justify-center gap-4">
-              <Link href="/register">
-                <Button size="lg" className="rounded-full px-8 text-base">
-                  立即加入 <ArrowRight className="ml-2 h-4 w-4" />
+      <main>
+        <section className="relative overflow-hidden border-b bg-[linear-gradient(135deg,#ffffff_0%,#eef4ff_48%,#edfff8_100%)]">
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+          <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 md:px-8 lg:grid-cols-[0.95fr_1.05fr] lg:py-20">
+            <div className="flex flex-col justify-center">
+              <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight text-foreground sm:text-5xl">
+                CSA 计协协作平台
+              </h1>
+              <p className="mt-5 max-w-2xl text-base leading-8 text-muted-foreground">
+                面向协会成员和访客的统一入口：公开信息对外展示，资源、比赛、简历和提案按身份进入对应工作区，让协作像一套清晰的产品流。
+              </p>
+
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Button asChild size="lg">
+                  <Link href={primaryHref}>
+                    {primaryLabel}
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
                 </Button>
-              </Link>
-              <Link href="/about">
-                <Button variant="outline" size="lg" className="rounded-full px-8 text-base">
-                  了解更多
+                <Button asChild variant="outline" size="lg">
+                  <Link href="/resources">浏览资源库</Link>
                 </Button>
-              </Link>
-            </div>
-          </div>
-          {/* 背景装饰 */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full opacity-10 pointer-events-none">
-             <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]"></div>
-          </div>
-        </section>
+              </div>
 
-        {/* 2. Features - 功能特区 */}
-        <section className="py-20 bg-white dark:bg-background">
-          <div className="container px-4 md:px-8 mx-auto max-w-7xl">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <FeatureCard 
-                icon={<Database className="h-10 w-10 text-blue-500" />}
-                title="海量资源"
-                desc="汇聚历届学长学姐的学习资料、软件工具与实战项目，等级越高，权限越大。"
-              />
-              <FeatureCard 
-                icon={<Trophy className="h-10 w-10 text-yellow-500" />}
-                title="技术竞赛"
-                desc="定期举办编程比赛、黑客马拉松，提供丰厚奖品与核心成员晋升通道。"
-              />
-              <FeatureCard 
-                icon={<Code className="h-10 w-10 text-green-500" />}
-                title="简历托管"
-                desc="支持 Markdown 在线编辑与 Git 仓库绑定，提供专业的简历审核与指导。"
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* 3. Introduction - 协会介绍 (从后端加载) */}
-        <section className="py-20 bg-slate-50 dark:bg-slate-900/50">
-          <div className="container px-4 md:px-8 mx-auto max-w-5xl">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold mb-4">关于 CSA</h2>
-              <div className="h-1 w-20 bg-blue-600 mx-auto rounded-full"></div>
-            </div>
-            <div className="prose prose-lg dark:prose-invert mx-auto bg-white dark:bg-slate-800 p-8 md:p-12 rounded-2xl shadow-sm">
-              {loading ? (
-                <div className="space-y-4">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-5/6" />
-                  <Skeleton className="h-4 w-full" />
-                </div>
-              ) : (
-                <div dangerouslySetInnerHTML={{ __html: about }} className="whitespace-pre-wrap leading-relaxed" />
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* 4. Contributors - 核心成员/贡献墙 */}
-        <section className="py-20 bg-white dark:bg-background">
-          <div className="container px-4 md:px-8 mx-auto max-w-7xl">
-            <div className="flex flex-col md:flex-row justify-between items-end mb-10 gap-4">
-               <div>
-                  <h2 className="text-3xl font-bold mb-2">核心成员</h2>
-                  <p className="text-muted-foreground">这些大佬正在为社团提供技术与运营支持</p>
-               </div>
-               <Link href="/contributors">
-                  <Button variant="ghost" className="group">
-                    查看完整榜单 <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </Button>
-               </Link>
-            </div>
-            
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex flex-col items-center space-y-3">
-                    <Skeleton className="h-24 w-24 rounded-full" />
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-3 w-16" />
+              <div className="mt-10 grid gap-3 sm:grid-cols-3">
+                {[
+                  ["公开成员", String(roleStats.total || "--")],
+                  ["组织负责人", String(roleStats.leaders || "--")],
+                  ["核心成员", String(roleStats.core || "--")],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className="rounded-lg border bg-white/80 px-4 py-5 shadow-sm backdrop-blur"
+                  >
+                    <p className="text-sm text-muted-foreground">{label}</p>
+                    <p className="mt-2 text-2xl font-semibold">{value}</p>
                   </div>
-                ))
-              ) : (
-                contributors.slice(0, 10).map((member) => (
-                  <Card key={member.id} className="border-0 shadow-none hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
-                    <CardContent className="flex flex-col items-center p-6 text-center">
-                      <Avatar className="h-20 w-20 mb-4 border-2 border-slate-100">
-                        <AvatarImage src={member.avatar} />
-                        <AvatarFallback className="text-lg bg-blue-100 text-blue-600">
-                          {member.realName ? member.realName.substring(0, 1) : "U"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">{member.realName || "神秘成员"}</h3>
-                      <p className="text-xs text-blue-600 font-medium mt-1 mb-1">{member.title}</p>
-                      <p className="text-xs text-muted-foreground">{member.deptName || "核心组"}</p>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
+                ))}
+              </div>
             </div>
+
+            <div className="rounded-lg border bg-white/85 p-4 shadow-[0_24px_80px_rgba(37,56,112,0.14)] backdrop-blur">
+              <div className="flex items-center justify-between border-b pb-4">
+                <div>
+                  <p className="text-sm font-medium">今日工作台</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    从公开页面到内部协作的一张入口图
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3">
+                {platformItems.map((item) => {
+                  const Icon = item.icon
+
+                  return (
+                    <div
+                      key={item.title}
+                      className="grid grid-cols-[auto_1fr] gap-3 rounded-lg border bg-white p-4 shadow-sm transition-transform hover:-translate-y-0.5"
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-md bg-accent text-accent-foreground">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{item.title}</p>
+                        <p className="mt-1 text-xs leading-6 text-muted-foreground">
+                          {item.desc}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-7xl bg-background px-4 py-14 md:px-8">
+          <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr]">
+            <div className="space-y-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <BookOpen className="h-5 w-5" />
+              </div>
+              <h2 className="text-3xl font-semibold tracking-tight">
+                把公开信息讲清楚，也把内部协作接住
+              </h2>
+              <p className="text-sm leading-8 text-muted-foreground">{aboutSummary}</p>
+              <Button asChild variant="outline">
+                <Link href="/about">
+                  查看完整介绍
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              {[
+                {
+                  title: "访客入口",
+                  desc: "浏览协会介绍、比赛活动和核心成员。",
+                },
+                {
+                  title: "成员路径",
+                  desc: "拿到邀请码后进入资源库，开始使用沉淀内容。",
+                },
+                {
+                  title: "核心协作",
+                  desc: "简历、提案和公开内容维护逐级向上开放。",
+                },
+              ].map((item) => (
+                <div key={item.title} className="rounded-lg border bg-card p-5">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <h3 className="mt-4 font-semibold">{item.title}</h3>
+                  <p className="mt-2 text-sm leading-7 text-muted-foreground">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="border-t bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] py-14">
+          <div className="mx-auto max-w-7xl px-4 md:px-8">
+            <div className="mb-8 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Users className="h-5 w-5" />
+                </div>
+                <h2 className="text-3xl font-semibold tracking-tight">
+                  正在把这件事推进下去的人
+                </h2>
+              </div>
+              <Button asChild variant="outline">
+                <Link href="/contributors">
+                  查看完整名单
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+
+            <ContributorWall members={contributors} loading={loading} limit={4} />
           </div>
         </section>
       </main>
 
       <Footer />
     </div>
-  );
-}
-
-// 简单的功能卡片组件
-function FeatureCard({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
-  return (
-    <div className="group p-8 rounded-2xl border bg-card text-card-foreground shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
-      <div className="mb-4 inline-flex p-3 rounded-xl bg-slate-50 dark:bg-slate-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20 transition-colors">
-        {icon}
-      </div>
-      <h3 className="text-xl font-bold mb-3">{title}</h3>
-      <p className="text-muted-foreground leading-relaxed">
-        {desc}
-      </p>
-    </div>
-  );
+  )
 }

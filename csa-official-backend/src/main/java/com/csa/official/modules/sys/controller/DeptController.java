@@ -1,10 +1,12 @@
 package com.csa.official.modules.sys.controller;
 
+import com.csa.official.common.exception.CsaException;
 import com.csa.official.common.result.R;
-import com.csa.official.modules.sys.entity.Dept;
 import com.csa.official.modules.sys.service.DeptService;
+import com.csa.official.modules.sys.vo.DeptVO;
 import lombok.Data;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,8 +21,8 @@ public class DeptController {
 
     // 1. 查看所有部门列表 (公开接口，方便查看 ID)
     @GetMapping("/list")
-    public R<List<Dept>> list() {
-        return R.ok(deptService.getAllDepts());
+    public R<List<DeptVO>> list() {
+        return R.ok(deptService.getAllDepts().stream().map(DeptVO::from).toList());
     }
 
     /**
@@ -32,7 +34,7 @@ public class DeptController {
     @PostMapping("/appoint")
     public R<String> appoint(@RequestBody AppointDto dto) {
         if (dto.getDeptId() == null || dto.getUserId() == null) {
-            return R.fail("参数不完整");
+            throw new CsaException(HttpStatus.BAD_REQUEST.value(), "参数不完整");
         }
 
         deptService.appointLeader(dto.getDeptId(), dto.getUserId());

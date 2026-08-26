@@ -1,27 +1,23 @@
-import { DashboardSidebar } from "@/components/layout/DashboardSidebar";
-import { Navbar } from "@/components/layout/Navbar"; 
+import { DashboardGuard } from "@/components/layout/DashboardGuard"
+import { DashboardSidebar } from "@/components/layout/DashboardSidebar"
+import { Navbar } from "@/components/layout/Navbar"
 
 export default function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
     <div className="flex min-h-screen flex-col">
-      {/* 这里我复用了 Navbar，你也可以去掉它，只留 Sidebar。
-         但为了方便用户随时回首页或退出登录，保留 Navbar 是个不错的选择。
-      */}
-      <Navbar /> 
-      
-      <div className="flex flex-1">
-        {/* 左侧侧边栏 */}
+      <Navbar />
+
+      <div className="flex min-h-[calc(100vh-4rem)] flex-1 flex-col lg:flex-row">
         <DashboardSidebar />
-        
-        {/* 右侧内容区域 */}
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto bg-slate-50/50 dark:bg-black">
-          {children}
+
+        <main className="min-w-0 flex-1 overflow-y-auto bg-muted/20 p-4 md:p-8">
+          <DashboardGuard>{children}</DashboardGuard>
         </main>
       </div>
     </div>
-  );
+  )
 }

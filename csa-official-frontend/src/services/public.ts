@@ -1,34 +1,48 @@
-import api from '@/lib/axios';
+import api from "@/lib/axios"
 
 export interface CarouselItem {
-  id: number;
-  imgUrl: string;
-  targetUrl: string;
-  title: string;
+  id: number
+  imgUrl: string
+  targetUrl: string
+  title: string
 }
 
 export interface ContributorVo {
-  id: number;
-  realName: string;
-  avatar: string;
-  deptName: string;
-  title: string;
-  roleLevel: number;
+  id: number
+  realName: string
+  avatar: string
+  deptName: string
+  title: string
+  roleLevel: number
+}
+
+export interface PrivacyNotice {
+  policyVersion: string
+  collectedFields: string[]
+  purposes: Record<string, string>
+  retention: Record<string, string>
+  userRights: string[]
+  contactEmail: string
 }
 
 export const publicService = {
-  // 获取轮播图
   getCarousel: () => {
-    return api.get<any, CarouselItem[]>('/api/public/carousel/list');
+    return api.get<CarouselItem[], CarouselItem[]>("/api/public/carousel/list")
   },
 
-  // 获取协会介绍
   getAbout: () => {
-    return api.get<any, string>('/api/public/about');
+    return api.get<string, string>("/api/public/about")
   },
 
-  // 获取贡献者/核心成员名单
   getContributors: () => {
-    return api.get<any, ContributorVo[]>('/api/public/contributors');
-  }
-};
+    return api.get<ContributorVo[], ContributorVo[]>("/api/public/contributors")
+  },
+
+  getPrivacyNotice: () => {
+    return api.get<PrivacyNotice, PrivacyNotice>("/api/public/privacy", { skipAuthRedirect: true })
+  },
+
+  updateAbout: (content: string) => {
+    return api.post<string, string>("/api/sys/config/update-about", { content })
+  },
+}

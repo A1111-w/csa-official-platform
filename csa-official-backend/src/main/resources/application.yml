@@ -1,29 +1,47 @@
 server:
   port: ${SERVER_PORT:8080}
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:framework}
+  shutdown: graceful
 
 spring:
+  config:
+    import: "optional:file:.env[.properties]"
   application:
     name: csa-official-backend
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:30s}
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    # 动态读取环境变量
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_MAX_POOL_SIZE:4}
+      minimum-idle: ${DB_MIN_IDLE:1}
+      idle-timeout: ${DB_IDLE_TIMEOUT:600000}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT:30000}
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: ${FLYWAY_LOCATIONS:classpath:db/migration}
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+    baseline-version: 1
+    baseline-description: Legacy schema before Flyway
+    validate-on-migrate: true
+    clean-disabled: true
+    out-of-order: false
   data:
     redis:
-      # 动态读取 Redis 环境变量
-      host: ${REDIS_HOST}
+      host: ${REDIS_HOST:}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD}
-      database: 0
+      username: ${REDIS_USERNAME:}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
       ssl:
-        enabled: true
-  # 邮件配置 
+        enabled: ${REDIS_SSL:true}
   mail:
     host: smtp.qq.com
-    username: ${MAIL_USERNAME:3331283195@qq.com} 
-    password: ${MAIL_PASSWORD}         
+    username: ${MAIL_USERNAME:mail@localhost.invalid}
+    password: ${MAIL_PASSWORD:}
     default-encoding: UTF-8
     properties:
       mail:
@@ -32,31 +50,94 @@ spring:
           starttls:
             enable: true
             required: true
-  
   servlet:
     multipart:
-      max-file-size: 500MB
-      max-request-size: 500MB
+      max-file-size: ${MAX_FILE_SIZE:50MB}
+      max-request-size: ${MAX_REQUEST_SIZE:50MB}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+        liveness:
+          include: livenessState
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
 
 mybatis-plus:
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
     map-underscore-to-camel-case: true
   global-config:
     db-config:
       logic-delete-field: deleted
 
 csa:
+  public-base-url: ${PUBLIC_BASE_URL:}
+  seed:
+    enabled: ${DEMO_SEED_ENABLED:false}
+    location: ${DEMO_SEED_LOCATION:file:../db/seed.sql}
+    password: ${DEMO_SEED_PASSWORD:}
+  cache:
+    type: ${CSA_CACHE_TYPE:redis}
+  security:
+    cookie:
+      name: ${AUTH_COOKIE_NAME:CSA_AUTH_TOKEN}
+      secure: ${AUTH_COOKIE_SECURE:false}
+      same-site: ${AUTH_COOKIE_SAME_SITE:Lax}
+    csrf:
+      enabled: ${CSRF_ENABLED:true}
+      cookie-name: ${CSRF_COOKIE_NAME:CSA_CSRF_TOKEN}
+      header-name: ${CSRF_HEADER_NAME:X-CSRF-Token}
+    cors:
+      allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,http://localhost:5173,http://127.0.0.1:5173}
+    rate-limit:
+      forwarded-ip-header: ${RATE_LIMIT_FORWARDED_IP_HEADER:X-Forwarded-For}
+      trusted-proxies: ${RATE_LIMIT_TRUSTED_PROXIES:}
   jwt:
     secret: ${JWT_SECRET}
-    expiration: ${JWT_EXPIRATION:604800000} 
-  
-  # 本地路径暂时保留，部署 Render 时虽然会重置，但能跑通
+    expiration: ${JWT_EXPIRATION:604800000}
+  privacy:
+    current-version: ${PRIVACY_POLICY_VERSION:2026-01}
+    contact-email: ${PRIVACY_CONTACT_EMAIL:privacy@localhost.invalid}
+    account-retention-days: ${ACCOUNT_DELETION_RETENTION_DAYS:30}
+  mail:
+    max-attempts: ${MAIL_MAX_ATTEMPTS:3}
+  scheduling:
+    lock-seconds: ${SCHEDULED_JOB_LOCK_SECONDS:900}
   upload-path: ${UPLOAD_PATH:${user.home}/csa-upload/}
-  
+  upload:
+    max-file-size-bytes: ${UPLOAD_MAX_FILE_SIZE_BYTES:52428800}
+    user-quota-bytes: ${UPLOAD_USER_QUOTA_BYTES:209715200}
+    school-quota-bytes: ${UPLOAD_SCHOOL_QUOTA_BYTES:21474836480}
+    orphan-grace-hours: ${UPLOAD_ORPHAN_GRACE_HOURS:24}
+    cleanup-batch-size: ${UPLOAD_CLEANUP_BATCH_SIZE:100}
+  git:
+    allowed-hosts: ${GIT_ALLOWED_HOSTS:github.com,gitee.com,gitlab.com}
   allow-types: jpg,jpeg,png,gif,pdf,zip,rar,7z,tar,gz,doc,docx,ppt,pptx
-
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: GMT+8
-

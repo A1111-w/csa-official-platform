@@ -1,13 +1,18 @@
 package com.csa.official.common.annotation;
 
-import java.lang.annotation.*;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface RateLimit {
-    String key() default ""; // 限流 Key 的前缀
+    String key() default "";
 
-    int time() default 300; // 时间窗口 (秒)
+    String[] identifiers() default {};
 
-    int count() default 10; // 允许请求的次数
+    int time() default 300;
+
+    int count() default 10;
 }

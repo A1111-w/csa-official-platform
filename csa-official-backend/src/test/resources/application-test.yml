@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    driver-class-name: org.h2.Driver
+    url: jdbc:h2:mem:csa-test;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  flyway:
+    enabled: false
+
+csa:
+  seed:
+    enabled: false
+  cache:
+    type: memory
+  jwt:
+    secret: test-only-jwt-secret-at-least-32-chars
+  upload-path: ${java.io.tmpdir}/csa-test-upload/

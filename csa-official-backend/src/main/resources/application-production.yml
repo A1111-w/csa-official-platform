@@ -1,0 +1,35 @@
+spring:
+  config:
+    activate:
+      on-profile: production
+
+logging:
+  structured:
+    format:
+      console: logstash
+  level:
+    root: INFO
+    com.csa.official: INFO
+
+csa:
+  cache:
+    type: ${CSA_CACHE_TYPE:redis}
+  security:
+    cookie:
+      secure: ${AUTH_COOKIE_SECURE:true}
+      same-site: ${AUTH_COOKIE_SAME_SITE:Lax}
+    csrf:
+      enabled: ${CSRF_ENABLED:true}
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoint:
+    health:
+      group:
+        readiness:
+          include: readinessState,db,redis

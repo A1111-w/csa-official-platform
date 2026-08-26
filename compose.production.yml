@@ -1,0 +1,185 @@
+name: csa-production
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?required}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-csa_db}
+      MYSQL_USER: ${MYSQL_APP_USER:-csa_app}
+      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD:?required}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    security_opt:
+      - no-new-privileges:true
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?required}
+    command:
+      - /bin/sh
+      - -ec
+      - exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+    volumes:
+      - redis-data:/data
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    security_opt:
+      - no-new-privileges:true
+
+  backend:
+    build:
+      context: ./csa-official-backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      SERVER_PORT: 8080
+      FORWARD_HEADERS_STRATEGY: framework
+      PUBLIC_BASE_URL: ${PUBLIC_ORIGIN:?required}
+      DB_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-csa_db}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&sslMode=REQUIRED&allowPublicKeyRetrieval=false"
+      DB_USERNAME: ${MYSQL_APP_USER:-csa_app}
+      DB_PASSWORD: ${MYSQL_APP_PASSWORD:?required}
+      DB_MAX_POOL_SIZE: ${DB_MAX_POOL_SIZE:-12}
+      DB_MIN_IDLE: ${DB_MIN_IDLE:-2}
+      FLYWAY_BASELINE_ON_MIGRATE: ${FLYWAY_BASELINE_ON_MIGRATE:-false}
+      CSA_CACHE_TYPE: redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?required}
+      REDIS_SSL: "false"
+      JWT_SECRET: ${JWT_SECRET:?required}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-604800000}
+      AUTH_COOKIE_SECURE: "true"
+      AUTH_COOKIE_SAME_SITE: Lax
+      CSRF_ENABLED: "true"
+      CORS_ALLOWED_ORIGIN_PATTERNS: ${PUBLIC_ORIGIN:?required}
+      RATE_LIMIT_TRUSTED_PROXIES: 172.30.0.0/24
+      MAIL_USERNAME: ${MAIL_USERNAME:?required}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:?required}
+      MAIL_MAX_ATTEMPTS: ${MAIL_MAX_ATTEMPTS:-3}
+      PRIVACY_POLICY_VERSION: ${PRIVACY_POLICY_VERSION:-2026-01}
+      PRIVACY_CONTACT_EMAIL: ${PRIVACY_CONTACT_EMAIL:-privacy@localhost.invalid}
+      ACCOUNT_DELETION_RETENTION_DAYS: ${ACCOUNT_DELETION_RETENTION_DAYS:-30}
+      UPLOAD_PATH: /app/uploads/
+      UPLOAD_MAX_FILE_SIZE_BYTES: ${UPLOAD_MAX_FILE_SIZE_BYTES:-52428800}
+      UPLOAD_USER_QUOTA_BYTES: ${UPLOAD_USER_QUOTA_BYTES:-209715200}
+      UPLOAD_SCHOOL_QUOTA_BYTES: ${UPLOAD_SCHOOL_QUOTA_BYTES:-21474836480}
+      UPLOAD_ORPHAN_GRACE_HOURS: ${UPLOAD_ORPHAN_GRACE_HOURS:-24}
+      UPLOAD_CLEANUP_BATCH_SIZE: ${UPLOAD_CLEANUP_BATCH_SIZE:-100}
+      SCHEDULED_JOB_LOCK_SECONDS: ${SCHEDULED_JOB_LOCK_SECONDS:-900}
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"
+      TZ: Asia/Shanghai
+    expose:
+      - "8080"
+    volumes:
+      - backend-uploads:/app/uploads
+    networks:
+      - edge
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/actuator/health/readiness || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 75s
+    stop_grace_period: 40s
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+
+  frontend:
+    build:
+      context: ./csa-official-frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: /
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: /
+      AUTH_COOKIE_NAME: CSA_AUTH_TOKEN
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    expose:
+      - "3000"
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    security_opt:
+      - no-new-privileges:true
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?required}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      edge:
+        ipv4_address: 172.30.0.2
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+  data:
+    internal: true
+
+volumes:
+  mysql-data:
+  redis-data:
+  backend-uploads:
+  caddy-data:
+  caddy-config:

@@ -1,5 +1,7 @@
 package com.csa.official.config;
 
+import com.csa.official.common.security.JwtAccessDeniedHandler;
+import com.csa.official.common.security.JwtAuthenticationEntryPoint;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,8 +17,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-
-import com.csa.official.common.security.JwtAuthenticationEntryPoint;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 
 @Configuration
 @EnableWebSecurity
@@ -25,8 +26,15 @@ public class SecurityConfig {
 
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
+
     @Autowired
     private JwtAuthenticationEntryPoint unauthorizedHandler;
+
+    @Autowired
+    private JwtAccessDeniedHandler accessDeniedHandler;
+
+    @Autowired
+    private CsrfProtectionFilter csrfProtectionFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -43,23 +51,34 @@ public class SecurityConfig {
         http
                 .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
+                .headers(headers -> headers
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .preload(true)
+                                .maxAgeInSeconds(63072000))
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                "default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"))
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.NO_REFERRER))
+                        .permissionsPolicyHeader(permissions -> permissions
+                                .policy("camera=(), microphone=(), geolocation=(), payment=()")))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                // 2. 配置异常处理
                 .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(unauthorizedHandler) // 401 认证失败处理
-                // 如果你想处理 403 权限不足，可以用 .accessDeniedHandler(...)
-                )
-
+                        .authenticationEntryPoint(unauthorizedHandler)
+                        .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/test/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
-                        // .requestMatchers("/api/common/**").permitAll() // 之前讨论过，这一行如果没删就删掉
+                        // Swagger/Knife4j — 生产环境通过 SWAGGER_ENABLED=false 在 springdoc 层禁用，此处仅白名单静态资源
+                        .requestMatchers("/doc.html", "/webjars/**", "/v3/api-docs/**",
+                                "/swagger-ui/**", "/swagger-resources/**").permitAll()
+                        // 生产编排不暴露后端端口，Prometheus 和探针只能从内部网络访问。
+                        .requestMatchers("/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
+                        .requestMatchers("/actuator/**").denyAll()
+                        .requestMatchers("/api/test/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(csrfProtectionFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }
-
 }

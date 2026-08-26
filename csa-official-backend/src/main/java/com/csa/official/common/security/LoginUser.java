@@ -1,6 +1,7 @@
 package com.csa.official.common.security;
 
-import com.csa.official.common.constant.RoleConsts; // 👈 引入常量
+import com.csa.official.common.constant.AccountStatus;
+import com.csa.official.common.constant.RoleConsts;
 import com.csa.official.modules.sys.entity.User;
 import lombok.Data;
 import org.springframework.security.core.GrantedAuthority;
@@ -85,6 +86,8 @@ public class LoginUser implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return user.getDeleted() == 0;
+        boolean notDeleted = user.getDeleted() == null || user.getDeleted() == 0;
+        String status = user.getAccountStatus();
+        return notDeleted && (status == null || AccountStatus.ACTIVE.equals(status));
     }
 }

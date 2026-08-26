@@ -1,0 +1,54 @@
+groups:
+  - name: csa-backend
+    rules:
+      - alert: CsaBackendTargetDown
+        expr: up{job="csa-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: CSA backend Prometheus target is down
+          description: Backend metrics have not been scraped for two minutes.
+
+      - alert: CsaBackendHigh5xxRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{job="csa-backend",status=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(http_server_requests_seconds_count{job="csa-backend"}[5m])), 1)
+          > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: CSA backend 5xx rate is above 5 percent
+
+      - alert: CsaBackendHighP95Latency
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(http_server_requests_seconds_bucket{job="csa-backend"}[5m])))
+          > 1.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: CSA backend p95 latency is above 1.5 seconds
+
+      - alert: CsaBackendReadinessFailed
+        expr: probe_success{job="csa-backend-readiness"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: CSA backend readiness is failing
+
+      - alert: CsaBackendHikariPoolNearLimit
+        expr: |
+          max by (instance) (hikaricp_connections_active{job="csa-backend"})
+          /
+          clamp_min(max by (instance) (hikaricp_connections_max{job="csa-backend"}), 1)
+          > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: CSA backend Hikari pool is above 90 percent utilization
