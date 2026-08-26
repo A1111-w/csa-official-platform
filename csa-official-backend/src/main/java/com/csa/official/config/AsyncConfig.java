@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -42,6 +43,28 @@ public class AsyncConfig {
         executor.setQueueCapacity(200);
         executor.setThreadNamePrefix("contribution-async-");
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.initialize();
+        return executor;
+    }
+
+    /**
+     * Git synchronization is blocking I/O and must not consume request, mail or contribution threads.
+     */
+    @Bean("gitSyncTaskExecutor")
+    public Executor gitSyncTaskExecutor(
+            @Value("${csa.git.executor-max-size:2}") int configuredMaxSize,
+            @Value("${csa.git.executor-queue-capacity:20}") int configuredQueueCapacity) {
+        int maxSize = Math.max(1, Math.min(configuredMaxSize, 4));
+        int queueCapacity = Math.max(1, Math.min(configuredQueueCapacity, 100));
+
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(maxSize);
+        executor.setQueueCapacity(queueCapacity);
+        executor.setThreadNamePrefix("git-sync-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
         executor.initialize();
         return executor;
     }

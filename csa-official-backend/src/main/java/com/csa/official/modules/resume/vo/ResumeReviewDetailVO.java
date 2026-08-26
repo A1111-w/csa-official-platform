@@ -27,6 +27,12 @@ public class ResumeReviewDetailVO {
 
     private String content;
     private String gitRepoUrl;
+    private String gitSyncStatus;
+    private LocalDateTime gitSyncCompletedAt;
+    private String gitSyncErrorCode;
+    private String gitSyncBranch;
+    private String gitSyncCommit;
+    private Long gitSyncSizeBytes;
     private Integer status;
     private String rejectReason;
 

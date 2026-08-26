@@ -144,6 +144,11 @@ csa:
     cleanup-batch-size: ${UPLOAD_CLEANUP_BATCH_SIZE:100}
   git:
     allowed-hosts: ${GIT_ALLOWED_HOSTS:github.com,gitee.com,gitlab.com}
+    timeout-seconds: ${GIT_SYNC_TIMEOUT_SECONDS:30}
+    max-repository-size-bytes: ${GIT_MAX_REPOSITORY_SIZE_BYTES:209715200}
+    stale-seconds: ${GIT_SYNC_STALE_SECONDS:300}
+    executor-max-size: ${GIT_SYNC_EXECUTOR_MAX_SIZE:2}
+    executor-queue-capacity: ${GIT_SYNC_EXECUTOR_QUEUE_CAPACITY:20}
   allow-types: jpg,jpeg,png,gif,pdf,zip,rar,7z,tar,gz,doc,docx,ppt,pptx
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss

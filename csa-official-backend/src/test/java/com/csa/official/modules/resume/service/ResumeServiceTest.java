@@ -1,6 +1,10 @@
 package com.csa.official.modules.resume.service;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeAll;
 import com.csa.official.common.cache.KeyValueStore;
 import com.csa.official.common.exception.CsaException;
 import com.csa.official.modules.resume.entity.Resume;
@@ -32,6 +36,13 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ResumeServiceTest {
+
+    @BeforeAll
+    static void initializeMybatisMetadata() {
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), "resume-test"),
+                Resume.class);
+    }
 
     @Mock
     private ResumeMapper resumeMapper;

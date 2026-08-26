@@ -3,7 +3,9 @@ package com.csa.official.modules.resume.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.csa.official.common.result.R;
 import com.csa.official.common.util.SecurityUtils;
+import com.csa.official.modules.resume.service.ResumeGitSyncService;
 import com.csa.official.modules.resume.service.ResumeService;
+import com.csa.official.modules.resume.vo.ResumeGitSyncVO;
 import com.csa.official.modules.resume.vo.ResumeReviewDetailVO;
 import com.csa.official.modules.resume.vo.ResumeReviewListVO;
 import com.csa.official.modules.resume.vo.ResumeVO;
@@ -21,6 +23,9 @@ public class ResumeController {
 
     @Autowired
     private ResumeService resumeService;
+
+    @Autowired
+    private ResumeGitSyncService resumeGitSyncService;
 
     // ================= 核心成员接口 (Level 2+) =================
 
@@ -45,6 +50,18 @@ public class ResumeController {
 
         resumeService.submitForAudit(SecurityUtils.getUserId());
         return R.ok("已提交审核");
+    }
+
+    @PreAuthorize("hasRole('LEVEL_2')")
+    @GetMapping("/git-sync")
+    public R<ResumeGitSyncVO> gitSyncStatus() {
+        return R.ok(resumeGitSyncService.getMyStatus(SecurityUtils.getUserId()));
+    }
+
+    @PreAuthorize("hasRole('LEVEL_2')")
+    @PostMapping("/git-sync")
+    public R<ResumeGitSyncVO> syncGitRepository() {
+        return R.ok(resumeGitSyncService.startMySync(SecurityUtils.getUserId()));
     }
 
     // ================= 部长/管理员接口 =================

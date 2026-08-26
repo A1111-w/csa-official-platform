@@ -26,6 +26,13 @@ public class ResumeVO {
     private Long id;
     private String content;
     private String gitRepoUrl;
+    private String gitSyncStatus;
+    private LocalDateTime gitSyncStartedAt;
+    private LocalDateTime gitSyncCompletedAt;
+    private String gitSyncErrorCode;
+    private String gitSyncBranch;
+    private String gitSyncCommit;
+    private Long gitSyncSizeBytes;
     /** 状态码 0草稿/1待审核/2已通过/3已驳回，对应 {@code ResumeStatusEnum.code}。 */
     private Integer status;
     private String rejectReason;
@@ -47,6 +54,13 @@ public class ResumeVO {
         vo.setId(resume.getId());
         vo.setContent(resume.getContent());
         vo.setGitRepoUrl(resume.getGitRepoUrl());
+        vo.setGitSyncStatus(resume.getGitSyncStatus());
+        vo.setGitSyncStartedAt(resume.getGitSyncStartedAt());
+        vo.setGitSyncCompletedAt(resume.getGitSyncCompletedAt());
+        vo.setGitSyncErrorCode(resume.getGitSyncErrorCode());
+        vo.setGitSyncBranch(resume.getGitSyncBranch());
+        vo.setGitSyncCommit(resume.getGitSyncCommit());
+        vo.setGitSyncSizeBytes(resume.getGitSyncSizeBytes());
         vo.setStatus(resume.getStatus() == null ? null : resume.getStatus().getCode());
         vo.setRejectReason(resume.getRejectReason());
         vo.setAuditBy(resume.getAuditBy());

@@ -23,6 +23,7 @@ public class ResumeReviewListVO {
     private Integer status;
     private String contentSummary;
     private String gitRepoUrl;
+    private String gitSyncStatus;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private LocalDateTime auditTime;

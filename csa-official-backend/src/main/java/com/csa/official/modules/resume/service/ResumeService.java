@@ -100,8 +100,12 @@ public class ResumeService {
                 resume.setAuditTime(null);
             }
 
+            boolean gitUrlChanged = !Objects.equals(resume.getGitRepoUrl(), normalizedGitUrl);
             resume.setContent(normalizedContent);
             resume.setGitRepoUrl(normalizedGitUrl);
+            if (gitUrlChanged) {
+                resetGitSync(resume);
+            }
 
             if (resume.getId() == null) {
                 resumeMapper.insert(resume);
@@ -294,6 +298,7 @@ public class ResumeService {
         vo.setStatus(resume.getStatus() == null ? null : resume.getStatus().getCode());
         vo.setContentSummary(buildContentSummary(resume.getContent()));
         vo.setGitRepoUrl(resume.getGitRepoUrl());
+        vo.setGitSyncStatus(resume.getGitSyncStatus());
         vo.setCreateTime(resume.getCreateTime());
         vo.setUpdateTime(resume.getUpdateTime());
         vo.setAuditTime(resume.getAuditTime());
@@ -321,6 +326,12 @@ public class ResumeService {
         vo.setDepartmentName(department == null ? null : department.getName());
         vo.setContent(resume.getContent());
         vo.setGitRepoUrl(resume.getGitRepoUrl());
+        vo.setGitSyncStatus(resume.getGitSyncStatus());
+        vo.setGitSyncCompletedAt(resume.getGitSyncCompletedAt());
+        vo.setGitSyncErrorCode(resume.getGitSyncErrorCode());
+        vo.setGitSyncBranch(resume.getGitSyncBranch());
+        vo.setGitSyncCommit(resume.getGitSyncCommit());
+        vo.setGitSyncSizeBytes(resume.getGitSyncSizeBytes());
         vo.setStatus(resume.getStatus() == null ? null : resume.getStatus().getCode());
         vo.setRejectReason(resume.getRejectReason());
         vo.setAuditBy(resume.getAuditBy());
@@ -346,14 +357,25 @@ public class ResumeService {
         try {
             URI uri = new URI(normalized);
             String scheme = uri.getScheme();
-            if (uri.getHost() == null
-                    || !("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme))) {
-                throw new CsaException(ApiErrorCode.BAD_REQUEST, "Git repository URL must use HTTP or HTTPS");
+            if (uri.getHost() == null || !"https".equalsIgnoreCase(scheme)
+                    || uri.getUserInfo() != null || uri.getQuery() != null || uri.getFragment() != null) {
+                throw new CsaException(ApiErrorCode.BAD_REQUEST, "Git repository URL must use HTTPS");
             }
         } catch (URISyntaxException e) {
             throw new CsaException(ApiErrorCode.BAD_REQUEST, "Git repository URL is invalid");
         }
         return normalized;
+    }
+
+    private void resetGitSync(Resume resume) {
+        resume.setGitSyncStatus("NOT_SYNCED");
+        resume.setGitSyncRunId(null);
+        resume.setGitSyncStartedAt(null);
+        resume.setGitSyncCompletedAt(null);
+        resume.setGitSyncErrorCode(null);
+        resume.setGitSyncBranch(null);
+        resume.setGitSyncCommit(null);
+        resume.setGitSyncSizeBytes(null);
     }
 
     private boolean registerLockRelease(String lockKey, String lockToken) {
