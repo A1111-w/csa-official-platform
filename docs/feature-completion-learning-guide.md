@@ -168,4 +168,4 @@ Git 同步专项测试：
 
 ## 9. 尚需发布环境验证
 
-本机 Docker VHD/EXT4 故障不影响源码单测和前端静态构建，但当前源码镜像、Playwright、备份恢复和 Trivy 必须在健康 staging 环境重新执行后，才能把“代码已完成”提升为“发布已验收”。
+本机 Docker VHD/EXT4 故障不影响源码单测和前端静态构建。当前源码的镜像构建、Trivy、真实 MySQL/Redis/Flyway 和关键 Playwright E2E 已由 GitHub Actions `#33010814757` 在 `fcddab2` 上验收通过；备份恢复仍必须在健康 staging 环境重新执行后，才能把“代码已完成”提升为“生产发布已完成”。

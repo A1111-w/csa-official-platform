@@ -2254,7 +2254,7 @@ npm run test:e2e
 
 本机 `java -version` 和 Maven 实际使用的是 **JDK 21.0.8**，但项目 `pom.xml` 的 `<java.version>` 仍是 **17**，后端 Docker 构建阶段也使用 Temurin 17。前者表示“这次本地测试运行在 JDK 21 上”，后者才是项目声明的编译/运行目标；不能因为电脑安装了 JDK 21 就把项目版本回答成 Java 21。
 
-同一轮前端验证结果是：干净 `npm ci` 后，`npm test` **6 files、12 tests passed**，`npm run lint` exit code 0（保留 1 条既有导航 warning），`npm run build` 使用 Next.js 16.3.3 并完成页面生成 **25/25**，完整与 production `npm audit` 都是 0 vulnerabilities。Playwright 第一次因本机缺 Chromium 失败；安装 Playwright Chromium 151 后再次执行，又在等待配置的 Next.js dev server 时达到 120 秒超时。因此当前 E2E 仍是“环境阻断、未通过”，不能写成全绿。即使 dev server 正常启动，缺少 `E2E_USERNAME/E2E_PASSWORD` 时三个认证用例也会按设计跳过，只运行公开页和未登录跳转用例。
+同一轮前端验证结果是：干净 `npm ci` 后，`npm test` **6 files、12 tests passed**，`npm run lint` exit code 0（保留 1 条既有导航 warning），`npm run build` 使用 Next.js 16.3.3 并完成页面生成 **25/25**，完整与 production `npm audit` 都是 0 vulnerabilities。Playwright 第一次因本机缺 Chromium 失败；安装 Playwright Chromium 151 后再次执行，又在等待配置的 Next.js dev server 时达到 120 秒超时。因此本机 E2E 仍是“环境阻断、未通过”，不能把本机结果写成全绿。与此同时，GitHub Actions `#33010814757` 已在 `fcddab2` 上通过当前源码的真实 MySQL/Redis/Flyway、镜像 Trivy 和关键 Playwright E2E。即使 dev server 正常启动，缺少 `E2E_USERNAME/E2E_PASSWORD` 时三个认证用例也会按设计跳过，只运行公开页和未登录跳转用例。
 
 这次 CI 修复也说明一个容易误判的点：日志显示 `test` profile 已激活，不代表所有测试基础设施都已经隔离。Spring 的 Redis 自动配置仍会在空 `REDIS_HOST` 下尝试创建连接工厂。正确修复是只在 `application-test.yml` 排除 Redis 自动配置，并在 `CsaOfficialApplicationTests` 断言不存在 `RedisConnectionFactory`；不要把生产 profile 改成 memory 来掩盖 CI 问题。这个 checkpoint 不含 Flyway migration、数据库结构或生产环境变量变更，回退时使用 Git revert 并重新执行 `npm ci`。
 
@@ -3119,7 +3119,7 @@ Flyway V1-V5 版本链，并用 docker-compose 把 MySQL、Redis、前端、后�
 再加了详情接口按需取正文，前端编辑弹窗改成点开时才拉详情。
 另外把资源模块的业务逻辑从 Controller 抽到 Service，这样才能加事务、才能单测。
 
-验证方式是后端全量用例、显式 Testcontainers、前端测试、lint 和 next build 全绿，并能拿出 Phase 1 的 Flyway、备份恢复与 HTTPS E2E 记录；当前源码的 Docker 镜像和 Playwright 若受环境故障影响，必须如实标为阻断，不能用旧镜像结果冒充。
+验证方式是后端全量用例、显式 Testcontainers、前端测试、lint 和 next build 全绿，并能拿出 Phase 1 的 Flyway、备份恢复与 HTTPS E2E 记录；当前源码的 GitHub Actions `#33010814757` 已通过镜像和关键 E2E 门禁，但本机 Docker 故障导致的备份恢复仍需在 staging 单独演练，不能用 CI 结果冒充恢复证据。
 ```
 
 ### 7.14 为什么接口不直接返回 Entity？

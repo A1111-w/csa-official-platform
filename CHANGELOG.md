@@ -68,7 +68,9 @@
 
 ### Verification
 
-- 2026-08-26：GitHub Actions `#33009147368` 已通过后端单测、MySQL/Redis/Flyway Testcontainers、前端 lint/build/test/audit、Compose fail-fast 和关键 Playwright E2E；Docker job 仅在前端镜像 Trivy 扫描失败。报告显示 `node:20-alpine` 最终镜像中的全局 npm `node-tar` 有 19 个高危/严重项，另有 4 个 Alpine 高危项；本提交移除运行时不需要的全局 npm 并升级 Alpine 包，新运行结果待推送后确认。
+- 2026-08-26：GitHub Actions `#33010814757` 在 `fcddab2` 上全绿：后端单测、MySQL/Redis/Flyway Testcontainers、前端 lint/build/test/audit、Compose fail-fast、依赖/配置扫描、前后端镜像构建与 Trivy、关键 Playwright E2E 均通过。前端 runner 移除运行时不需要的全局 npm/npx 并升级 Alpine 包后，前端镜像 Trivy 已通过；本机 Docker 数据盘故障不影响这份远端当前源码证据，备份恢复 staging 演练仍需单独完成。
+- 更正：此前“GitHub Actions 远端结果待本 checkpoint 推送后确认”的历史记录已由 `#33010814757` 完成确认；该表述仅保留当时的验证时间点，不代表当前状态。
+- 2026-08-26：GitHub Actions `#33009147368` 已通过后端单测、MySQL/Redis/Flyway Testcontainers、前端 lint/build/test/audit、Compose fail-fast 和关键 Playwright E2E；Docker job 仅在前端镜像 Trivy 扫描失败。报告显示 `node:20-alpine` 最终镜像中的全局 npm `node-tar` 有 19 个高危/严重项，另有 4 个 Alpine 高危项；该问题已由后续 `#33010814757` 修复并验证通过。
 - 2026-08-26：GitHub Actions `#33006154587` 在 `5b5457a` 上通过后端单测、MySQL/Redis/Flyway Testcontainers、前端 lint/build/test/audit、Compose fail-fast 和关键 Playwright E2E。失败的两项已定位：私有仓库未启用 GitHub Advanced Security，导致 `dependency-review-action` 不可运行；后端镜像 Trivy 检出均有修复版本的 Alpine 与 Java 依赖漏洞。当前提交应用相应修复；其远端扫描结果以新运行记录为准。
 - 2026-08-26：本提交在本地通过 `csa-official-backend\\mvnw.cmd test`（174 tests，0 failures，0 errors，1 个 Docker Testcontainers skipped）、`npm run test`（6 files / 12 tests）、`npm run lint`（0 errors，1 条既有 warning）、`npm run build`（25/25）和 `npm audit --omit=dev --audit-level=high`（0 vulnerabilities）；开发 Compose 可解析，生产 Compose 对缺少必填秘密按预期 fail-fast，临时占位值可展开。
 - 2026-08-26：在无 `.env`、空 `REDIS_HOST` 的等价 CI 配置下，`mvnw.cmd test` 为 174 tests、0 failures、0 errors、1 Docker Testcontainers skipped；`npm ci`、`npm run test`（6 files / 12 tests）、`npm run lint`（0 errors、1 既有 warning）、`npm run build`（Next.js 16.3.3，25/25）及完整/production `npm audit` 均通过。GitHub Actions 远端结果待本 checkpoint 推送后确认。

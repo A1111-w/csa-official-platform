@@ -603,11 +603,11 @@ cd D:\CSA-Project\csa-official-backend
 - 统一 HTTP status、`errorCode`、`traceId` 和 `X-Request-ID`，补齐 JSON 日志、指标、readiness/liveness、优雅停机、备份恢复和回滚 Runbook。
 - Phase 2 已加入账号生命周期、到期匿名化、密码找回/修改、会话吊销、审计、个人数据导出、原子上传配额、邮件有限重试/崩溃补偿和定时任务幂等。
 - Phase 3 只完成多学校 SaaS ADR 与迁移方案，当前仍是单学校系统，没有直接实现 tenant 隔离或支付。
-- 2026-08-26 GitHub Actions `#33009147368` 已通过后端单测、MySQL/Redis/Flyway Testcontainers、前端 lint/build/test、Compose fail-fast 和关键 Playwright E2E；Docker job 仅在前端镜像 Trivy 扫描失败。根因是最终 `node:20-alpine` 镜像带有运行时不需要的全局 npm，其 `node-tar` 传递依赖存在可修复漏洞，另有可通过 Alpine 包升级修复的基础镜像项。当前提交让 runner 用 `node` 直接启动 Next.js、移除全局 npm 并执行 Alpine 升级；远端最终结论以新 Actions 运行结果为准。
+- 2026-08-26 GitHub Actions `#33010814757` 在 `fcddab2` 上全绿：后端单测、MySQL/Redis/Flyway Testcontainers、前端 lint/build/test/audit、Compose fail-fast、依赖/配置扫描、前后端镜像构建与 Trivy、关键 Playwright E2E 全部通过。此前 `#33009147368` 的前端镜像 Trivy 失败来自最终 `node:20-alpine` 镜像中运行时不需要的全局 npm `node-tar` 依赖；runner 现用 `node` 直接启动 Next.js、移除 npm/npx 并执行 Alpine 升级，已由本次远端扫描验证。
 
 发布前仍需完成：
 
-1. 在健康 Docker/staging 环境重跑当前源码的镜像构建、备份恢复和 Trivy 扫描；本地 Docker 数据盘仍不可用。GitHub Actions 已实际通过 Playwright 登录、CSRF、权限等关键浏览器路径，但本次依赖补丁后的镜像扫描仍须在远端实际通过。不能拿历史镜像或历史 E2E 结果代替当前验收。
+1. GitHub Actions 已对当前源码完成镜像构建、Trivy 和 Playwright 登录/CSRF/权限等关键路径验收；本机 Docker 数据盘仍不可用。上线前仍必须在健康 staging 使用真实部署环境完成备份恢复演练，并记录镜像 digest 和恢复证据。
 2. 在 staging 演练到期匿名化、备份保留和恢复；当前已实现保留期后的自动匿名化，不做不可恢复的物理删除，审批/豁免流程仍需按运营制度补齐。
 3. 按 ADR 设计 tenant、membership、租户角色和行级隔离；本轮不直接大改业务表。
 
