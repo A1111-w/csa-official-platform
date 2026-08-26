@@ -237,11 +237,14 @@ CREATE TABLE IF NOT EXISTS sys_contribution_log (
     type        VARCHAR(16)   NOT NULL               COMMENT '贡献类型 DEV/RES/COMP/OPS（存枚举名字符串）',
     score       DECIMAL(10,2) NOT NULL DEFAULT 0.00  COMMENT '分值（DEV 按分，其余按条计数）',
     detail      VARCHAR(500)      NULL               COMMENT '明细描述',
+    source      VARCHAR(16)   NOT NULL DEFAULT 'LEGACY' COMMENT '来源 AUTO/MANUAL/LEGACY',
+    awarded_by  BIGINT            NULL               COMMENT '自动触发人或人工补录操作人',
     create_time DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (id),
     -- 贡献墙聚合：ContributionLogMapper.selectWall 按 user_id 分组并对 type 做条件聚合，
     -- (user_id, type) 覆盖 GROUP BY + CASE WHEN type=... 过滤
-    KEY idx_contrib_user_type (user_id, type)
+    KEY idx_contrib_user_type (user_id, type),
+    KEY idx_contribution_admin_history (source, create_time, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='贡献流水表';
 
 -- =====================================================================

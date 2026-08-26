@@ -15,6 +15,8 @@ public class ContributionLog implements Serializable {
     private String type; // 存枚举字符串
     private BigDecimal score;
     private String detail;
+    private String source;
+    private Long awardedBy;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

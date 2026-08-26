@@ -60,6 +60,8 @@ public class ContributionTask {
             logEntry.setType(ContributionType.OPS.name());
             logEntry.setScore(new BigDecimal("1.00"));
             logEntry.setDetail("维护协会介绍 (版本存活超7天)");
+            logEntry.setSource("AUTO");
+            logEntry.setAwardedBy(config.getUpdateBy());
             logMapper.insert(logEntry);
             log.info("结算完成！用户ID [{}] 获得贡献分。", config.getUpdateBy());
         });

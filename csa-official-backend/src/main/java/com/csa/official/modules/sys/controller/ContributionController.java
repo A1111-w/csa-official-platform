@@ -2,13 +2,16 @@ package com.csa.official.modules.sys.controller;
 
 import com.csa.official.common.result.R;
 import com.csa.official.common.util.PageUtils;
-import com.csa.official.modules.sys.entity.ContributionLog;
 import com.csa.official.modules.sys.mapper.ContributionLogMapper;
 import com.csa.official.modules.sys.service.ContributionQueryService;
+import com.csa.official.modules.sys.service.ContributionService;
+import com.csa.official.common.util.SecurityUtils;
+import com.csa.official.modules.sys.dto.ContributionAwardRequest;
 import com.csa.official.modules.sys.vo.ContributionWallVO;
 import com.csa.official.modules.sys.vo.ContributionRankVO;
-import org.springframework.cache.annotation.CacheEvict;
-import lombok.Data;
+import com.csa.official.modules.sys.vo.ContributionAwardVO;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -26,11 +28,14 @@ public class ContributionController {
 
     private final ContributionLogMapper logMapper;
     private final ContributionQueryService contributionQueryService;
+    private final ContributionService contributionService;
 
     public ContributionController(ContributionLogMapper logMapper,
-                                  ContributionQueryService contributionQueryService) {
+                                  ContributionQueryService contributionQueryService,
+                                  ContributionService contributionService) {
         this.logMapper = logMapper;
         this.contributionQueryService = contributionQueryService;
+        this.contributionService = contributionService;
     }
 
     @GetMapping("/public/contribution/wall")
@@ -47,24 +52,21 @@ public class ContributionController {
     }
 
     @PreAuthorize("hasRole('LEVEL_4')")
-    @CacheEvict(value = "public_contribution_rank", allEntries = true)
     @PostMapping("/sys/contribution/award")
-    public R<String> award(@RequestBody AwardDto dto) {
-        ContributionLog log = new ContributionLog();
-        log.setUserId(dto.getUserId());
-        log.setType(dto.getType());
-        log.setScore(dto.getScore());
-        log.setDetail(dto.getReason());
-        logMapper.insert(log);
+    public R<String> award(@RequestBody @Valid ContributionAwardRequest request) {
+        contributionService.award(request, SecurityUtils.getUserId());
         return R.ok("Award granted");
     }
 
-    @Data
-    static class AwardDto {
-        private Long userId;
-        private String type;
-        private BigDecimal score;
-        private String reason;
+    @PreAuthorize("hasRole('LEVEL_4')")
+    @GetMapping("/sys/contribution/awards")
+    public R<Page<ContributionAwardVO>> listAwards(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String source) {
+        return R.ok(contributionService.listAwards(page, size, keyword, type, source));
     }
 
 }

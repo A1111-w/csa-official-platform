@@ -41,6 +41,8 @@ public class ContributionLogWriter {
             record.setType(type);
             record.setScore(BigDecimal.ONE); // 默认 +1
             record.setDetail(detail);
+            record.setSource("AUTO");
+            record.setAwardedBy(userId);
 
             logMapper.insert(record);
             log.info("自动记录贡献: User={} Type={}", userId, type);
