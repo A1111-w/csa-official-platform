@@ -33,6 +33,7 @@
 
 ### Fixed
 
+- 修复 GitHub Actions 引用不存在的 `aquasecurity/trivy-action@0.28.0` 导致扫描任务在下载 Action 阶段失败的问题；改为固定到官方 `v0.36.0` 对应的不可变 commit SHA。
 - 修复 Flyway 引入后 Spring Boot 测试上下文因测试资源同名遮蔽主配置而缺失 DataSource 的回归。
 - 修复生产 MySQL JDBC URL 使用明文连接且关闭公钥回取导致 MySQL 8 默认认证插件无法登录的问题；生产改为强制 TLS。
 - 修复 Redis 缓存反序列化 `User.balance` 的 `BigDecimal` 被安全类型白名单拒绝而导致登录 500 的问题，并增加序列化回归测试。
