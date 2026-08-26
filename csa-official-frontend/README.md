@@ -4,7 +4,7 @@
 
 ## 技术栈
 
-- Next.js 16.2.12 + React 19.2.4
+- Next.js 16.3.3 + React 19.2.4
 - TypeScript
 - Tailwind CSS
 - shadcn/ui 风格组件
@@ -52,10 +52,15 @@ NEXT_PUBLIC_API_URL=http://localhost:8080
 ## 构建验证
 
 ```powershell
+npm ci
 npm run build
 npm run test
+npm run lint
+npm audit --audit-level=high
 npm run test:e2e
 ```
+
+2026-08-26 的 CI 修复 checkpoint 在干净 `npm ci` 安装后通过 Vitest（6 files、12 tests）、lint（0 errors、1 既有 warning）、Next.js 16.3.3 build（25/25）和完整/production `npm audit`。该变更只更新依赖锁定与测试类型写法；需要回退时还原对应 Git checkpoint 后重新执行 `npm ci`，不涉及数据库迁移或环境变量变更。
 
 ## 前后端契约
 

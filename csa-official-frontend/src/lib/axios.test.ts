@@ -34,13 +34,13 @@ describe("API response handling", () => {
       }),
     })
 
-    await expect(request).rejects.toMatchObject<Partial<ApiError>>({
+    await expect(request).rejects.toMatchObject({
       message: "duplicate",
       status: 200,
       code: 409,
       errorCode: "CONFLICT",
       traceId: "trace-business",
-    })
+    } satisfies Partial<ApiError>)
   })
 
   it("rejects a non-2xx HTTP response even if the body claims success", async () => {
@@ -55,12 +55,12 @@ describe("API response handling", () => {
       validateStatus: () => true,
     })
 
-    await expect(request).rejects.toMatchObject<Partial<ApiError>>({
+    await expect(request).rejects.toMatchObject({
       message: "temporarily unavailable",
       status: 503,
       code: 200,
       errorCode: "SERVICE_UNAVAILABLE",
       traceId: "trace-http",
-    })
+    } satisfies Partial<ApiError>)
   })
 })

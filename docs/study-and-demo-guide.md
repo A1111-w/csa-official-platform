@@ -93,13 +93,13 @@
 | `learning-log/day-02-request-chain.md` | 重构后的资源列表主链路 | 与当前 `ResourceLibrary`、`ResourceService`、Axios 源码逐箭头复核 |
 | `learning-log/day-03-unified-response-and-errors.md` | 统一返回、MVC 异常、Validation、401/403 和逐题掌握状态 | 压缩后恢复 Day 3 真实验收进度，不把标准答案当作已掌握 |
 | 当前任务中的批注和逐题回答 | Day 1 后半段、Day 2 请求链路、Day 3 异常链路 | 用于区分独立找到、经提示掌握和术语仍混淆的部分 |
-| `D:\CSA-Project` 当前工作区 | 最终事实来源 | 当前为 `main@43889f95ea36` 且工作区 dirty；结论按未提交源码重新取证 |
+| `D:\CSA-Project` 当前工作区 | 最终事实来源 | 每次以 `git status --short --branch` 和 `git rev-parse HEAD` 重新取证；不把本文件中的旧分支或 commit 当作当前事实 |
 
 历史材料里已经确认存在下列旧口径。它们保留的是学习过程，不能复制回当前答案：
 
 | 历史说法 | 当前口径 | 当前证据 |
 | --- | --- | --- |
-| Next.js `16.2.10` | Next.js `16.2.12` | `csa-official-frontend/package.json` 的 `dependencies.next` |
+| Next.js `16.2.10` | Next.js `16.3.3` | `csa-official-frontend/package.json` 的 `dependencies.next` |
 | 资源列表返回 `R<Page<Resource>>` | Controller 返回 `R<Page<ResourceVO>>` | `ResourceController.list()` |
 | 资源接口没有 Service，Controller 直接操作 Mapper | 已有 `ResourceService`；Controller 只接参、鉴权和包装结果 | `ResourceController`、`ResourceService` |
 | Mapper “没有执行操作，只是继承 BaseMapper” | 真正查询调用是 `resourceMapper.selectPage(pageParam, query)` | `ResourceService.listResources()` |
@@ -207,14 +207,14 @@ csa-official-frontend/src/app
 当前版本要对得上源码：
 
 ```text
-Spring Boot 3.5.8
+Spring Boot 3.5.12
 Java 17
 MyBatis-Plus 3.5.5
 JJWT 0.12.6
 EasyExcel 3.3.4
 JGit 6.8.0.202311291450-r
 Knife4j 4.3.0
-Next.js 16.2.12
+Next.js 16.3.3
 React 19.2.4
 axios 1.18.1
 isomorphic-dompurify 3.18.0
@@ -223,12 +223,12 @@ isomorphic-dompurify 3.18.0
 你要能回答：
 
 1. Spring Boot 版本在哪里查？
-   `csa-official-backend/pom.xml` 的 `<parent><version>`，当前是 `3.5.8`。
+   `csa-official-backend/pom.xml` 的 `<parent><version>`，当前是 `3.5.12`。
 2. Java 版本在哪里查？
    同一个 `pom.xml` 的 `<properties><java.version>`，当前是 `17`。
 3. Next.js、React、React DOM、TypeScript 版本在哪里查？
    `csa-official-frontend/package.json`：`dependencies.next`、`dependencies.react`、
-   `dependencies.react-dom` 和 `devDependencies.typescript`。当前分别是 `16.2.12`、
+   `dependencies.react-dom` 和 `devDependencies.typescript`。当前分别是 `16.3.3`、
    `19.2.4`、`19.2.4` 和 `^5`。
 4. 后端依赖如何从“名字”追到“用途”？
    先从 `pom.xml` 列出依赖，再用源码搜索使用位置，最后按调用范围判断是否核心：
@@ -2254,7 +2254,9 @@ npm run test:e2e
 
 本机 `java -version` 和 Maven 实际使用的是 **JDK 21.0.8**，但项目 `pom.xml` 的 `<java.version>` 仍是 **17**，后端 Docker 构建阶段也使用 Temurin 17。前者表示“这次本地测试运行在 JDK 21 上”，后者才是项目声明的编译/运行目标；不能因为电脑安装了 JDK 21 就把项目版本回答成 Java 21。
 
-同一轮前端验证结果是：`npm test` **6 files、12 tests passed**，`npm run lint` exit code 0，`npm run build` 使用 Next.js 16.2.12 并完成页面生成 **25/25**。Playwright 第一次因本机缺 Chromium 失败；安装 Playwright Chromium 151 后再次执行，又在等待配置的 Next.js dev server 时达到 120 秒超时。因此当前 E2E 仍是“环境阻断、未通过”，不能写成全绿。即使 dev server 正常启动，缺少 `E2E_USERNAME/E2E_PASSWORD` 时三个认证用例也会按设计跳过，只运行公开页和未登录跳转用例。
+同一轮前端验证结果是：干净 `npm ci` 后，`npm test` **6 files、12 tests passed**，`npm run lint` exit code 0（保留 1 条既有导航 warning），`npm run build` 使用 Next.js 16.3.3 并完成页面生成 **25/25**，完整与 production `npm audit` 都是 0 vulnerabilities。Playwright 第一次因本机缺 Chromium 失败；安装 Playwright Chromium 151 后再次执行，又在等待配置的 Next.js dev server 时达到 120 秒超时。因此当前 E2E 仍是“环境阻断、未通过”，不能写成全绿。即使 dev server 正常启动，缺少 `E2E_USERNAME/E2E_PASSWORD` 时三个认证用例也会按设计跳过，只运行公开页和未登录跳转用例。
+
+这次 CI 修复也说明一个容易误判的点：日志显示 `test` profile 已激活，不代表所有测试基础设施都已经隔离。Spring 的 Redis 自动配置仍会在空 `REDIS_HOST` 下尝试创建连接工厂。正确修复是只在 `application-test.yml` 排除 Redis 自动配置，并在 `CsaOfficialApplicationTests` 断言不存在 `RedisConnectionFactory`；不要把生产 profile 改成 memory 来掩盖 CI 问题。这个 checkpoint 不含 Flyway migration、数据库结构或生产环境变量变更，回退时使用 Git revert 并重新执行 `npm ci`。
 
 #### 常见混淆
 

@@ -11,7 +11,8 @@
 - 显式 Testcontainers 用例：2026-08-26 未运行成功；当前机器 Docker 环境不可用，因此 V1-V5 的真实 MySQL、Redis、Flyway 验收仍待健康 staging 重跑。历史隔离栈曾在 V2 版本链上通过，不能当作当前 V5 证据。
 - 真实依赖版本：MySQL 8.0.36、Redis 7.2-alpine；历史演练先把空库迁到 V1、插入旧版用户、再迁到 V2。当前源码还会执行 V3 审核队列索引、V4 账号匿名化/原子配额/邮件恢复/Git 同步结构和 V5 贡献审计结构，需在健康 Docker/staging 复验。
 - 前端 `npm run test`：6 files、12 tests 通过；`npm run lint` 通过。
-- 前端 `npm run build`：Next.js 16.2.12 构建通过，页面生成数据 25/25。
+- 前端 `npm ci`：干净安装完成；`npm run test` 为 6 files、12 tests，`npm run lint` 为 0 errors、1 既有 warning，`npm run build`：Next.js 16.3.3 构建通过，页面生成数据 25/25；完整与 production `npm audit` 均为 0 vulnerabilities。
+- CI Redis 回归：2026-08-26 在无 `.env`、空 `REDIS_HOST` 的等价 CI 配置下复验。`test` profile 原本已经激活，实际失败点是 Redis 自动配置仍创建连接工厂；`application-test.yml` 现只排除测试用 Redis 自动配置，`CsaOfficialApplicationTests` 断言没有 `RedisConnectionFactory`。生产 Redis 配置没有变化。
 - Playwright：首次因缺少 Chromium 失败；安装 Playwright Chromium 151 后再次执行，等待配置的 Next.js dev server 120 秒超时，因此当前 E2E 仍未通过。该阻断与下述 Docker VHD 故障分别记录。
 - 生产 Compose 缺少必填变量时 fail-fast；使用进程内临时随机值静默展开通过。静态断言确认只有 Caddy 发布宿主端口，`data` 网络为 internal。
 
@@ -55,7 +56,8 @@
 3. Flyway 失败：保存日志、history 和备份，在副本恢复或发布新的向前迁移；不要盲目 `repair`。
 4. 数据或文件损坏：先制作当前快照，再按 `backup-restore.md` 在维护窗口恢复。
 5. Docker 数据盘故障：先停止 Desktop 并复制 VHD/卷级备份，禁止在没有备份时 reset data 或格式化。
+6. 本 CI checkpoint 回退：使用 Git revert 回退本提交并执行前端 `npm ci`；本轮没有 Flyway migration、数据库结构或生产环境变量变更。
 
 ## 6. 结论
 
-Phase 1 代码、迁移、配置和历史隔离栈证据齐全；当前源码的单元测试、前端 Vitest/lint/build 通过。V1-V5 真实 MySQL/Redis/Flyway、最新镜像和备份恢复仍受 Docker 数据盘故障阻断；Playwright 受 Next.js dev server 启动超时阻断。必须在健康的本机环境或 staging 分别重跑。
+Phase 1 代码、迁移、配置和历史隔离栈证据齐全；当前源码的单元测试、干净前端安装、Vitest/lint/build 和依赖审计通过。GitHub Actions 的远端结论需在此 checkpoint 推送后确认。V1-V5 真实 MySQL/Redis/Flyway、最新镜像和备份恢复仍受 Docker 数据盘故障阻断；Playwright 受 Next.js dev server 启动超时阻断。必须在健康的本机环境或 staging 分别重跑。

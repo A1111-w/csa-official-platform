@@ -29,6 +29,8 @@
 
 ### Changed
 
+- 2026-08-26 CI 修复 checkpoint 将 Spring Boot 从 `3.5.8` 升级到 `3.5.12`，将 Next.js 与 `eslint-config-next` 升级到 `16.3.3`；前端 lockfile 同步更新受影响的传递依赖，完整与 production `npm audit` 均为 0 vulnerabilities。
+- 前端 Axios 响应断言改用 TypeScript `satisfies Partial<ApiError>`，适配 Next.js 16.3.3 的类型检查，不改变运行时请求或错误处理行为。
 - 开发 Compose 仅将基础设施绑定到回环地址，并使用独立应用数据库用户；生产 Compose 不发布 MySQL、Redis、backend、frontend 端口。
 - 生产部署强制 `production` profile、HTTPS origin、Secure Cookie、Redis、CSRF 和可信代理配置；Caddy 增加 HSTS。
 - 测试配置改为 `test` profile + H2，不再以同名 `application.yml` 遮蔽主配置；Surefire 自动激活 test profile。
@@ -38,7 +40,7 @@
 
 ### Fixed
 
-- 修复 Linux CI 中 Maven 测试未实际激活 `test` profile、进而因空 Redis host 导致 Spring 上下文连锁失败的问题；测试资源和 CI 均显式激活该 profile，并在上下文测试中断言。当前工作区复验为后端 174 tests、前端 6 files / 12 tests，lint 与 production build 通过。
+- 修复 Linux CI 中测试上下文在已激活 `test` profile 后仍创建 `RedisConnectionFactory`、进而因空 `REDIS_HOST` 连锁失败的问题；测试 profile 现显式排除 Redis 自动配置，并新增“没有 `RedisConnectionFactory` Bean”的回归断言。生产 Redis 配置和运行时行为未改变；当前工作区复验为后端 174 tests、前端 6 files / 12 tests，lint 与 production build 通过。
 - 修复 GitHub Actions 引用不存在的 `aquasecurity/trivy-action@0.28.0` 导致扫描任务在下载 Action 阶段失败的问题；改为固定到官方 `v0.36.0` 对应的不可变 commit SHA。
 - 修复 Flyway 引入后 Spring Boot 测试上下文因测试资源同名遮蔽主配置而缺失 DataSource 的回归。
 - 修复生产 MySQL JDBC URL 使用明文连接且关闭公钥回取导致 MySQL 8 默认认证插件无法登录的问题；生产改为强制 TLS。
@@ -54,6 +56,7 @@
 
 ### Database / Config
 
+- 本 CI checkpoint 不新增 Flyway migration、不修改生产环境变量、不改变数据库结构；回退应用提交后执行 `npm ci` 即可恢复对应的前端依赖树。
 - 空数据库执行 `db/migration/V1__initial_schema.sql`；已有数据库 baseline/升级和失败迁移处理见 `docs/production-readiness/flyway.md`。
 - 生产不执行 `db/seed.sql`；演示 seed 仅允许 `dev`/`test` profile 且显式开启。
 - 新增 Flyway `V3__resume_review_queue_index.sql`，为 `biz_resume(status, update_time)` 增加审核队列索引；回滚应用时保留该向前兼容索引，不原地修改已执行 migration。
@@ -62,6 +65,7 @@
 
 ### Verification
 
+- 2026-08-26：在无 `.env`、空 `REDIS_HOST` 的等价 CI 配置下，`mvnw.cmd test` 为 174 tests、0 failures、0 errors、1 Docker Testcontainers skipped；`npm ci`、`npm run test`（6 files / 12 tests）、`npm run lint`（0 errors、1 既有 warning）、`npm run build`（Next.js 16.3.3，25/25）及完整/production `npm audit` 均通过。GitHub Actions 远端结果待本 checkpoint 推送后确认。
 - 2026-08-26：后端全量 163 个测试通过、0 失败、0 错误，1 个 Testcontainers 测试因 Docker 不可用跳过；前端 5 个测试文件、10 个测试通过，`npm run lint` 和 `npm run build` 通过；Playwright 公开边界 2 个通过，3 个真实账号场景因未配置 E2E 凭据跳过。
 - `csa-official-backend\\mvnw.cmd test`：本轮 Redis 修复后的全量测试通过，最终计数见 `phase-1-verification.md`。
 - 前端 `npm run test`：3/3 通过；`npm run lint` 和 `npm run build` 通过。

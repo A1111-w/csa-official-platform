@@ -13,16 +13,19 @@
 | 显式 Testcontainers | 待健康 Docker/staging 重跑 | 当前测试目标为 MySQL 8.0.36、Redis 7.2、Flyway V1→V5；本机 Docker 不可用 |
 | `npm run lint` | 通过 | ESLint exit code 0 |
 | `npm run test` | 通过 | Vitest 6 files、12 tests |
-| `npm run build` | 通过 | Next.js 16.2.12；页面生成数据 25/25 |
+| `npm ci` + `npm audit` | 通过 | 干净安装完成；完整与 production audit 均为 0 vulnerabilities |
+| `npm run build` | 通过 | Next.js 16.3.3；页面生成数据 25/25 |
 | 开发 Compose config | 通过 | 配置可解析 |
 | 生产 Compose 缺变量 | 通过 | 缺少必填变量时按预期失败 |
 | 生产 Compose 静态展开 | 通过 | 进程内随机值；只有 Caddy 发布端口；data 网络 internal |
 | 当前 Docker 镜像构建 | 环境阻断 | Docker 数据盘 I/O 错误，EXT4 journal aborted，dockerd SIGBUS |
 | 当前 Playwright | 环境阻断 | Chromium 151 已安装；再次运行时等待 Next.js dev server 120 秒超时；未拿旧镜像冒充通过 |
 | 当前备份恢复复演 | 未完成 | Docker 数据盘故障后停止，保护已有卷 |
-| Trivy / GitHub Actions 远端运行 | 未执行 | 工作流已建立，本地未伪造 CI 成功状态 |
+| Trivy / GitHub Actions 远端运行 | 待本 checkpoint 推送后确认 | 工作流已建立；本地依赖审计通过，但不把它写成远端 CI 成功 |
 
 默认后端全测跳过的 1 项就是 Testcontainers。历史记录曾在 V2 版本链上通过；当前测试已更新到 V5，并断言 V3 审核索引、V4 `sys_file_usage` 和 V5 贡献来源列，必须在健康 Docker/staging 重跑，不能把旧结果当作当前源码证据。
+
+CI Redis 根因已复核：GitHub Actions 日志中 `test` profile 实际已经激活；空 `REDIS_HOST` 时，Redis 自动配置仍尝试创建连接工厂并失败。本 checkpoint 只在测试 profile 排除 Redis 自动配置，并在应用上下文测试中断言没有 `RedisConnectionFactory`。同时升级 Spring Boot 至 3.5.12、Next.js 至 16.3.3，并更新 lockfile 使完整与 production npm audit 均为 0 vulnerabilities。没有新增 Flyway migration、生产配置或数据库影响。
 
 Playwright 当前共有 5 个用例。缺少 `E2E_USERNAME/E2E_PASSWORD` 时，3 个认证用例会按设计跳过，但公开隐私页和未登录跳转仍应运行。本轮在测试开始前就因 Next.js dev server 120 秒未就绪而终止，所以不能把“理论上会跳过”写成“匿名用例已通过”。
 
@@ -81,13 +84,14 @@ Playwright 当前共有 5 个用例。缺少 `E2E_USERNAME/E2E_PASSWORD` 时，3
 - 上传回滚：保留上传卷和 `sys_stored_file`，旧应用必须能读取现有路径；对象存储切换需要双读/离线迁移。
 - 邮件故障：停发送入口或降低重试，保留投递状态；不得通过删除状态表无限重发。
 - 定时任务故障：停止调度并保留幂等记录，用新 key 或补偿任务恢复。
+- CI checkpoint 回退：使用 Git revert 回退该提交，随后执行前端 `npm ci`；不需要执行数据库回退。
 
 ## 8. 剩余风险与发布门槛
 
 1. 到期匿名化已有代码和单元测试，但当前 Docker/staging 尚未执行真实定时任务、失败恢复和备份保留演练；当前不做不可恢复的物理删除，运营审批/豁免流程仍需明确。
 2. 原子上传配额依赖 V4 `sys_file_usage` 的初始回填和后续释放一致性；真实 MySQL 并发上传、孤儿清理和备份恢复仍需在 staging 验证并监控计数漂移。
 3. 邮件补偿依赖 Redis 中有 TTL 的短期恢复载荷；停机超过 TTL、验证码过期或载荷不匹配会把投递标记失败，需要用户重新申请验证码，不能无限重试。
-4. 本机 Docker VHD 发生文件系统 I/O 故障，最新镜像、备份恢复和 Trivy 仍被阻断；Playwright 另外阻断在 Next.js dev server 120 秒未就绪。这些都仍是发布阻断项。
+4. 本机 Docker VHD 发生文件系统 I/O 故障，最新镜像、备份恢复和本地 Trivy 复验仍被阻断；GitHub Actions/Trivy 的远端结果也需要在本 checkpoint 推送后确认。Playwright 另外阻断在 Next.js dev server 120 秒未就绪。这些都仍是发布阻断项。
 5. Windows 上前端构建耗时明显波动；CI 应以 Linux runner 的稳定耗时和缓存命中为准。
 6. Phase 3 仅有 SaaS ADR 和迁移方案，没有实施 tenant 隔离；当前仍是单学校系统。
 
