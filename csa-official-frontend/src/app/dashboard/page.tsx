@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   FileText,
   HardDrive,
+  ScrollText,
   Settings,
   Trophy,
   Users2,
@@ -64,6 +65,13 @@ export default function DashboardPage() {
       title: "部门人事",
       description: "查看部门负责人并完成部长任命。",
       icon: Users2,
+      minLevel: 4,
+    },
+    {
+      href: "/dashboard/audit",
+      title: "审计日志",
+      description: "查询角色变更、导出、删除与登录安全事件。",
+      icon: ScrollText,
       minLevel: 4,
     },
     {

@@ -4,6 +4,7 @@ import {
   FileText,
   HardDrive,
   LayoutDashboard,
+  ScrollText,
   Settings,
   Trophy,
   UserCircle,
@@ -65,6 +66,12 @@ export const dashboardMenu: MenuItem[] = [
     title: "部门人事",
     href: "/dashboard/departments",
     icon: Users2,
+    minLevel: 4,
+  },
+  {
+    title: "审计日志",
+    href: "/dashboard/audit",
+    icon: ScrollText,
     minLevel: 4,
   },
   {
