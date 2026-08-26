@@ -3,8 +3,18 @@ import api from "@/lib/axios"
 export interface CarouselItem {
   id: number
   imgUrl: string
-  targetUrl: string
+  targetUrl: string | null
   title: string
+}
+
+export interface ContributionRankItem {
+  userId: number
+  username: string | null
+  realName: string | null
+  avatar: string | null
+  deptName: string | null
+  score: number | string
+  contributionCount: number
 }
 
 export interface ContributorVo {
@@ -36,6 +46,13 @@ export const publicService = {
 
   getContributors: () => {
     return api.get<ContributorVo[], ContributorVo[]>("/api/public/contributors")
+  },
+
+  getContributionRank: (limit = 5) => {
+    return api.get<ContributionRankItem[], ContributionRankItem[]>(
+      "/api/public/contribution/rank",
+      { params: { limit } }
+    )
   },
 
   getPrivacyNotice: () => {

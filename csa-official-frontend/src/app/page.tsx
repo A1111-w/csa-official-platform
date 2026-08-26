@@ -1,10 +1,14 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import {
   ArrowRight,
   BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Crown,
   FileText,
   GitPullRequest,
   HardDrive,
@@ -19,8 +23,13 @@ import { Footer } from "@/components/layout/Footer"
 import { Navbar } from "@/components/layout/Navbar"
 import { Button } from "@/components/ui/button"
 import { useIsClient } from "@/hooks/use-is-client"
-import { excerptText } from "@/lib/format"
-import { publicService, type ContributorVo } from "@/services/public"
+import { excerptText, resolveAssetUrl } from "@/lib/format"
+import {
+  publicService,
+  type CarouselItem,
+  type ContributionRankItem,
+  type ContributorVo,
+} from "@/services/public"
 import { useAuthStore } from "@/store/useAuthStore"
 
 const platformItems = [
@@ -46,12 +55,33 @@ const platformItems = [
   },
 ]
 
+function safeCarouselTarget(value: string | null) {
+  if (!value) return null
+  if (value.startsWith("/") && !value.startsWith("//")) return value
+
+  try {
+    const url = new URL(value)
+    return url.protocol === "https:" || url.protocol === "http:" ? value : null
+  } catch {
+    return null
+  }
+}
+
+function formatScore(value: number | string) {
+  const score = Number(value)
+  if (!Number.isFinite(score)) return String(value)
+  return Number.isInteger(score) ? String(score) : score.toFixed(1)
+}
+
 export default function HomePage() {
   const isClient = useIsClient()
   const { user } = useAuthStore()
   const [loading, setLoading] = useState(true)
   const [about, setAbout] = useState("")
   const [contributors, setContributors] = useState<ContributorVo[]>([])
+  const [carouselItems, setCarouselItems] = useState<CarouselItem[]>([])
+  const [activeCarouselIndex, setActiveCarouselIndex] = useState(0)
+  const [contributionRank, setContributionRank] = useState<ContributionRankItem[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -59,17 +89,25 @@ export default function HomePage() {
     async function loadHomeData() {
       setLoading(true)
       try {
-        const [aboutContent, contributorList] = await Promise.all([
+        const results = await Promise.allSettled([
           publicService.getAbout(),
           publicService.getContributors(),
+          publicService.getCarousel(),
+          publicService.getContributionRank(5),
         ])
 
         if (cancelled) {
           return
         }
 
-        setAbout(aboutContent)
-        setContributors(contributorList)
+        if (results[0].status === "fulfilled") setAbout(results[0].value)
+        if (results[1].status === "fulfilled") setContributors(results[1].value)
+        if (results[2].status === "fulfilled") setCarouselItems(results[2].value)
+        if (results[3].status === "fulfilled") setContributionRank(results[3].value)
+
+        if (results.some((result) => result.status === "rejected")) {
+          toast.error("部分首页数据加载失败，已展示可用内容")
+        }
       } catch (error) {
         if (!cancelled) {
           toast.error(error instanceof Error ? error.message : "首页数据加载失败")
@@ -88,6 +126,16 @@ export default function HomePage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (carouselItems.length <= 1) return
+
+    const timer = window.setInterval(() => {
+      setActiveCarouselIndex((current) => (current + 1) % carouselItems.length)
+    }, 6000)
+
+    return () => window.clearInterval(timer)
+  }, [carouselItems.length])
+
   const roleStats = useMemo(() => {
     const leaderCount = contributors.filter((item) => item.roleLevel >= 3).length
     const coreCount = contributors.filter((item) => item.roleLevel >= 2).length
@@ -105,6 +153,10 @@ export default function HomePage() {
 
   const primaryHref = isClient && user ? "/dashboard" : "/login"
   const primaryLabel = isClient && user ? "进入控制台" : "登录平台"
+  const activeCarousel = carouselItems.length
+    ? carouselItems[activeCarouselIndex % carouselItems.length]
+    : null
+  const carouselTarget = safeCarouselTarget(activeCarousel?.targetUrl ?? null)
 
   return (
     <div className="min-h-screen bg-background">
@@ -187,6 +239,81 @@ export default function HomePage() {
           </div>
         </section>
 
+        {activeCarousel ? (
+          <section className="relative min-h-[360px] overflow-hidden border-b bg-neutral-950 text-white">
+            <Image
+              src={resolveAssetUrl(activeCarousel.imgUrl)}
+              alt={activeCarousel.title}
+              fill
+              priority
+              unoptimized
+              sizes="100vw"
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-black/55" />
+            <div className="relative mx-auto flex min-h-[360px] max-w-7xl items-end px-4 py-10 md:px-8">
+              <div className="flex w-full flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+                <div className="max-w-3xl">
+                  <p className="text-sm font-medium text-white/70">协会动态</p>
+                  <h2 className="mt-3 text-3xl font-semibold leading-tight sm:text-4xl">
+                    {activeCarousel.title}
+                  </h2>
+                  {carouselTarget ? (
+                    <Button asChild className="mt-6 bg-white text-neutral-950 hover:bg-white/90">
+                      <a
+                        href={carouselTarget}
+                        target={carouselTarget.startsWith("http") ? "_blank" : undefined}
+                        rel={carouselTarget.startsWith("http") ? "noopener noreferrer" : undefined}
+                      >
+                        查看详情
+                        <ArrowRight />
+                      </a>
+                    </Button>
+                  ) : null}
+                </div>
+
+                {carouselItems.length > 1 ? (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      aria-label="上一张轮播图"
+                      title="上一张轮播图"
+                      className="border-white/40 bg-black/20 text-white hover:bg-white hover:text-neutral-950"
+                      onClick={() =>
+                        setActiveCarouselIndex((current) =>
+                          (current - 1 + carouselItems.length) % carouselItems.length
+                        )
+                      }
+                    >
+                      <ChevronLeft />
+                    </Button>
+                    <span className="min-w-16 text-center text-sm text-white/80">
+                      {activeCarouselIndex + 1} / {carouselItems.length}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      aria-label="下一张轮播图"
+                      title="下一张轮播图"
+                      className="border-white/40 bg-black/20 text-white hover:bg-white hover:text-neutral-950"
+                      onClick={() =>
+                        setActiveCarouselIndex((current) =>
+                          (current + 1) % carouselItems.length
+                        )
+                      }
+                    >
+                      <ChevronRight />
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
         <section className="mx-auto max-w-7xl bg-background px-4 py-14 md:px-8">
           <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr]">
             <div className="space-y-4">
@@ -227,6 +354,83 @@ export default function HomePage() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section className="border-t bg-muted/30 py-14">
+          <div className="mx-auto max-w-7xl px-4 md:px-8">
+            <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700">
+                  <Crown className="h-5 w-5" />
+                </div>
+                <h2 className="text-3xl font-semibold tracking-tight">贡献排行榜</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  按已记录贡献积分与贡献次数排序
+                </p>
+              </div>
+              <Button asChild variant="outline">
+                <Link href="/contributors">
+                  查看成员名单
+                  <ArrowRight />
+                </Link>
+              </Button>
+            </div>
+
+            {loading ? (
+              <div className="h-32 animate-pulse rounded-lg border bg-background" />
+            ) : contributionRank.length ? (
+              <div className="divide-y rounded-lg border bg-background">
+                {contributionRank.map((item, index) => (
+                  <article
+                    key={item.userId}
+                    className="grid grid-cols-[2.5rem_3rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-4 sm:grid-cols-[3rem_3rem_minmax(0,1fr)_7rem_7rem] sm:px-6"
+                  >
+                    <span className="text-center text-lg font-semibold text-muted-foreground">
+                      {index + 1}
+                    </span>
+                    <div className="relative h-11 w-11 overflow-hidden rounded-full border bg-secondary">
+                      {item.avatar ? (
+                        <Image
+                          src={resolveAssetUrl(item.avatar)}
+                          alt={item.realName || item.username || "贡献者"}
+                          fill
+                          unoptimized
+                          sizes="44px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-sm font-semibold text-primary">
+                          {(item.realName || item.username || "U").slice(0, 1)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">
+                        {item.realName || item.username || "未命名成员"}
+                      </p>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {item.deptName || "协会协作组"}
+                      </p>
+                    </div>
+                    <div className="hidden text-right sm:block">
+                      <p className="text-xs text-muted-foreground">贡献次数</p>
+                      <p className="mt-1 font-medium">{item.contributionCount}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">积分</p>
+                      <p className="mt-1 text-lg font-semibold text-primary">
+                        {formatScore(item.score)}
+                      </p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-dashed px-6 py-10 text-sm text-muted-foreground">
+                暂时还没有可展示的贡献记录。
+              </div>
+            )}
           </div>
         </section>
 
