@@ -119,9 +119,6 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
-      - name: Review changed dependencies on pull requests
-        if: github.event_name == 'pull_request'
-        uses: actions/dependency-review-action@v4
 
   docker:
     name: Docker build and image scan

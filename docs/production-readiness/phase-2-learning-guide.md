@@ -159,11 +159,11 @@ npm run test:e2e
 ### 2026-08-26 实际结果
 
 - 后端默认全测：2026-08-26 为 174 tests，0 failures，0 errors，1 skipped。
-- 显式 Testcontainers：当前测试目标为 MySQL 8.0.36、Redis 7.2 和 Flyway V1→V5；本机 Docker 不可用时必须标记为待重跑，不得引用旧 V2 结果冒充当前证据。
+- 显式 Testcontainers：当前测试目标为 MySQL 8.0.36、Redis 7.2 和 Flyway V1→V5；GitHub Actions `#33006154587` 已通过该真实依赖测试。本机 Docker 不可用时仍必须标记为待重跑，不得引用旧 V2 结果冒充当前证据。
 - 前端：干净 `npm ci` 后 Vitest **6 files、12 tests**、lint（0 errors、1 既有 warning）、Next.js 16.3.3 build 全部通过；build 页面生成数据为 **25/25**，完整与 production `npm audit` 为 0 vulnerabilities。
 - CI Redis 修复：不要把“test profile 未激活”当作结论。实际日志已显示 profile 为 `test`；空 `REDIS_HOST` 下失败是测试上下文仍自动创建 Redis 连接工厂。测试 profile 排除 Redis 自动配置，并用 `CsaOfficialApplicationTests` 的 Bean 断言防止回归；生产 Redis 配置不受影响。
 - Compose：缺必填变量按预期失败；临时值展开通过，只有 Caddy 发布端口。
-- 当前 Docker 镜像重建时宿主 Docker VHD 出现 I/O/EXT4 journal 故障；Playwright 已安装 Chromium 151，但等待 Next.js dev server 120 秒超时，备份恢复和镜像扫描也没有完成，不能写成“全绿”。证据和恢复门槛见 [`phase-2-verification.md`](phase-2-verification.md)。
+- 当前 Docker 镜像重建时宿主 Docker VHD 出现 I/O/EXT4 journal 故障；本机 Playwright 等待 Next.js dev server 120 秒超时，备份恢复和本地镜像扫描仍不能完成。远端工作流已通过关键 Playwright E2E 和镜像构建，但首轮因私有仓库不支持 `dependency-review-action` 及后端镜像 Trivy 可修复漏洞而失败。当前提交移除不适用 Action，并把 Spring Boot、Spring Framework、Spring Data、Tomcat、Micrometer、Netty、Jackson、Commons IO 与 Alpine 包升级到报告的修复范围；新远端运行未全绿前，不能写成“全绿”。证据和恢复门槛见 [`phase-2-verification.md`](phase-2-verification.md)。
 
 ## 9. Phase 2 验收与迁移回滚清单
 
@@ -176,7 +176,7 @@ npm run test:e2e
 - [x] 邮件异步、有限重试、失败状态和 `PENDING`/`SENDING` 崩溃补偿有单元测试。
 - [x] 定时任务 Redis 锁 + 数据库幂等键有测试。
 - [x] CI 依赖升级、干净 `npm ci`、完整/production `npm audit` 和本地前端 build 已复验；本 checkpoint 没有迁移或生产配置变化，回退使用 Git revert 后重新执行 `npm ci`。
-- [ ] 当前源码的 Playwright、Docker 镜像构建和 Trivy 扫描仍需补跑；GitHub Actions 远端结果必须以本 checkpoint 推送后的实际运行结论为准。
+- [ ] 当前源码的本地 Playwright、Docker 镜像构建、Trivy 和备份恢复仍需在健康 Docker/staging 补跑；GitHub Actions 的依赖补丁后扫描结果必须以本次推送后的实际运行结论为准。
 - [x] 到期账号匿名化执行器、审计和单元测试已实现。
 - [ ] 匿名化任务、运营审批/豁免和备份保留仍需在健康 staging 做恢复演练。
 

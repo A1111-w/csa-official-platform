@@ -6,7 +6,8 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
-RUN addgroup -S -g 10001 csa \
+RUN apk upgrade --no-cache \
+    && addgroup -S -g 10001 csa \
     && adduser -S -D -H -u 10001 -G csa csa \
     && mkdir -p /app/uploads \
     && chown -R csa:csa /app

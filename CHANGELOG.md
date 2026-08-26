@@ -29,6 +29,8 @@
 
 ### Changed
 
+- 2026-08-26 GitHub Actions 安全门禁修复：Spring Boot 从 `3.5.12` 升级到 `3.5.14`，并以受控 patch-level 覆盖 Spring Framework `6.2.19`、Spring Data `2025.0.12`、Tomcat `10.1.55`、Micrometer `1.15.12`、Netty `4.1.136.Final`、Jackson BOM `2.21.4` 和 Commons IO `2.20.0`。后端 runner 镜像在创建运行用户前执行 `apk upgrade --no-cache`，以取得基础镜像可用的安全补丁；不引入迁移或运行时行为变更。
+- CI 移除仅在启用 GitHub Advanced Security 的私有仓库可用的 `actions/dependency-review-action`；保留并继续强制 Trivy 文件系统/镜像扫描、`npm audit`、后端测试、Testcontainers、Compose fail-fast 和 Playwright E2E。
 - 2026-08-26 CI 修复 checkpoint 将 Spring Boot 从 `3.5.8` 升级到 `3.5.12`，将 Next.js 与 `eslint-config-next` 升级到 `16.3.3`；前端 lockfile 同步更新受影响的传递依赖，完整与 production `npm audit` 均为 0 vulnerabilities。
 - 前端 Axios 响应断言改用 TypeScript `satisfies Partial<ApiError>`，适配 Next.js 16.3.3 的类型检查，不改变运行时请求或错误处理行为。
 - 开发 Compose 仅将基础设施绑定到回环地址，并使用独立应用数据库用户；生产 Compose 不发布 MySQL、Redis、backend、frontend 端口。
@@ -65,6 +67,8 @@
 
 ### Verification
 
+- 2026-08-26：GitHub Actions `#33006154587` 在 `5b5457a` 上通过后端单测、MySQL/Redis/Flyway Testcontainers、前端 lint/build/test/audit、Compose fail-fast 和关键 Playwright E2E。失败的两项已定位：私有仓库未启用 GitHub Advanced Security，导致 `dependency-review-action` 不可运行；后端镜像 Trivy 检出均有修复版本的 Alpine 与 Java 依赖漏洞。当前提交应用相应修复；其远端扫描结果以新运行记录为准。
+- 2026-08-26：本提交在本地通过 `csa-official-backend\\mvnw.cmd test`（174 tests，0 failures，0 errors，1 个 Docker Testcontainers skipped）、`npm run test`（6 files / 12 tests）、`npm run lint`（0 errors，1 条既有 warning）、`npm run build`（25/25）和 `npm audit --omit=dev --audit-level=high`（0 vulnerabilities）；开发 Compose 可解析，生产 Compose 对缺少必填秘密按预期 fail-fast，临时占位值可展开。
 - 2026-08-26：在无 `.env`、空 `REDIS_HOST` 的等价 CI 配置下，`mvnw.cmd test` 为 174 tests、0 failures、0 errors、1 Docker Testcontainers skipped；`npm ci`、`npm run test`（6 files / 12 tests）、`npm run lint`（0 errors、1 既有 warning）、`npm run build`（Next.js 16.3.3，25/25）及完整/production `npm audit` 均通过。GitHub Actions 远端结果待本 checkpoint 推送后确认。
 - 2026-08-26：后端全量 163 个测试通过、0 失败、0 错误，1 个 Testcontainers 测试因 Docker 不可用跳过；前端 5 个测试文件、10 个测试通过，`npm run lint` 和 `npm run build` 通过；Playwright 公开边界 2 个通过，3 个真实账号场景因未配置 E2E 凭据跳过。
 - `csa-official-backend\\mvnw.cmd test`：本轮 Redis 修复后的全量测试通过，最终计数见 `phase-1-verification.md`。

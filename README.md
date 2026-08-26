@@ -42,7 +42,7 @@ CSA Official 是一个面向计算机协会的官网与内部管理平台。它�
 | 样式 | Tailwind CSS、shadcn/ui 风格组件 | 页面布局、表单、按钮、卡片、弹窗 |
 | 状态 | Zustand | 保存当前登录用户和会话状态 |
 | 请求 | axios 1.18.1 | 统一封装 API、Cookie、CSRF、错误处理 |
-| 后端框架 | Spring Boot 3.5.12 | Web 接口、依赖注入、配置管理 |
+| 后端框架 | Spring Boot 3.5.14 | Web 接口、依赖注入、配置管理；关键传递依赖使用受控补丁级覆盖 |
 | 安全 | Spring Security、JJWT 0.12.6 | 登录认证、接口授权、Token 校验 |
 | 数据访问 | MyBatis-Plus 3.5.5 | Mapper、分页、条件查询、逻辑删除 |
 | 数据库 | MySQL | 用户、资源、竞赛、简历、部门、投票等业务数据 |
@@ -603,11 +603,11 @@ cd D:\CSA-Project\csa-official-backend
 - 统一 HTTP status、`errorCode`、`traceId` 和 `X-Request-ID`，补齐 JSON 日志、指标、readiness/liveness、优雅停机、备份恢复和回滚 Runbook。
 - Phase 2 已加入账号生命周期、到期匿名化、密码找回/修改、会话吊销、审计、个人数据导出、原子上传配额、邮件有限重试/崩溃补偿和定时任务幂等。
 - Phase 3 只完成多学校 SaaS ADR 与迁移方案，当前仍是单学校系统，没有直接实现 tenant 隔离或支付。
-- 2026-08-26 CI 修复 checkpoint 已在无 `.env`、空 Redis host 的等价 CI 配置下通过后端 174 项测试；前端 `npm ci`、Vitest、lint、生产构建和完整/production 依赖审计均通过。该 checkpoint 不新增迁移或生产配置；GitHub Actions 的远端结论以推送后的运行结果为准。
+- 2026-08-26 GitHub Actions 的首轮验证已通过后端单测、MySQL/Redis/Flyway Testcontainers、前端 lint/build/test、Compose fail-fast 和关键 Playwright E2E；失败项是私有仓库不支持的 `dependency-review-action`，以及 Trivy 检出的可修复后端/Alpine 依赖漏洞。当前提交移除了不可用 Action，并将 Spring Boot 与相关依赖提升到修复版本；远端最终结论以本次推送后的 Actions 为准。
 
 发布前仍需完成：
 
-1. 在健康 Docker/staging 环境重跑当前源码的镜像构建、备份恢复和 Trivy 扫描；GitHub Actions 远端扫描也必须在本次 checkpoint 推送后实际通过。另行解决 Next.js dev server 120 秒未就绪后重跑 Playwright 登录/CSRF/权限/上传。不能拿历史镜像或历史 E2E 结果代替当前验收。
+1. 在健康 Docker/staging 环境重跑当前源码的镜像构建、备份恢复和 Trivy 扫描；本地 Docker 数据盘仍不可用。GitHub Actions 已实际通过 Playwright 登录、CSRF、权限等关键浏览器路径，但本次依赖补丁后的镜像扫描仍须在远端实际通过。不能拿历史镜像或历史 E2E 结果代替当前验收。
 2. 在 staging 演练到期匿名化、备份保留和恢复；当前已实现保留期后的自动匿名化，不做不可恢复的物理删除，审批/豁免流程仍需按运营制度补齐。
 3. 按 ADR 设计 tenant、membership、租户角色和行级隔离；本轮不直接大改业务表。
 
