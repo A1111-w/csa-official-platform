@@ -68,6 +68,20 @@ function applicantName(item: Pick<ResumeReviewListItem, "realName" | "username">
   return item.realName || item.username || "未命名成员"
 }
 
+function gitSyncLabel(status: string | null | undefined) {
+  if (status === "SUCCEEDED") return "仓库已同步"
+  if (status === "SYNCING") return "仓库同步中"
+  if (status === "FAILED") return "仓库同步失败"
+  return "仓库未同步"
+}
+
+function formatBytes(size: number | null | undefined) {
+  if (size == null) return "-"
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
 export function ResumeReviewWorkspace() {
   const isClient = useIsClient()
   const { user } = useAuthStore()
@@ -263,6 +277,12 @@ export function ResumeReviewWorkspace() {
                 <span className="truncate">{item.departmentName || "未分配部门"}</span>
               </div>
 
+              {item.gitRepoUrl ? (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {gitSyncLabel(item.gitSyncStatus)}
+                </p>
+              ) : null}
+
               <p className="mt-4 line-clamp-3 min-h-[4.5rem] break-words text-sm leading-6 text-muted-foreground">
                 {item.contentSummary || "仅提交了仓库链接"}
               </p>
@@ -347,15 +367,46 @@ export function ResumeReviewWorkspace() {
               </div>
 
               {detail.gitRepoUrl ? (
-                <a
-                  href={detail.gitRepoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex min-w-0 items-center gap-2 rounded-lg border px-4 py-3 text-sm text-primary hover:bg-muted/40"
-                >
-                  <ExternalLink className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{detail.gitRepoUrl}</span>
-                </a>
+                <section className="space-y-3 rounded-lg border p-4">
+                  <a
+                    href={detail.gitRepoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex min-w-0 items-center gap-2 text-sm text-primary hover:underline"
+                  >
+                    <ExternalLink className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{detail.gitRepoUrl}</span>
+                  </a>
+                  <div className="grid gap-3 border-t pt-3 text-sm sm:grid-cols-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground">同步状态</p>
+                      <p className="mt-1 font-medium">{gitSyncLabel(detail.gitSyncStatus)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">分支</p>
+                      <p className="mt-1 truncate font-mono">{detail.gitSyncBranch || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">仓库大小</p>
+                      <p className="mt-1">{formatBytes(detail.gitSyncSizeBytes)}</p>
+                    </div>
+                  </div>
+                  {detail.gitSyncCommit ? (
+                    <p className="break-all font-mono text-xs text-muted-foreground">
+                      commit {detail.gitSyncCommit}
+                    </p>
+                  ) : null}
+                  {detail.gitSyncCompletedAt ? (
+                    <p className="text-xs text-muted-foreground">
+                      同步完成于 {formatDateTime(detail.gitSyncCompletedAt)}
+                    </p>
+                  ) : null}
+                  {detail.gitSyncErrorCode ? (
+                    <p className="text-xs text-rose-700">
+                      同步错误：{detail.gitSyncErrorCode}
+                    </p>
+                  ) : null}
+                </section>
               ) : null}
 
               <section>

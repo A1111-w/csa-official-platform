@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   GitBranch,
   Loader2,
+  RefreshCw,
   Save,
   Send,
 } from "lucide-react"
@@ -28,7 +29,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { useIsClient } from "@/hooks/use-is-client"
 import { hasRoleLevel } from "@/lib/access"
 import { formatDateTime } from "@/lib/format"
-import { RESUME_STATUS, resumeService, type ResumeData } from "@/services/resume"
+import {
+  RESUME_STATUS,
+  resumeService,
+  type ResumeData,
+  type ResumeGitSyncData,
+  type ResumeGitSyncStatus,
+} from "@/services/resume"
 import { useAuthStore } from "@/store/useAuthStore"
 
 function validateGitUrl(url: string) {
@@ -36,7 +43,36 @@ function validateGitUrl(url: string) {
     return true
   }
 
-  return /^(http|https):\/\/[^ "]+$/.test(url)
+  return /^https:\/\/[^ "]+$/.test(url)
+}
+
+function syncStatusLabel(status: ResumeGitSyncStatus | undefined) {
+  if (status === "SYNCING") return "同步中"
+  if (status === "SUCCEEDED") return "同步成功"
+  if (status === "FAILED") return "同步失败"
+  return "尚未同步"
+}
+
+function syncStatusClassName(status: ResumeGitSyncStatus | undefined) {
+  if (status === "SUCCEEDED") return "bg-emerald-500/10 text-emerald-700"
+  if (status === "FAILED") return "bg-rose-500/10 text-rose-700"
+  if (status === "SYNCING") return "bg-amber-500/10 text-amber-700"
+  return "bg-secondary text-secondary-foreground"
+}
+
+function formatBytes(size: number | null | undefined) {
+  if (size == null) return null
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function syncErrorLabel(errorCode: string | null | undefined) {
+  if (!errorCode) return "仓库同步失败，请稍后重试。"
+  if (errorCode === "GIT_REPOSITORY_TOO_LARGE") return "仓库超过服务器允许的大小。"
+  if (errorCode === "GIT_SYNC_QUEUE_FULL") return "同步任务较多，请稍后重试。"
+  if (errorCode === "UPSTREAM_ERROR") return "远程仓库暂时无法访问。"
+  return `同步失败（${errorCode}）`
 }
 
 function getStatusBadge(status: number) {
@@ -73,7 +109,9 @@ export default function ResumePage() {
   const { user } = useAuthStore()
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [syncSubmitting, setSyncSubmitting] = useState(false)
   const [resume, setResume] = useState<ResumeData | null>(null)
+  const [gitSync, setGitSync] = useState<ResumeGitSyncData | null>(null)
   const [gitUrl, setGitUrl] = useState("")
   const [content, setContent] = useState("")
 
@@ -81,8 +119,12 @@ export default function ResumePage() {
 
   async function loadData() {
     try {
-      const data = await resumeService.getMyResume()
+      const [data, syncStatus] = await Promise.all([
+        resumeService.getMyResume(),
+        resumeService.getGitSyncStatus(),
+      ])
       setResume(data)
+      setGitSync(syncStatus)
       setGitUrl(data?.gitRepoUrl || "")
       setContent(data?.content || "")
     } catch (error) {
@@ -100,6 +142,25 @@ export default function ResumePage() {
 
     void loadData()
   }, [canAccess, isClient])
+
+  useEffect(() => {
+    if (!canAccess || gitSync?.status !== "SYNCING") return
+
+    const timer = window.setInterval(async () => {
+      try {
+        const status = await resumeService.getGitSyncStatus()
+        setGitSync(status)
+        if (status.status !== "SYNCING") {
+          const data = await resumeService.getMyResume()
+          setResume(data)
+        }
+      } catch {
+        // Keep the last known state; the user can retry with the refresh button.
+      }
+    }, 2000)
+
+    return () => window.clearInterval(timer)
+  }, [canAccess, gitSync?.status])
 
   async function handleSave() {
     if (gitUrl && !validateGitUrl(gitUrl)) {
@@ -146,6 +207,39 @@ export default function ResumePage() {
       toast.error(error instanceof Error ? error.message : "提交失败")
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleGitSync() {
+    const normalizedGitUrl = gitUrl.trim()
+    if (!normalizedGitUrl || !validateGitUrl(normalizedGitUrl)) {
+      toast.error("请先填写有效的 HTTPS 仓库地址")
+      return
+    }
+
+    setSyncSubmitting(true)
+    try {
+      if (!isPending && normalizedGitUrl !== (resume?.gitRepoUrl || "")) {
+        await resumeService.save({
+          content: content.trim(),
+          gitRepoUrl: normalizedGitUrl,
+        })
+      }
+      const status = await resumeService.syncGitRepository()
+      setGitSync(status)
+      toast.success("仓库同步任务已启动")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "仓库同步启动失败")
+    } finally {
+      setSyncSubmitting(false)
+    }
+  }
+
+  async function refreshGitSyncStatus() {
+    try {
+      setGitSync(await resumeService.getGitSyncStatus())
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "同步状态刷新失败")
     }
   }
 
@@ -271,7 +365,86 @@ export default function ResumePage() {
             </div>
             {gitUrl && !validateGitUrl(gitUrl) ? (
               <p className="text-xs text-rose-600">
-                链接格式错误，请输入完整的 HTTP/HTTPS 地址。
+                  链接格式错误，请输入完整的 HTTPS 地址。
+              </p>
+            ) : null}
+          </div>
+
+          <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">仓库同步</p>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs ${syncStatusClassName(gitSync?.status)}`}
+                  >
+                    {syncStatusLabel(gitSync?.status)}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  同步后审核人可以确认仓库分支、提交版本与大小。
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  title="刷新同步状态"
+                  aria-label="刷新同步状态"
+                  onClick={() => void refreshGitSyncStatus()}
+                  disabled={gitSync?.status === "SYNCING"}
+                >
+                  <RefreshCw className={gitSync?.status === "SYNCING" ? "animate-spin" : ""} />
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => void handleGitSync()}
+                  disabled={
+                    syncSubmitting ||
+                    gitSync?.status === "SYNCING" ||
+                    !gitUrl.trim() ||
+                    !validateGitUrl(gitUrl.trim())
+                  }
+                >
+                  {syncSubmitting || gitSync?.status === "SYNCING" ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <GitBranch />
+                  )}
+                  同步仓库
+                </Button>
+              </div>
+            </div>
+
+            {gitSync?.status === "SUCCEEDED" ? (
+              <dl className="grid gap-3 border-t pt-4 text-sm sm:grid-cols-3">
+                <div>
+                  <dt className="text-xs text-muted-foreground">分支</dt>
+                  <dd className="mt-1 truncate font-mono">{gitSync.branch || "-"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">提交</dt>
+                  <dd className="mt-1 truncate font-mono" title={gitSync.commit || undefined}>
+                    {gitSync.commit?.slice(0, 12) || "-"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">仓库大小</dt>
+                  <dd className="mt-1">{formatBytes(gitSync.sizeBytes) || "-"}</dd>
+                </div>
+              </dl>
+            ) : null}
+
+            {gitSync?.status === "FAILED" ? (
+              <p className="border-t pt-4 text-sm text-rose-700">
+                {syncErrorLabel(gitSync.errorCode)}
+              </p>
+            ) : null}
+
+            {gitSync?.completedAt ? (
+              <p className="text-xs text-muted-foreground">
+                最近完成：{formatDateTime(gitSync.completedAt)}
               </p>
             ) : null}
           </div>

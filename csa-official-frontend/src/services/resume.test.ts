@@ -44,6 +44,27 @@ describe("resume review service", () => {
     })
   })
 
+  it("loads and starts Git repository synchronization", async () => {
+    const status = {
+      configured: true,
+      status: "SYNCING" as const,
+      startedAt: null,
+      completedAt: null,
+      errorCode: null,
+      branch: null,
+      commit: null,
+      sizeBytes: null,
+    }
+    const get = vi.spyOn(api, "get").mockResolvedValue(status)
+    const post = vi.spyOn(api, "post").mockResolvedValue(status)
+
+    await expect(resumeService.getGitSyncStatus()).resolves.toEqual(status)
+    await expect(resumeService.syncGitRepository()).resolves.toEqual(status)
+
+    expect(get).toHaveBeenCalledWith("/api/resume/git-sync")
+    expect(post).toHaveBeenCalledWith("/api/resume/git-sync")
+  })
+
   it("only treats pending resumes as reviewable", () => {
     expect(isPendingResumeReview(RESUME_STATUS.PENDING)).toBe(true)
     expect(isPendingResumeReview(RESUME_STATUS.APPROVED)).toBe(false)

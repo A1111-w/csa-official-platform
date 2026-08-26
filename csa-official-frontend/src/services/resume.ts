@@ -5,11 +5,35 @@ export interface ResumeData {
   id?: number
   content: string
   gitRepoUrl: string
+  gitSyncStatus?: ResumeGitSyncStatus
+  gitSyncStartedAt?: string | null
+  gitSyncCompletedAt?: string | null
+  gitSyncErrorCode?: string | null
+  gitSyncBranch?: string | null
+  gitSyncCommit?: string | null
+  gitSyncSizeBytes?: number | null
   status: number
   rejectReason?: string
   auditBy?: number
   auditTime?: string
   updateTime?: string
+}
+
+export type ResumeGitSyncStatus =
+  | "NOT_SYNCED"
+  | "SYNCING"
+  | "SUCCEEDED"
+  | "FAILED"
+
+export interface ResumeGitSyncData {
+  configured: boolean
+  status: ResumeGitSyncStatus
+  startedAt: string | null
+  completedAt: string | null
+  errorCode: string | null
+  branch: string | null
+  commit: string | null
+  sizeBytes: number | null
 }
 
 export const RESUME_STATUS = {
@@ -35,6 +59,7 @@ export interface ResumeReviewListItem {
   status: ResumeReviewStatus
   contentSummary: string
   gitRepoUrl: string | null
+  gitSyncStatus: ResumeGitSyncStatus | null
   createTime: string | null
   updateTime: string | null
   auditTime: string | null
@@ -46,6 +71,11 @@ export interface ResumeReviewDetail extends ResumeReviewListItem {
   college: string | null
   className: string | null
   content: string | null
+  gitSyncCompletedAt: string | null
+  gitSyncErrorCode: string | null
+  gitSyncBranch: string | null
+  gitSyncCommit: string | null
+  gitSyncSizeBytes: number | null
   rejectReason: string | null
   auditBy: number | null
   auditorName: string | null
@@ -79,6 +109,12 @@ export const resumeService = {
   submit: () => {
     return api.post<string, string>("/api/resume/submit")
   },
+
+  getGitSyncStatus: () =>
+    api.get<ResumeGitSyncData, ResumeGitSyncData>("/api/resume/git-sync"),
+
+  syncGitRepository: () =>
+    api.post<ResumeGitSyncData, ResumeGitSyncData>("/api/resume/git-sync"),
 
   listReviews: (params: ResumeReviewListParams = {}) =>
     api.get<PageResult<ResumeReviewListItem>, PageResult<ResumeReviewListItem>>(
