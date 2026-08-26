@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import {
+  Award,
   ArrowRight,
   ClipboardCheck,
   FileText,
@@ -73,6 +74,13 @@ export default function DashboardPage() {
       title: "审计日志",
       description: "查询角色变更、导出、删除与登录安全事件。",
       icon: ScrollText,
+      minLevel: 4,
+    },
+    {
+      href: "/dashboard/contributions",
+      title: "贡献记录",
+      description: "补录线下贡献并查询自动与人工流水。",
+      icon: Award,
       minLevel: 4,
     },
     {

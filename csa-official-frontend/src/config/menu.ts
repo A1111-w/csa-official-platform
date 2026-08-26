@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react"
 import {
+  Award,
   ClipboardCheck,
   FileText,
   FileSpreadsheet,
@@ -73,6 +74,12 @@ export const dashboardMenu: MenuItem[] = [
     title: "审计日志",
     href: "/dashboard/audit",
     icon: ScrollText,
+    minLevel: 4,
+  },
+  {
+    title: "贡献记录",
+    href: "/dashboard/contributions",
+    icon: Award,
     minLevel: 4,
   },
   {
