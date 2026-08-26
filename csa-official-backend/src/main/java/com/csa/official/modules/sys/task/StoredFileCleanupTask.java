@@ -2,6 +2,7 @@ package com.csa.official.modules.sys.task;
 
 import com.csa.official.modules.sys.entity.StoredFile;
 import com.csa.official.modules.sys.mapper.StoredFileMapper;
+import com.csa.official.modules.sys.service.FileAccountingService;
 import com.csa.official.modules.sys.service.ScheduledJobService;
 import com.csa.official.modules.sys.storage.FileStorage;
 import lombok.extern.slf4j.Slf4j;
@@ -21,16 +22,19 @@ public class StoredFileCleanupTask {
 
     private final StoredFileMapper storedFileMapper;
     private final FileStorage fileStorage;
+    private final FileAccountingService fileAccountingService;
     private final ScheduledJobService scheduledJobService;
     private final int batchSize;
     private final long graceHours;
 
     public StoredFileCleanupTask(StoredFileMapper storedFileMapper, FileStorage fileStorage,
+                                 FileAccountingService fileAccountingService,
                                  ScheduledJobService scheduledJobService,
                                  @Value("${csa.upload.cleanup-batch-size:100}") int batchSize,
                                  @Value("${csa.upload.orphan-grace-hours:24}") long graceHours) {
         this.storedFileMapper = storedFileMapper;
         this.fileStorage = fileStorage;
+        this.fileAccountingService = fileAccountingService;
         this.scheduledJobService = scheduledJobService;
         this.batchSize = Math.max(1, Math.min(batchSize, 1000));
         this.graceHours = Math.max(1, graceHours);
@@ -49,7 +53,7 @@ public class StoredFileCleanupTask {
                     log.warn("Could not delete orphan file metadataId={}", orphan.getId(), e);
                     continue;
                 }
-                storedFileMapper.markDeleted(orphan.getId());
+                fileAccountingService.markDeletedAndRelease(orphan);
             }
             log.info("Orphan file cleanup completed: candidates={}", orphans.size());
         });

@@ -3,6 +3,7 @@ package com.csa.official.modules.sys.service;
 import com.csa.official.common.exception.CsaException;
 import com.csa.official.modules.sys.entity.StoredFile;
 import com.csa.official.modules.sys.mapper.StoredFileMapper;
+import com.csa.official.modules.sys.storage.LocalFileStorage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -21,7 +22,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 class FileServiceTest {
 
@@ -29,11 +29,15 @@ class FileServiceTest {
     Path uploadRoot;
 
     private FileService fileService;
+    private StoredFileMapper storedFileMapper;
+    private FileAccountingService fileAccountingService;
 
     @BeforeEach
     void setUp() {
-        fileService = new FileService();
-        ReflectionTestUtils.setField(fileService, "basePath", uploadRoot.toString());
+        storedFileMapper = mock(StoredFileMapper.class);
+        fileAccountingService = mock(FileAccountingService.class);
+        fileService = new FileService(
+                new LocalFileStorage(uploadRoot.toString()), storedFileMapper, fileAccountingService);
         ReflectionTestUtils.setField(fileService, "allowedExtensions", List.of("jpg", "jpeg", "png", "pdf", "zip"));
         ReflectionTestUtils.setField(fileService, "maxFileSizeBytes", 1024L);
         ReflectionTestUtils.setField(fileService, "userQuotaBytes", 1024L * 1024L);
@@ -84,26 +88,25 @@ class FileServiceTest {
     }
 
     @Test
-    void rejectsUploadWhenUserQuotaWouldBeExceeded() {
-        StoredFileMapper mapper = mock(StoredFileMapper.class);
-        ReflectionTestUtils.setField(fileService, "storedFileMapper", mapper);
+    void rejectsUploadWhenUserQuotaWouldBeExceeded() throws Exception {
         ReflectionTestUtils.setField(fileService, "userQuotaBytes", 8L);
-        when(mapper.sumActiveBytesByOwner(42L)).thenReturn(8L);
-        when(mapper.sumAllActiveBytes()).thenReturn(8L);
+        doThrow(new CsaException(413, "已超过个人文件配额"))
+                .when(fileAccountingService).reserveAndRecord(any(StoredFile.class), any(Long.class), any(Long.class));
 
         MockMultipartFile file = validPng("avatar.png");
 
         CsaException exception = assertThrows(CsaException.class, () -> fileService.upload(file, 42L));
 
         assertThat(exception.getCode()).isEqualTo(413);
-        assertTrue(Files.notExists(uploadRoot.resolve("42")));
+        try (var files = Files.list(uploadRoot.resolve("42"))) {
+            assertThat(files).isEmpty();
+        }
     }
 
     @Test
     void removesPhysicalFileWhenMetadataInsertFails() throws Exception {
-        StoredFileMapper mapper = mock(StoredFileMapper.class);
-        ReflectionTestUtils.setField(fileService, "storedFileMapper", mapper);
-        doThrow(new IllegalStateException("metadata failure")).when(mapper).insert(any(StoredFile.class));
+        doThrow(new IllegalStateException("metadata failure"))
+                .when(fileAccountingService).reserveAndRecord(any(StoredFile.class), any(Long.class), any(Long.class));
 
         assertThrows(CsaException.class, () -> fileService.upload(validPng("avatar.png"), 42L));
 
@@ -116,14 +119,12 @@ class FileServiceTest {
 
     @Test
     void persistsSha256AndStorageMetadata() throws Exception {
-        StoredFileMapper mapper = mock(StoredFileMapper.class);
-        ReflectionTestUtils.setField(fileService, "storedFileMapper", mapper);
         MockMultipartFile file = validPng("avatar.png");
 
         fileService.upload(file, 42L);
 
         ArgumentCaptor<StoredFile> captor = ArgumentCaptor.forClass(StoredFile.class);
-        verify(mapper).insert(captor.capture());
+        verify(fileAccountingService).reserveAndRecord(captor.capture(), any(Long.class), any(Long.class));
         StoredFile metadata = captor.getValue();
         String expected = java.util.HexFormat.of().formatHex(
                 java.security.MessageDigest.getInstance("SHA-256").digest(file.getBytes()));

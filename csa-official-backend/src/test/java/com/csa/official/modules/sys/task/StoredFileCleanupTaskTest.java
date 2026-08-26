@@ -2,6 +2,7 @@ package com.csa.official.modules.sys.task;
 
 import com.csa.official.modules.sys.entity.StoredFile;
 import com.csa.official.modules.sys.mapper.StoredFileMapper;
+import com.csa.official.modules.sys.service.FileAccountingService;
 import com.csa.official.modules.sys.service.ScheduledJobService;
 import com.csa.official.modules.sys.storage.FileStorage;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ class StoredFileCleanupTaskTest {
     void deletesOnlyFilesSelectedAsUnreferencedByMapper() throws Exception {
         StoredFileMapper mapper = mock(StoredFileMapper.class);
         FileStorage storage = mock(FileStorage.class);
+        FileAccountingService accountingService = mock(FileAccountingService.class);
         ScheduledJobService scheduledJobService = mock(ScheduledJobService.class);
         StoredFile orphan = new StoredFile();
         orphan.setId(7L);
@@ -32,11 +34,12 @@ class StoredFileCleanupTaskTest {
             return true;
         }).when(scheduledJobService).runOnce(anyString(), anyString(), any(Runnable.class));
 
-        StoredFileCleanupTask task = new StoredFileCleanupTask(mapper, storage, scheduledJobService, 10, 1);
+        StoredFileCleanupTask task = new StoredFileCleanupTask(
+                mapper, storage, accountingService, scheduledJobService, 10, 1);
 
         task.cleanup();
 
         verify(storage).delete("/files/42/orphan.png");
-        verify(mapper).markDeleted(7L);
+        verify(accountingService).markDeletedAndRelease(orphan);
     }
 }
