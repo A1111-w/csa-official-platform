@@ -19,6 +19,14 @@ public class Resume implements Serializable {
 
     // 硬核模式：Git 仓库地址
     private String gitRepoUrl;
+    private String gitSyncStatus;
+    private String gitSyncRunId;
+    private LocalDateTime gitSyncStartedAt;
+    private LocalDateTime gitSyncCompletedAt;
+    private String gitSyncErrorCode;
+    private String gitSyncBranch;
+    private String gitSyncCommit;
+    private Long gitSyncSizeBytes;
 
     // 状态 (使用枚举)
     private ResumeStatusEnum status;

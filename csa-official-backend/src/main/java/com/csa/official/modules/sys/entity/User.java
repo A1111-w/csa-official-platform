@@ -23,6 +23,7 @@ public class User implements Serializable {
     private LocalDateTime lastLoginAt;
     private LocalDateTime deactivatedAt;
     private LocalDateTime deletionRequestedAt;
+    private LocalDateTime anonymizedAt;
     private String privacyConsentVersion;
     private LocalDateTime privacyConsentAt;
 
