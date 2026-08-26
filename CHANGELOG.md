@@ -25,6 +25,7 @@
 - 增加 `phase-1-verification.md`，记录隔离数据库、镜像、备份恢复和同源 HTTPS E2E 的实际结果及回滚路径；历史镜像证据与当前源码复验边界已在文档中标明。
 - 增加 `phase-2-verification.md`，记录账号生命周期、审计、个人数据导出、上传元数据、邮件重试、定时任务幂等和真实依赖测试的实际结果。
 - 完成简历审核前后端闭环：成员提交后，部长可在 `/dashboard/resume-reviews` 分页查看队列、打开详情并通过/驳回；新增审核接口说明、学习链路和模块完成度审计文档。
+- 完成人工贡献记录前后端闭环：Level 4 可在 `/dashboard/contributions` 搜索成员、记录贡献并分页查询 `AUTO`、`MANUAL`、`LEGACY` 流水；写入操作人和管理审计事件。
 
 ### Changed
 
@@ -33,6 +34,7 @@
 - 测试配置改为 `test` profile + H2，不再以同名 `application.yml` 遮蔽主配置；Surefire 自动激活 test profile。
 - 同步根 README、项目学习指南、部署手册、接口地图和安全说明：生产结构以 Flyway 为准，`db/schema.sql` 只作学习快照，补齐 Phase 2 账号/审计/导出/邮件/任务口径，并标明当前 Docker 故障和未完成的删除执行器。
 - 简历审核列表使用轻量 `ResumeReviewListVO`，详情使用白名单 `ResumeReviewDetailVO`；申请人和部门按页批量加载，避免审核队列 N+1 查询。
+- 贡献管理历史使用 `ContributionAwardVO` 和批量成员/部门加载，人工记录不再直接绑定完整实体；贡献类型、分值、说明和目标账号状态均在后端校验。
 
 ### Fixed
 
@@ -41,6 +43,7 @@
 - 修复生产 MySQL JDBC URL 使用明文连接且关闭公钥回取导致 MySQL 8 默认认证插件无法登录的问题；生产改为强制 TLS。
 - 修复 Redis 缓存反序列化 `User.balance` 的 `BigDecimal` 被安全类型白名单拒绝而导致登录 500 的问题，并增加序列化回归测试。
 - 修复简历审核此前只有按 ID 手工调用接口、没有队列和网页入口的问题；补上草稿隐私、审核中禁止编辑、驳回原因校验和并发审核冲突处理。
+- 修复人工贡献接口缺少事务、来源和操作人追踪的问题；旧贡献流水不猜测来源，统一标记为 `LEGACY`。
 
 ### Security
 
@@ -52,6 +55,7 @@
 - 空数据库执行 `db/migration/V1__initial_schema.sql`；已有数据库 baseline/升级和失败迁移处理见 `docs/production-readiness/flyway.md`。
 - 生产不执行 `db/seed.sql`；演示 seed 仅允许 `dev`/`test` profile 且显式开启。
 - 新增 Flyway `V3__resume_review_queue_index.sql`，为 `biz_resume(status, update_time)` 增加审核队列索引；回滚应用时保留该向前兼容索引，不原地修改已执行 migration。
+- 新增 Flyway `V5__contribution_award_audit.sql`，为 `sys_contribution_log` 增加 `source`、`awarded_by` 和管理历史索引；已有记录标记为 `LEGACY`，回退应用代码前不得删除已执行的 V5，结构回退需另写补偿 migration。
 
 ### Verification
 
@@ -64,6 +68,7 @@
 - 修正隐私说明：删除申请当前只进入保留和人工审核流程，最终匿名化/删除执行器尚未实现，不再对外承诺系统自动在 N 天内完成删除。
 - 2026-08-26：本轮定向简历测试 8/8 通过；后端全量测试 133 个通过、0 失败、1 个因 Docker 不可用跳过；前端测试 6/6、`npm run lint` 和 `npm run build` 通过。浏览器级简历审核 E2E 仍需在具备真实数据库、Redis 和部长测试账号的环境补跑。
 - 文档更正：V3 已加入当前 Flyway 版本链，旧文档中“最新版本为 V2”和“125 个测试”的内容均保留为历史证据或已改为当前验证口径；当前 V3 真实 MySQL/Testcontainers 结果仍待健康 Docker/staging 重跑。
+- 2026-08-26：人工贡献专项后端 `11/11` 通过；后端全量 `174` 个测试通过、0 失败、0 错误、1 个 Docker Testcontainers 测试跳过；前端 Vitest `6` 个文件/`12` 个测试通过，`npm run lint` 和 `npm run build` 通过。
 
 ## [2026-07-27] Opus 5 优化基线（尚未提交）
 

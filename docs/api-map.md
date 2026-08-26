@@ -287,8 +287,8 @@ limit 默认 100
 | --- | --- | --- |
 | `DEV` | 官网建设 | 累加 score |
 | `RES` | 资源贡献 | 统计条数 |
-| `COMP` | 比赛贡献 | 统计条数 |
-| `OPS` | 运维维护 | 统计条数 |
+| `COMP` | 发布比赛 | 统计条数 |
+| `OPS` | 首页维护 | 统计条数 |
 
 ### 2.7 贡献排行
 
@@ -1193,7 +1193,7 @@ POST /api/sys/carousel/delete?id=1
 
 ## 12. 贡献和导出接口
 
-### 12.1 手动授予贡献
+### 12.1 人工记录贡献
 
 ```http
 POST /api/sys/contribution/award
@@ -1209,12 +1209,31 @@ Content-Type: application/json
 
 权限：`LEVEL_4`。
 
-用途：
+请求校验：
 
-- 给官网建设、运维、资源等贡献补录分数。
-- 贡献墙会通过 `ContributionLogMapper.selectWall(limit)` 聚合这些记录。
+- `userId` 必须对应仍存在且处于 `ACTIVE` 状态的成员；已删除或已匿名化账号不能新增记录。
+- `type` 只能是 `DEV`、`RES`、`COMP`、`OPS`，分别表示官网建设、资源贡献、发布比赛和首页维护。
+- `score` 必须大于 0，最多 8 位整数和 2 位小数；`reason` 必填且最多 500 个字符。
+- 成功后写入 `source=MANUAL`、`awardedBy=当前操作人`，并记录 `CONTRIBUTION_MANUAL_AWARD` 管理审计事件。
+- 贡献墙和总排行会通过 SQL 聚合这条记录。
 
-### 12.2 导出成员
+### 12.2 查询贡献记录
+
+```http
+GET /api/sys/contribution/awards?page=1&size=20&keyword=张三&type=DEV&source=MANUAL
+```
+
+权限：`LEVEL_4`。分页 `size` 统一收敛到 1-100。筛选参数：
+
+- `keyword`：按成员用户名、姓名或学号匹配，最多 64 个字符。
+- `type`：`DEV`、`RES`、`COMP`、`OPS`。
+- `source`：`AUTO`（系统自动）、`MANUAL`（人工补录）或 `LEGACY`（V5 以前的历史记录）。
+
+返回 `R<Page<ContributionAwardVO>>`，包含成员、部门、类型、分值、说明、来源、操作人和创建时间。查询先分页贡献流水，再批量加载成员和部门信息，不按记录逐条查库。
+
+前端入口：`/dashboard/contributions`。Level 4 管理员可以搜索成员、选择类型、输入分值和说明，确认后提交；页面默认展示人工记录，并可切换查看自动和历史流水。
+
+### 12.3 导出成员
 
 ```http
 POST /api/sys/export/members
@@ -1240,7 +1259,7 @@ LEVEL_4 或 ADMIN
 
 前端入口：`/dashboard/member-export`。支持日期、学院、班级、姓名、学号、角色、邀请码筛选和列选择；导出动作写入审计日志。
 
-### 12.3 查询审计日志
+### 12.4 查询审计日志
 
 ```http
 GET /api/sys/audit/list?page=1&size=20&action=LOGIN_FAILURE&result=FAILURE&requestId=request-id

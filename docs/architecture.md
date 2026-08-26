@@ -381,7 +381,7 @@ CompetitionDetailVO
 需要说明的是，本轮只重构了资源模块，其它 Controller 目前仍直接持有 Mapper，文档不夸大：
 
 - `CarouselController` 直接用 `CarouselMapper`。
-- `ContributionController` 直接用 `ContributionLogMapper`。
+- `ContributionController` 的公开贡献墙仍直接使用 `ContributionLogMapper`；人工补录和管理历史已下沉到 `ContributionService`。
 - `VoteController` 只有创建/投票走 `VoteService`，列表查询仍直接用 `ProposalMapper`（部分未拆）。
 - `PublicController` 直接用 `SysConfigMapper`、`UserMapper`、`DeptMapper`。
 - `SysUserController`、`AuthController` 也仍直接用 Mapper。
@@ -430,9 +430,21 @@ Jackson 默认把 Java 枚举序列化成**名字**，所以 `Resume.status` 出
 
 `ContributionAspect` 原来在 `@AfterReturning` 里同步 `INSERT`，等于给每个被 `@LogContribution` 切到的写接口都额外挂一次数据库往返，拖长了接口 RT。
 
-现在切面只在请求线程上做一件事：取 `userId`。这一步的关键在于——`SecurityContext` 默认是 ThreadLocal，异步线程里取不到当前登录用户，所以必须在请求线程先拿好再往下传。取到后把实际写库交给 `ContributionLogWriter`，它跑在专用的 `contributionTaskExecutor` 线程池上，用 CallerRunsPolicy：队列满时退化为同步写，宁可慢也不丢记录。
+现在切面只在请求线程上做一件事：取 `userId`。这一步的关键在于——`SecurityContext` 默认是 ThreadLocal，异步线程里取不到当前登录用户，所以必须在请求线程先拿好再往下传。取到后把实际写库交给 `ContributionLogWriter`，它跑在专用的 `contributionTaskExecutor` 线程池上，用 CallerRunsPolicy：队列满时退化为同步写，宁可慢也不丢记录。自动记录写入 `source=AUTO`。
 
 `ContributionLogWriter` 之所以单独成一个 Bean（而不是把 `@Async` 加在切面里），和已有的 `AsyncMailSender` 是同一个道理：`@Async` 走 Spring 代理，同类内部自调用会绕过代理不生效，必须从外部 Bean 调进来。
+
+### 5.8.1 人工贡献记录闭环
+
+旧版本虽然已经有 `POST /api/sys/contribution/award`，但只有 API 调试工具能调用，缺少成员选择、历史查询和操作追踪。现在 `ContributionController` 只负责 HTTP 边界，`ContributionService` 负责：
+
+1. 校验成员存在、未删除且处于 `ACTIVE` 状态。
+2. 校验 `DEV/RES/COMP/OPS` 类型、正分值和说明长度。
+3. 在事务中写入 `source=MANUAL` 和 `awarded_by`。
+4. 记录不含贡献说明正文的管理审计事件，避免审计日志重复保存个人输入。
+5. 分页查询流水后批量加载成员和部门，避免管理历史产生 N+1 查询。
+
+前端 `/dashboard/contributions` 先调用成员目录搜索，再提交人工记录，并默认按 `MANUAL` 查看历史；`AUTO` 和 `LEGACY` 可用于核对自动流水及迁移前数据。
 
 ### 5.9 分页上限统一（PageUtils）
 
@@ -442,7 +454,7 @@ Jackson 默认把 Java 枚举序列化成**名字**，所以 `Resume.status` 出
 
 ### 5.10 数据库结构进入版本控制
 
-生产数据库结构的唯一执行入口是 `csa-official-backend/src/main/resources/db/migration/` 下的 Flyway 版本链：当前包含 `V1__initial_schema.sql`、`V2__production_operations.sql` 和 `V3__resume_review_queue_index.sql`。根目录的 `db/schema.sql` 保留为学习用结构快照，`db/seed.sql` 只允许 dev/test 在显式运行时口令下加载，不能当作生产迁移。
+生产数据库结构的唯一执行入口是 `csa-official-backend/src/main/resources/db/migration/` 下的 Flyway 版本链：当前版本为 V1-V5，V5 为贡献来源和操作人迁移。根目录的 `db/schema.sql` 保留为学习用结构快照，`db/seed.sql` 只允许 dev/test 在显式运行时口令下加载，不能当作生产迁移。
 
 一个刻意的决定是**不建物理外键**：项目用逻辑删除（父行 `deleted=1` 但物理仍在）+ MyBatis-Plus，物理外键会和逻辑删除、框架的级联行为互相打架，所以表间关系只用注释描述，不加 `FOREIGN KEY` 约束（详见 `docs/database.md`）。
 
@@ -461,7 +473,7 @@ Jackson 默认把 Java 枚举序列化成**名字**，所以 `Resume.status` 出
 | 部门 | `DeptController` | `DeptService` |
 | 资源 | `ResourceController` | `ResourceService`、`ResourceMapper` |
 | 轮播图 | `CarouselController` | `CarouselMapper`（Controller 直接持有） |
-| 贡献 | `ContributionController` | `ContributionLogMapper`；自动记录经 `ContributionAspect` → `ContributionLogWriter` 异步落库 |
+| 贡献 | `ContributionController` | `ContributionService`、`ContributionLogMapper`；自动记录经 `ContributionAspect` → `ContributionLogWriter` 异步落库 |
 | 投票 | `VoteController` | `VoteService`、`ProposalMapper` |
 | 导出 | `ExportController` | `UserExportService` |
 | 公开内容 | `PublicController` | `SysConfigMapper` |
@@ -537,14 +549,14 @@ src/types/activity.ts
 
 - 列表接口统一最大 `size`：分页走 `PageUtils.of`（上限 100），非分页列表走 `PageUtils.clampLimit`（上限 200）。
 - 资源、竞赛、部门、轮播、提案、简历返回改为 VO，不再直接返回 Entity（详见 5.6）。
-- 保留 `db/schema.sql` 学习结构快照，生产结构由 Flyway V1/V2/V3 管理，并用 `SchemaConsistencyTest` 防止实体与 migration 漂移。
+- 保留 `db/schema.sql` 学习结构快照，生产结构由 Flyway V1-V5 管理，并用 `SchemaConsistencyTest` 防止实体与 migration 漂移。
 
 仍待推进：
 
 1. 把 Controller 内部 DTO 拆到 `dto` 包，方便复用和测试。
-2. 把仍直接持有 Mapper 的 Controller（轮播、贡献、公开内容、投票列表、用户、注册等）继续下沉到 Service。
-3. 将上传配额改为并发安全的原子计数，并增加 PENDING 邮件的数据库补偿扫描。
-4. 实现账号最终匿名化/物理删除执行器，补审批、审计和恢复演练。
+2. 把仍直接持有 Mapper 的 Controller（轮播、公开内容、投票列表、用户、注册等）继续下沉到 Service。
+3. 为简历审核、Git 同步、审计、成员导出和贡献管理补真实账号 Playwright E2E。
+4. 补账号删除审批、数据保留核验和匿名化恢复演练；当前不做不可恢复的物理删除。
 5. 在健康 staging 环境补跑当前镜像、Playwright、备份恢复和 Trivy 验证。
 6. 接入 RAG 后，把知识库模块单独放 `modules/kb`。
 6. 接入 Agent 后，把工具调用和审计单独放 `modules/agent`。

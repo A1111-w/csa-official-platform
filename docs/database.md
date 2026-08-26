@@ -12,6 +12,9 @@
 ```text
 csa-official-backend/src/main/resources/db/migration/V1__initial_schema.sql  初始结构
 csa-official-backend/src/main/resources/db/migration/V2__production_operations.sql  Phase 2 运营结构
+csa-official-backend/src/main/resources/db/migration/V3__resume_review_queue_index.sql  简历审核队列索引
+csa-official-backend/src/main/resources/db/migration/V4__account_storage_and_git_sync.sql  账号、文件配额和 Git 同步
+csa-official-backend/src/main/resources/db/migration/V5__contribution_award_audit.sql  贡献来源和操作人
 db/schema.sql   历史/本地结构参考，不是生产迁移入口
 db/seed.sql     仅 dev/test 演示种子
 ```
@@ -29,7 +32,7 @@ db/seed.sql     仅 dev/test 演示种子
 | `sys_proposal` | 投票提案 | sys | `Proposal` |
 | `sys_vote_record` | 投票记录 | sys | `VoteRecord` |
 | `sys_resource` | 资源库 | sys | `Resource` |
-| `sys_contribution_log` | 贡献流水（贡献墙数据源） | sys | `ContributionLog` |
+| `sys_contribution_log` | 贡献流水、人工补录来源和操作人 | sys | `ContributionLog` |
 | `sys_config` | 系统配置（如协会介绍 CSA_INTRO） | sys | `SysConfig` |
 | `biz_competition` | 竞赛 | biz | `Competition` |
 | `biz_comp_editor` | 竞赛授权编辑者 | biz | `CompEditor` |
@@ -49,7 +52,7 @@ erDiagram
   sys_user            ||--o{ sys_dept             : "leader_id(正部长)"
   sys_user            ||--o{ sys_invite_code      : "creator_id"
   sys_user            ||--o{ sys_resource         : "uploader_id"
-  sys_user            ||--o{ sys_contribution_log : "user_id"
+  sys_user            ||--o{ sys_contribution_log : "user_id / awarded_by"
   sys_user            ||--o{ sys_proposal         : "proposer_id"
   sys_user            ||--o{ sys_vote_record      : "voter_id"
   sys_proposal        ||--o{ sys_vote_record      : "proposal_id"
@@ -65,7 +68,7 @@ erDiagram
 - 一个提案（`sys_proposal`）有多条投票记录（`sys_vote_record.proposal_id`），每个用户对同一提案最多投一次。
 - 一个竞赛（`biz_competition`）可授权多个编辑者（`biz_comp_editor`），同一竞赛不重复授权同一人。
 - 一个用户最多一份简历（`biz_resume.user_id` 唯一）。
-- 贡献流水（`sys_contribution_log`）按 `user_id` 聚合成贡献墙。
+- 贡献流水（`sys_contribution_log`）按 `user_id` 聚合成贡献墙；`awarded_by` 记录人工操作人或触发自动记录的用户。
 
 ### 2.1 为什么不建物理外键
 
@@ -115,6 +118,8 @@ erDiagram
 
 **反例（易踩坑）**：`sys_contribution_log.type` 不是枚举列，实体里就是 `private String type`，直接存枚举**名字符串** `'DEV' / 'RES' / 'COMP' / 'OPS'`，所以用 **VARCHAR**。贡献墙 SQL 里也是按 `l.type = 'DEV'` 这样比对字符串的。
 
+`sys_contribution_log.source` 取值为 `AUTO`、`MANUAL` 或 `LEGACY`。V5 迁移不会猜测旧记录来源，历史行统一保留为 `LEGACY`；人工记录另外保存 `awarded_by`，便于管理页面和审计追踪。
+
 其余 `sys_proposal.status`、`sys_carousel.status` 是普通 `Integer`（非枚举），同样用 INT。
 
 ## 5. 索引设计（每个索引服务哪个查询）
@@ -131,6 +136,7 @@ erDiagram
 | `biz_competition` | `idx_comp_status_time (status, update_time, create_time)` | 普通 | 公开列表过滤 `status <> 0(UNPUBLISHED)` 并按 `update_time DESC, create_time DESC` 排序 |
 | `biz_comp_editor` | `uk_editor_comp_user (competition_id, user_id)` | UNIQUE | `CompetitionService.addEditor` 用 `exists(competition_id, user_id)` 查重，唯一约束把“同一竞赛不重复授权同一人”下沉到 DB |
 | `sys_contribution_log` | `idx_contrib_user_type (user_id, type)` | 普通 | 贡献墙 `selectWall` 按 `user_id` 分组、对 `type` 做条件聚合 |
+| `sys_contribution_log` | `idx_contribution_admin_history (source, create_time, id)` | 普通 | `/api/sys/contribution/awards` 按来源和时间分页查询管理流水 |
 | `sys_vote_record` | `uk_vote_proposal_voter (proposal_id, voter_id)` | UNIQUE | 防重复投票，见下方 5.1 |
 | `biz_resume` | `uk_resume_user (user_id)` | UNIQUE | `ResumeService.getMyResume` 用 `selectOne(user_id)`，唯一避免多行导致 `TooManyResultsException` |
 | `sys_config` | `uk_config_key (config_key)` | UNIQUE | 按键取配置 `selectOne(config_key)`（如 `CSA_INTRO`），保证一键一值 |
@@ -156,7 +162,7 @@ if (voteRecordMapper.exists(new LambdaQueryWrapper<VoteRecord>()
 
 ### 6.1 生产与普通启动
 
-应用启动时 Flyway 自动执行 `V1`、`V2` 等未执行迁移：
+应用启动时 Flyway 自动执行 `V1`-`V5` 等未执行迁移：
 
 ```bash
 cd csa-official-backend

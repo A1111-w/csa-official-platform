@@ -2,7 +2,7 @@
 
 更新日期：2026-08-26
 
-本文对应账号匿名化、贡献排行、邮件补偿、上传配额、简历 Git 同步、审计日志和成员导出改造。目标是解释“为什么这样设计、请求怎么流转、测试怎么证明、Git 怎么回退”。
+本文对应账号匿名化、贡献排行、邮件补偿、上传配额、简历 Git 同步、审计日志、成员导出和人工贡献记录改造。目标是解释“为什么这样设计、请求怎么流转、测试怎么证明、Git 怎么回退”。
 
 ## 1. 版本地图
 
@@ -17,6 +17,8 @@
 | `c517eda` | 首页轮播和贡献排行 | `git revert c517eda` |
 | `4850231` | 审计日志管理页 | `git revert 4850231` |
 | `2fe19b1` | 成员筛选、列选择和 Excel 导出页 | `git revert 2fe19b1` |
+| `77b944f` | 人工贡献记录后端、V5 迁移和后端测试 | `git revert 77b944f`（数据库需另行向前迁移） |
+| `26de897` | 人工贡献记录前端管理页、服务和前端测试 | `git revert 26de897` |
 
 回退应用代码优先使用 `git revert`，不要用 `reset --hard`。Flyway migration 一旦在数据库执行，不能通过回退 Git commit 自动撤销；需要新增更高版本的补偿 migration，并先备份和演练。
 
@@ -77,7 +79,67 @@ POST /api/resume/git-sync
 
 导出默认选择姓名、学号、学院、班级、手机号和角色。支付单号等字段不默认选择。每次导出记录操作人、列集合和是否使用筛选，但不记录导出的具体个人数据。
 
-## 8. 验证命令
+## 8. 人工贡献记录
+
+### 8.1 业务边界
+
+人工贡献记录用于补录系统自动切面无法捕获的线下或人工确认贡献。它不是普通成员自助加分入口，只向 `LEVEL_4` 开放。记录创建后不提供前端修改或删除按钮，后续纠正应追加一条有说明的记录，并保留原记录和审计证据。
+
+### 8.2 请求链路
+
+```text
+POST /api/sys/contribution/award
+→ ContributionController
+→ ContributionService.award
+→ 校验成员状态、类型、分值和说明
+→ 事务写入 sys_contribution_log(source=MANUAL, awarded_by=当前操作人)
+→ 清理贡献排行缓存
+→ 写入 CONTRIBUTION_MANUAL_AWARD 审计事件
+```
+
+历史查询使用：
+
+```text
+GET /api/sys/contribution/awards
+→ ContributionService.listAwards
+→ PageUtils.of 收敛分页参数
+→ 先分页流水，再批量加载成员和部门
+→ 返回 ContributionAwardVO
+```
+
+`keyword` 只查用户名、姓名和学号；列表不会把密码、邮箱等不必要的用户字段带到页面。`source` 用于区分 `AUTO`、`MANUAL` 和 `LEGACY`，V5 不对旧数据来源做猜测。
+
+### 8.3 前端使用
+
+`/dashboard/contributions` 包含成员搜索、贡献类型选择、分值、说明、二次确认和历史筛选。页面默认显示人工记录，也可以切换查看系统自动和迁移前历史记录。成员搜索复用受权限保护的用户目录并限制单次结果数，避免随着成员数量增长一次加载全表。
+
+### 8.4 测试重点
+
+- Level 3 账号不能调用人工补录接口，Level 4 可以调用。
+- 参数校验失败返回 400，Service 不写库。
+- 不存在、已删除、已停用或已匿名化账号不能成为补录目标。
+- 成功写入必须带 `source=MANUAL` 和 `awarded_by`，并触发排行缓存清理和审计。
+- 历史接口分页后批量加载用户，不按每条流水重复查库。
+- V5 migration 将旧行标为 `LEGACY`，不伪造历史操作人。
+
+### 8.5 V5 升级与回退
+
+升级前先备份 MySQL。部署包含 `77b944f` 的后端后，由 Flyway 执行 `V5__contribution_award_audit.sql`，再核对：
+
+```sql
+SELECT version, description, success
+FROM flyway_schema_history
+WHERE version = '5';
+
+SHOW COLUMNS FROM sys_contribution_log LIKE 'source';
+SHOW COLUMNS FROM sys_contribution_log LIKE 'awarded_by';
+```
+
+若 V5 尚未执行，可直接 `git revert 26de897 77b944f`。若 V5 已执行，应用代码仍可回退，但必须保留 V5 和新增列；旧代码会忽略额外列，新写记录将使用数据库默认值 `LEGACY`。不要删除 `flyway_schema_history` 记录，也不要修改已经执行的 V5 文件。
+
+只有确认旧版本稳定、已备份且确实需要删除结构时，才新增更高版本补偿 migration 删除索引和两列。该操作会永久丢失来源与操作人数据，不能作为常规应用回退手段。
+
+## 9. 验证命令
 
 ```powershell
 cd D:\CSA-Project\csa-official-backend
@@ -98,9 +160,10 @@ Git 同步专项测试：
 2026-08-26 实际结果：
 
 - 后端专项：38/38 通过。
-- 后端全量：163 个通过，0 失败，0 错误，1 个 Testcontainers 测试因 Docker 不可用跳过。
-- 前端 Vitest：5 个测试文件、10 个测试通过。
-- 前端 ESLint 和生产 build：通过，共生成 24 个应用路由。
+- 本轮贡献专项：后端 `11/11` 通过（管理接口 5、Service 6）。
+- 后端全量：174 个测试，0 失败，0 错误，1 个测试因 Docker 不可用跳过。
+- 前端 Vitest：6 个测试文件、12 个测试通过。
+- 前端 ESLint 和生产 build：通过，`/dashboard/contributions` 已进入构建路由表。
 - Playwright：公开隐私页与未登录重定向 2 个通过；登录、CSRF/权限和上传 3 个用例因未提供 E2E 账号而跳过。
 
 ## 9. 尚需发布环境验证
