@@ -22,6 +22,18 @@ export interface UserListParams {
   size?: number
 }
 
+export interface MemberExportPayload {
+  columns: string[]
+  startTime?: string
+  endTime?: string
+  college?: string
+  className?: string
+  realName?: string
+  studentId?: string
+  roleLevel?: number
+  inviteCode?: string
+}
+
 export const userService = {
   getInfo: (config?: AxiosRequestConfig) =>
     api.get<UserInfo, UserInfo>("/api/sys/user/info", config),
@@ -29,5 +41,10 @@ export const userService = {
   list: (params: UserListParams = {}) =>
     api.get<UserDirectoryItem[], UserDirectoryItem[]>("/api/sys/user/list", {
       params,
+    }),
+
+  exportMembers: (payload: MemberExportPayload) =>
+    api.post<Blob, Blob>("/api/sys/export/members", payload, {
+      responseType: "blob",
     }),
 }

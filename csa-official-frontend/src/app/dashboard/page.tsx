@@ -5,6 +5,7 @@ import {
   ArrowRight,
   ClipboardCheck,
   FileText,
+  FileSpreadsheet,
   HardDrive,
   ScrollText,
   Settings,
@@ -72,6 +73,13 @@ export default function DashboardPage() {
       title: "审计日志",
       description: "查询角色变更、导出、删除与登录安全事件。",
       icon: ScrollText,
+      minLevel: 4,
+    },
+    {
+      href: "/dashboard/member-export",
+      title: "成员导出",
+      description: "按条件筛选成员并选择字段导出 Excel。",
+      icon: FileSpreadsheet,
       minLevel: 4,
     },
     {
