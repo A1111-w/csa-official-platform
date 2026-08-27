@@ -1,8 +1,8 @@
 # 功能闭环、测试与 Git 回退学习指南
 
-更新日期：2026-08-26
+更新日期：2026-08-27
 
-本文对应账号匿名化、贡献排行、邮件补偿、上传配额、简历 Git 同步、审计日志、成员导出和人工贡献记录改造。目标是解释“为什么这样设计、请求怎么流转、测试怎么证明、Git 怎么回退”。
+本文对应账号匿名化、贡献排行、邮件补偿、上传配额、简历 Git 同步、审计日志、成员导出、人工贡献记录和轮播后台管理改造。目标是解释“为什么这样设计、请求怎么流转、测试怎么证明、Git 怎么回退”。
 
 ## 1. 版本地图
 
@@ -19,6 +19,7 @@
 | `2fe19b1` | 成员筛选、列选择和 Excel 导出页 | `git revert 2fe19b1` |
 | `77b944f` | 人工贡献记录后端、V5 迁移和后端测试 | `git revert 77b944f`（数据库需另行向前迁移） |
 | `26de897` | 人工贡献记录前端管理页、服务和前端测试 | `git revert 26de897` |
+| `f295e24` | 首页轮播后台管理、上传图片公开授权和测试 | `git revert f295e24` |
 
 回退应用代码优先使用 `git revert`，不要用 `reset --hard`。Flyway migration 一旦在数据库执行，不能通过回退 Git commit 自动撤销；需要新增更高版本的补偿 migration，并先备份和演练。
 
@@ -60,6 +61,13 @@ POST /api/resume/git-sync
 贡献排行不是把整张日志表读到 Java 再聚合，而是由 MySQL 完成 `SUM + COUNT + GROUP BY + ORDER BY + LIMIT`。服务按 limit 缓存，新增贡献时清空缓存。
 
 首页使用 `Promise.allSettled` 并行读取介绍、成员、轮播和排行。某一个公开接口失败时，只降级对应区域，不把整个首页清空。轮播跳转只接受站内路径或 HTTP(S) URL，图片使用 `next/image`。
+
+这里要区分两个提交：
+
+- `c517eda` 完成的是首页读取和展示轮播、贡献排行的公开链路。
+- `f295e24` 完成的是 `/dashboard/carousels` 可视化管理、停用项管理、上传图片发布权限和回归测试。
+
+因此“首页能展示轮播”和“管理员能在网页维护轮播”不是同一个完成标准。详细调用链、安全边界和回退演练见 `docs/carousel-management-learning-guide.md`。
 
 ## 4. 邮件崩溃补偿
 
@@ -157,6 +165,17 @@ Git 同步专项测试：
 .\mvnw.cmd "-Dtest=GitServiceTest,ResumeServiceTest,ResumeGitSyncServiceTest,ResumeGitSyncWorkerTest,ResumeControllerAuthorizationTest" test
 ```
 
+轮播管理专项测试：
+
+```powershell
+cd D:\CSA-Project\csa-official-backend
+.\mvnw.cmd "-Dtest=CarouselControllerAuthorizationTest,StoredFileControllerTest" test
+
+cd D:\CSA-Project\csa-official-frontend
+npm run test -- src/services/carousel.test.ts src/services/public.test.ts
+npm run test:e2e -- e2e/critical-workflows.spec.ts
+```
+
 2026-08-26 实际结果：
 
 - 后端专项：38/38 通过。
@@ -165,6 +184,16 @@ Git 同步专项测试：
 - 前端 Vitest：6 个测试文件、12 个测试通过。
 - 前端 ESLint 和生产 build：通过，`/dashboard/contributions` 已进入构建路由表。
 - Playwright：公开隐私页与未登录重定向 2 个通过；登录、CSRF/权限和上传 3 个用例因未提供 E2E 账号而跳过。
+
+2026-08-27 轮播管理实际结果：
+
+- 后端轮播与文件访问专项：16/16 通过。
+- 后端全量：185 个测试，0 失败，0 错误，1 个 Testcontainers 测试因本机 Docker 不可用跳过。
+- 前端 Vitest：7 个测试文件、13 个测试通过。
+- 前端 ESLint：0 错误，保留 `src/lib/axios.ts` 的 1 条既有 warning。
+- 前端 production build：通过，路由表包含 `/dashboard/carousels`。
+- Playwright：公开页、未登录重定向、模拟 Level 4 轮播管理页面 3 个通过；3 个需要真实账号的场景按配置跳过。
+- `git diff --check` 对本轮文件通过；用户已有 `packed-project.xml` 未纳入功能提交。
 
 ## 9. 尚需发布环境验证
 

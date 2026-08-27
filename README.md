@@ -19,7 +19,7 @@ CSA Official 是一个面向计算机协会的官网与内部管理平台。它�
 | 方向 | 当前状态 |
 | --- | --- |
 | 公开官网 | 已有首页、关于、竞赛、贡献者、资源入口等页面 |
-| 后台工作台 | 已有概览、资源、竞赛、简历、简历审核、部门、投票、设置等页面 |
+| 后台工作台 | 已有概览、资源、竞赛、简历、简历审核、部门、投票、审计、贡献、成员导出、轮播管理和设置页面 |
 | 登录注册 | 已有登录、注册、验证码、邀请码、退出登录、修改/找回密码和全会话吊销 |
 | 安全 | 已有 Spring Security、JWT、HttpOnly Cookie、CSRF、CORS、稳定 HTTP status / `errorCode` / `traceId` |
 | 权限 | 已有 `roleLevel` 等级体系，前端菜单隐藏 + 后端 `@PreAuthorize` |
@@ -28,6 +28,7 @@ CSA Official 是一个面向计算机协会的官网与内部管理平台。它�
 | 缓存/限流 | 支持 Redis，也支持本地内存缓存降级 |
 | 文件 | 支持上传、类型限制、大小限制、受控访问 |
 | 简历审核 | 已完成“成员提交 → 部长队列 → 详情 → 通过/驳回 → 状态回写”前后端闭环；接口和竞态规则见 `docs/api-map.md` |
+| 轮播管理 | 已完成“列表 → 上传/URL → 预览 → 新增/编辑 → 排序/启停 → 删除 → 首页生效”前后端闭环；仅 Level 4 可维护 |
 | 一键启动 | 已提供 `docker-compose.yml`，一条命令拉起 MySQL、Redis、后端、前端 |
 | 文档 | 已补充本 README、启动文档、接口地图、架构说明、数据库说明、部署手册、学习路线 |
 | 测试 | 后端全量测试、前端测试、lint 和生产构建均纳入验收，实际结果见生产就绪验证记录 |
@@ -135,6 +136,9 @@ D:\CSA-Project
 │  ├─ database.md               表清单、ER 关系、索引取舍、逻辑删除约定
 │  ├─ deployment.md             Docker Compose 用法、环境变量、排错
 │  ├─ security-design.md        登录、JWT、CSRF、权限和限流说明
+│  ├─ module-completeness.md     当前模块完成度与真实剩余项
+│  ├─ feature-completion-learning-guide.md  功能闭环与 Git 回退学习指南
+│  ├─ carousel-management-learning-guide.md 轮播管理调用链、权限、测试和回退
 │  ├─ rag-agent-roadmap.md      RAG/Agent 后续接入方案
 │  └─ study-and-demo-guide.md   学习路线、演示脚本、面试表达
 ├─ logs                         本地日志
@@ -200,10 +204,15 @@ LoginForm
 | 个人资料 | `/dashboard/profile` | 0 |
 | 资源库 | `/dashboard/resources` | 1 |
 | 我的简历 | `/dashboard/resume` | 2 |
+| 简历审核 | `/dashboard/resume-reviews` | 3 |
 | 比赛看板 | `/dashboard/competitions` | 3 |
 | 提案中心 | `/dashboard/vote` | 3 |
 | 部门人事 | `/dashboard/departments` | 4 |
-| 公开设置 | `/dashboard/settings` | 4 |
+| 审计日志 | `/dashboard/audit` | 4 |
+| 贡献记录 | `/dashboard/contributions` | 4 |
+| 成员导出 | `/dashboard/member-export` | 4 |
+| 轮播管理 | `/dashboard/carousels` | 4 |
+| 公开设置/账号安全 | `/dashboard/settings` | 0；协会介绍编辑要求 4 |
 
 前端菜单隐藏只是体验优化。真实权限以后端接口为准。
 
@@ -341,7 +350,7 @@ LoginForm
 
 ### 9. 公开设置
 
-公开设置用于维护协会介绍内容。
+公开设置页同时承载所有登录用户可用的账号安全操作，以及仅 Level 4 可见的协会介绍编辑器。
 
 关键点：
 
@@ -351,6 +360,21 @@ LoginForm
 - 不直接相信前端传来的 HTML。
 
 这可以作为 Web 安全面试点：富文本内容如果不清洗，可能产生 XSS 风险。
+
+### 10. 首页轮播管理
+
+Level 4 用户可从 `/dashboard/carousels` 完成轮播图维护，不再需要 Postman 手工调用接口。
+
+能力：
+
+- 查看启用和停用轮播，并按 `sortOrder` 升序排列。
+- 上传 JPG、PNG、GIF，或填写 HTTP(S) 图片地址。
+- 实时预览、新增、编辑、启停、排序和删除。
+- 跳转地址只允许站内绝对路径或 HTTP(S)，可以清空已有跳转。
+- 保存和删除后立即清理 `public_carousel` 缓存，首页读取最新启用项。
+- 本地上传图片在被启用轮播引用后可匿名展示；停用项只允许 Level 4 预览，其他私人文件仍保持原权限。
+
+完整请求链路、安全边界、测试和回退方法见 [轮播管理学习文档](docs/carousel-management-learning-guide.md)。
 
 ## 角色和权限模型
 
@@ -576,6 +600,8 @@ cd D:\CSA-Project\csa-official-backend
 - [RAG / Agent 扩展路线](docs/rag-agent-roadmap.md)
 - [项目讲解、演示和学习路线](docs/study-and-demo-guide.md)
 - [模块完成度审计](docs/module-completeness.md)
+- [功能闭环、测试与 Git 回退](docs/feature-completion-learning-guide.md)
+- [轮播管理调用链与回退学习文档](docs/carousel-management-learning-guide.md)
 - [生产就绪改造学习与演练](docs/production-readiness/learning-guide.md)
 - [Phase 2 运营能力学习与演练](docs/production-readiness/phase-2-learning-guide.md)
 - [Phase 1 验证记录](docs/production-readiness/phase-1-verification.md)

@@ -263,7 +263,7 @@ GET /api/public/carousel/list
 
 返回：`R<List<CarouselVO>>`，只对外暴露渲染用的四个字段：`id`、`imgUrl`、`targetUrl`、`title`。`sortOrder`、`status`、`deleted` 属于后台维护信息，不再下发给未登录用户。
 
-适合首页展示。
+适合首页展示。若 `imgUrl` 是站内 `/files/...` 路径，只有仍被启用轮播引用的图片才允许匿名读取；停用轮播不会进入该列表。
 
 ### 2.6 贡献墙
 
@@ -782,17 +782,22 @@ SecurityUtils.getUserId
 GET /files/{ownerId}/{fileName}
 ```
 
-权限：`LEVEL_1`。
+入口在 SecurityFilterChain 中允许匿名到达，真实权限由 `StoredFileController` 按具体文件对象判断。
 
 访问规则：
 
-1. 文件属于当前用户：允许。
-2. 文件 URL 已发布为资源：允许。
-3. 否则：403。
+1. 文件 URL 被启用轮播引用：允许匿名读取，并返回 `inline`。
+2. 已登录且文件属于当前用户：允许。
+3. 已登录且文件 URL 已发布为资源：允许。
+4. Level 4 及以上可预览停用轮播引用的图片。
+5. 其他私人文件：拒绝；匿名返回 401，已登录但无对象权限返回 403。
+
+站内轮播上传仍需先存在有效 `sys_stored_file` 元数据。公开文件读取不会把任意 `/files/**` 变成静态目录，路径穿越、元数据状态和 owner 路径仍会校验。
 
 返回头：
 
-- `Content-Disposition: attachment`
+- 轮播图片：`Content-Disposition: inline`
+- 普通文件：`Content-Disposition: attachment`
 - `X-Content-Type-Options: nosniff`
 - `Content-Length`
 
@@ -1154,7 +1159,19 @@ Jsoup.clean(content, ABOUT_CONTENT_SAFELIST)
 
 允许基础富文本，过滤危险脚本。
 
-### 11.2 保存轮播图
+### 11.2 查询后台轮播列表
+
+```http
+GET /api/sys/carousel/list
+```
+
+权限：`LEVEL_4`。
+
+返回：`R<List<CarouselAdminVO>>`。与公开接口不同，管理列表同时返回启用和停用项，并包含 `sortOrder`、`status`、`createTime`、`updateTime`，最多 200 条，按 `sortOrder` 升序、`createTime` 降序排列。
+
+前端入口：`/dashboard/carousels`。
+
+### 11.3 保存轮播图
 
 ```http
 POST /api/sys/carousel/save
@@ -1173,9 +1190,16 @@ Content-Type: application/json
 
 校验：
 
-- `title` 不能为空。
-- `imgUrl` 不能为空。
+- 请求使用 `CarouselSaveRequest` 白名单 DTO，不接受 `deleted`、创建时间等实体持久层字段。
+- `title` 必填，最多 128 个字符。
+- `imgUrl` 必填，最多 500 个字符；只允许站内有效 `/files/...` 图片或 HTTP(S) URL。
+- 站内上传只允许当前操作人拥有的有效 JPG、PNG、GIF，不能把其他成员的私人文件直接发布为首页轮播。
+- `targetUrl` 可为空；非空时只允许站内绝对路径或 HTTP(S) URL，拒绝 URL 凭据、反斜杠伪装和其他协议。
+- `sortOrder` 必须是 `-100000` 到 `100000` 的整数；`status` 只能是 0 或 1。
+- 编辑时显式更新管理字段，因此把 `targetUrl` 清空会真正写入数据库 `NULL`，不会残留旧链接。
 - 编辑不存在的 ID 返回 404。
+
+保存成功后清空 `public_carousel` 缓存，记录 `CAROUSEL_SAVE` 管理审计，并由既有 `@LogContribution(OPS)` 旁路记录一次自动贡献。
 
 贡献：
 
@@ -1183,13 +1207,15 @@ Content-Type: application/json
 @LogContribution(type = OPS, detail = "更新轮播图")
 ```
 
-### 11.3 删除轮播图
+### 11.4 删除轮播图
 
 ```http
 POST /api/sys/carousel/delete?id=1
 ```
 
 权限：`LEVEL_4`。
+
+逻辑删除成功后清空 `public_carousel` 缓存并记录 `CAROUSEL_DELETE` 管理审计；不存在或已删除的 ID 返回 404。
 
 ## 12. 贡献和导出接口
 

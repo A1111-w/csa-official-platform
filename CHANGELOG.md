@@ -26,6 +26,8 @@
 - 增加 `phase-2-verification.md`，记录账号生命周期、审计、个人数据导出、上传元数据、邮件重试、定时任务幂等和真实依赖测试的实际结果。
 - 完成简历审核前后端闭环：成员提交后，部长可在 `/dashboard/resume-reviews` 分页查看队列、打开详情并通过/驳回；新增审核接口说明、学习链路和模块完成度审计文档。
 - 完成人工贡献记录前后端闭环：Level 4 可在 `/dashboard/contributions` 搜索成员、记录贡献并分页查询 `AUTO`、`MANUAL`、`LEGACY` 流水；写入操作人和管理审计事件。
+- 完成首页轮播后台管理闭环：Level 4 可在 `/dashboard/carousels` 查看启用/停用项，上传或填写图片地址，并执行预览、新增、编辑、排序、启停和删除。
+- 新增 `docs/carousel-management-learning-guide.md`，记录轮播公开展示与后台维护的调用链、DTO/VO 边界、文件授权、缓存、测试和非破坏性回退方法。
 
 ### Changed
 
@@ -40,6 +42,7 @@
 - 同步根 README、项目学习指南、部署手册、接口地图和安全说明：生产结构以 Flyway V1-V5 为准，`db/schema.sql` 只作学习快照，补齐 Phase 2 账号匿名化、审计、导出、原子配额、邮件补偿和任务口径，并标明当前 Docker 故障。
 - 简历审核列表使用轻量 `ResumeReviewListVO`，详情使用白名单 `ResumeReviewDetailVO`；申请人和部门按页批量加载，避免审核队列 N+1 查询。
 - 贡献管理历史使用 `ContributionAwardVO` 和批量成员/部门加载，人工记录不再直接绑定完整实体；贡献类型、分值、说明和目标账号状态均在后端校验。
+- 轮播公开读取与后台维护使用独立契约：匿名接口只返回启用项和渲染字段，管理接口返回启用/停用状态、排序和时间字段；保存使用 `CarouselSaveRequest` 白名单 DTO。
 
 ### Fixed
 
@@ -50,16 +53,20 @@
 - 修复 Redis 缓存反序列化 `User.balance` 的 `BigDecimal` 被安全类型白名单拒绝而导致登录 500 的问题，并增加序列化回归测试。
 - 修复简历审核此前只有按 ID 手工调用接口、没有队列和网页入口的问题；补上草稿隐私、审核中禁止编辑、驳回原因校验和并发审核冲突处理。
 - 修复人工贡献接口缺少事务、来源和操作人追踪的问题；旧贡献流水不猜测来源，统一标记为 `LEGACY`。
+- 修复轮播此前只有首页展示和后端保存/删除接口、管理员仍需手工调用 API 的问题；后台现可完整维护停用项、排序、跳转和发布状态。
+- 修复轮播编辑时清空跳转地址可能被 ORM 忽略的问题；管理字段改用显式更新 SQL，空跳转会写入数据库 `NULL`。
 - 修正文档、公开隐私说明与账户设置页面仍把已实现的到期匿名化、原子上传配额和邮件崩溃补偿描述为“未实现”的问题；同时把集成测试的迁移验收从 V3 更新到 V5。
 
 ### Security
 
 - 生产 Compose 的数据库、Redis、JWT、邮件和公网地址变量使用 `${VAR:?required}`；仓库新增根级忽略规则，备份产物和本地秘密不进入 Git。
 - 生产后端镜像以 UID/GID 10001 运行，根文件系统只读并使用受限 tmpfs。
+- 轮播保存限制图片和跳转为安全站内路径或 HTTP(S)，站内上传只允许发布者本人拥有的有效 JPG/PNG/GIF；启用轮播图片可匿名读取，停用项只允许 Level 4 预览，其他私人文件权限不变。
 
 ### Database / Config
 
 - 本 CI checkpoint 不新增 Flyway migration、不修改生产环境变量、不改变数据库结构；回退应用提交后执行 `npm ci` 即可恢复对应的前端依赖树。
+- 2026-08-27 轮播管理不新增 Flyway migration、不修改数据库结构、不新增环境变量，也不修改 Maven/npm 依赖或 lockfile；功能提交为 `f295e24`，回退使用 `git revert f295e24`。
 - 空数据库执行 `db/migration/V1__initial_schema.sql`；已有数据库 baseline/升级和失败迁移处理见 `docs/production-readiness/flyway.md`。
 - 生产不执行 `db/seed.sql`；演示 seed 仅允许 `dev`/`test` profile 且显式开启。
 - 新增 Flyway `V3__resume_review_queue_index.sql`，为 `biz_resume(status, update_time)` 增加审核队列索引；回滚应用时保留该向前兼容索引，不原地修改已执行 migration。
@@ -84,6 +91,7 @@
 - 2026-08-26：本轮定向简历测试 8/8 通过；后端全量测试 133 个通过、0 失败、1 个因 Docker 不可用跳过；前端测试 6/6、`npm run lint` 和 `npm run build` 通过。浏览器级简历审核 E2E 仍需在具备真实数据库、Redis 和部长测试账号的环境补跑。
 - 文档更正：V4/V5 已加入当前 Flyway 版本链，旧文档中“最新版本为 V2/V3”和旧测试计数均保留为历史证据或已改为当前验证口径；当前 V1-V5 真实 MySQL/Testcontainers 结果仍待健康 Docker/staging 重跑。
 - 2026-08-26：人工贡献专项后端 `11/11` 通过；后端全量共 `174` 个测试，0 失败、0 错误、1 个 Docker Testcontainers 测试跳过；前端 Vitest `6` 个文件/`12` 个测试通过，`npm run lint` 和 `npm run build` 通过。
+- 2026-08-27：轮播与文件访问专项后端 `16/16` 通过；后端全量 `185` 个测试通过、0 失败、0 错误，1 个 Docker/Testcontainers 测试因本机 Docker 不可用跳过；前端 Vitest `7` 个文件/`13` 个测试通过，ESLint 0 错误（保留 `src/lib/axios.ts` 的 1 条既有 warning），production build 通过并包含 `/dashboard/carousels`；Playwright 3 个可运行场景通过，3 个需要真实账号的场景按配置跳过。
 
 ## [2026-07-27] Opus 5 优化基线（尚未提交）
 

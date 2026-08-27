@@ -1088,7 +1088,7 @@ POST /api/biz/comp/save
 - 前端菜单隐藏只能减少误操作。用户仍可在开发者工具、Postman 或脚本中直接请求接口。
 - 对象级权限需要具体 id。只写 `hasRole('LEVEL_3')` 无法表达“发布者本人可以改自己的竞赛”。
 - `JwtAccessDeniedHandler` 处理已认证但权限不足的 403；未认证是 `JwtAuthenticationEntryPoint` 的 401。
-- `CarouselController` 的旧注释可能写“部长及以上”，但当前保存/删除真实注解是 `LEVEL_4`。学习时以可执行注解为准。
+- 轮播公开读取和后台维护是两条契约：匿名接口只返回启用项，管理列表/保存/删除要求 `LEVEL_4`。前端隐藏菜单只改善体验，真实权限仍以后端注解为准。
 
 #### 动手验证
 
@@ -1895,7 +1895,8 @@ cd D:\CSA-Project\csa-official-backend
 | `csa-official-backend/src/main/java/com/csa/official/config/AsyncConfig.java` | 异步配置类 | `@EnableAsync` 开启代理；定义邮件池和贡献池、队列容量、拒绝策略 | Spring 启动时加载 |
 | `csa-official-backend/src/main/java/com/csa/official/modules/sys/controller/ResourceController.java` | 资源 Controller | `save` 标有 `@LogContribution(RES)`，成功后自动记资源贡献 | `ContributionAspect` 拦截 |
 | `csa-official-backend/src/main/java/com/csa/official/modules/biz/controller/CompetitionController.java` | 竞赛 Controller | `save` 标有 `@LogContribution(COMP)`，成功后自动记比赛贡献 | `ContributionAspect` 拦截 |
-| `csa-official-backend/src/main/java/com/csa/official/modules/sys/controller/CarouselController.java` | 轮播图 Controller | `save` 标有 `@LogContribution(OPS)`；公开读取、管理保存和删除；管理写入会清缓存 | AOP、Mapper、AuditService |
+| `csa-official-backend/src/main/java/com/csa/official/modules/sys/controller/CarouselController.java` | 轮播图 Controller | 公开读取、后台列表、白名单保存和删除；校验图片归属与 URL；管理写入会清缓存 | AOP、CarouselMapper、StoredFileMapper、AuditService |
+| `CarouselSaveRequest` / `CarouselVO` / `CarouselAdminVO` | 轮播输入与输出契约 | 保存只接收管理字段；公开 VO 隐藏状态，后台 VO 包含排序、状态和时间 | Controller 接收/返回，前端 service 对应建模 |
 | `csa-official-backend/src/main/java/com/csa/official/modules/sys/controller/ContributionController.java` | 贡献接口 Controller | 提供统计贡献墙、占位的 rank，以及会长手动发放贡献 | 公开 wall 调 Mapper；award 同步 insert |
 | `csa-official-backend/src/main/java/com/csa/official/modules/sys/mapper/ContributionLogMapper.java` | 贡献流水 Mapper | `selectWall(limit)` 用一条 SQL 连接用户/部门并按用户聚合 | `ContributionController.getWall` 调用 |
 | `csa-official-backend/src/main/java/com/csa/official/modules/sys/vo/ContributionWallVO.java` | 贡献墙 VO | 承载用户、部门、DEV 分数、三类次数和排序总分 | Mapper SQL 直接映射 |
@@ -1905,6 +1906,8 @@ cd D:\CSA-Project\csa-official-backend
 | `csa-official-backend/src/main/java/com/csa/official/modules/sys/task/ContributionTask.java` | 定时任务 Bean | 每天 04:00 检查协会介绍版本存活超过 7 天后，给最后修改者结算一次 OPS 贡献 | `@Scheduled` 自动触发；调用 `ScheduledJobService` 防重复 |
 | `ScheduledJobService` | 定时任务幂等 Service | Redis 锁先挡并发，数据库唯一幂等键再挡重复执行 | `ContributionTask` 调用 |
 | `csa-official-frontend/src/services/public.ts` | 前端公开内容 service | 封装 `getAbout`、`getContributors`、`getCarousel`、`updateAbout` | 首页、关于页、成员页、编辑器调用 |
+| `csa-official-frontend/src/services/carousel.ts` | 前端轮播管理 service | 封装管理列表、保存和删除 | `CarouselManagementWorkspace` 调用 |
+| `CarouselManagementWorkspace` | Level 4 轮播管理组件 | 上传、预览、新增、编辑、排序、启停和删除 | `/dashboard/carousels` 页面渲染 |
 | `csa-official-frontend/src/components/business/community/ContributorWall.tsx` | 成员目录展示组件 | 渲染 `ContributorVo[]` 的头像、姓名、部门、头衔和等级 | 首页/关于页/成员页调用 |
 | `csa-official-frontend/src/components/business/settings/AboutEditor.tsx` | 协会介绍编辑组件 | Level 4 才显示编辑器；本地预览也先调用 `sanitizeHtml` | 设置页调用 `publicService` |
 
@@ -1918,9 +1921,9 @@ cd D:\CSA-Project\csa-official-backend
 6. 读 `ContributionController.getWall` 和 `ContributionLogMapper.selectWall`，先看返回 VO，再把 SQL 每个 SELECT 别名翻译成中文。
 7. 读 `PublicController.getAbout/updateAbout`：对照 `@Cacheable`、`@CacheEvict`、Jsoup `Safelist` 和首次插入/后续更新两个分支。
 8. 读 `PublicController.getContributors`：它只取 Level 2+ 的必要字段，批量查部门名称，再组装内部 `ContributorVo`。
-9. 读 `CarouselController`：公开列表只取 `status=1`，按 `sortOrder ASC` 再 `createTime DESC`；保存/删除要求真实注解 `LEVEL_4`，旧注释“部长及以上”不可信。
+9. 读 `CarouselController`：公开列表只取 `status=1`；后台列表包含停用项；保存使用 `CarouselSaveRequest`，并通过 `CarouselMapper.updateManagedFields` 允许把 `target_url` 真正清空；管理接口统一要求 `LEVEL_4`。
 10. 最后读 `ContributionTask`，理解“修改后立即加分”和“版本存活七天后才结算”是两种不同规则。
-11. 用 `rg` 检查前端调用者：当前 `getContributors` 被首页、关于页、成员页使用；`getCarousel` 在 service 中存在，但当前源码没有搜到页面调用；`/api/public/contribution/wall` 也没有前端 service 调用。
+11. 用 `rg` 检查前端调用者：`getContributors` 被首页、关于页、成员页使用；`getCarousel` 被首页调用；`carouselService` 被 `/dashboard/carousels` 使用；贡献排行使用 `/api/public/contribution/rank`。
 
 #### 自动贡献记录链路
 
@@ -1984,7 +1987,7 @@ POST /api/sys/config/update-about（LEVEL_4）
 
 成员目录 `GET /api/public/contributors` 不查贡献流水，而是从 `sys_user` 取 `role_level >= 2` 的用户，再批量补部门名并计算“创始人/运维、会长、副会长、部长、副部长、核心成员”等头衔。它的排序是等级降序、ID 升序，且最多返回 `PageUtils.MAX_LIST_LIMIT = 200` 条。
 
-轮播图 `GET /api/public/carousel/list` 只取启用项（`status=1`），按 `sort_order ASC`、`create_time DESC` 排序，最多 200 条并缓存到 `public_carousel`。保存和删除都要求 `LEVEL_4`，成功后清缓存；保存方法还记一条 `OPS` 自动贡献。当前 `CarouselController` 的注释写着“部长及以上”，但可执行注解是 `hasRole('LEVEL_4')`，以注解为准。
+轮播图 `GET /api/public/carousel/list` 只取启用项（`status=1`），按 `sort_order ASC`、`create_time DESC` 排序，最多 200 条并缓存到 `public_carousel`。`GET /api/sys/carousel/list` 给 Level 4 返回启用和停用项；`/dashboard/carousels` 可上传或填写图片、预览、新增、编辑、排序、启停和删除。保存使用白名单 DTO，站内上传需要当前操作人拥有，跳转只允许站内绝对路径或 HTTP(S)；保存和删除成功后清缓存并写管理审计，保存还会旁路记录一条 `OPS` 自动贡献。
 
 #### 为什么异步不是“加一个注解”
 
@@ -2019,7 +2022,7 @@ Redis 锁解决多个实例同时执行，数据库幂等键解决锁过期、�
 4. 请求 `/api/public/contribution/wall?limit=99999`，确认最终 LIMIT 不超过 200；不传时默认 100。
 5. 用包含 `<script>、onclick、iframe、p、a` 的内容调用 `update-about`，检查数据库里只保留白名单内容。
 6. 修改 `CSA_INTRO` 后立刻读取公开介绍，确认缓存被清掉；不清缓存会继续看到旧文本。
-7. 用 Level 3 请求轮播图保存，预期 403；用 Level 4 保存后再读公开列表，确认新增/修改立即可见。
+7. 用 Level 3 请求轮播管理列表/保存，预期 403；用 Level 4 新建停用项，确认只在后台出现；启用后再读公开列表，确认立即可见；清空跳转后确认数据库 `target_url` 为 `NULL`。
 8. 阅读 `ContributionWallVO` 与 SQL 别名，手算一个用户的 `totalSortScore`，再和接口返回对照。
 9. 运行：
 
@@ -2044,7 +2047,7 @@ cd D:\CSA-Project\csa-official-backend
 10. `/api/public/contributors` 和 `/api/public/contribution/wall` 的数据来源、用途和排序有什么不同？
 11. 协会介绍为什么前后端都清洗 HTML？前端清洗能不能替代后端清洗？
 12. 修改协会介绍后为什么要清 `public_about`，轮播图保存后为什么要清 `public_carousel`？
-13. 当前轮播图保存真实要求哪个等级？为什么不能照抄旧注释“部长及以上”？
+13. 为什么轮播公开接口和管理接口要使用不同 VO？为什么 `/files/**` 放行到 Controller 不等于把全部上传目录公开？
 14. `ContributionController.award` 为什么保持同步？
 15. `ContributionTask` 为什么同时使用 Redis 锁和数据库幂等键？
 
