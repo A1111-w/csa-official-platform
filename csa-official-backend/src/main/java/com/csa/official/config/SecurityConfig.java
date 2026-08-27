@@ -68,6 +68,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+                        // 文件控制器会再次核对 owner、资源发布状态或启用轮播引用。
+                        .requestMatchers("/files/**").permitAll()
                         // Swagger/Knife4j — 生产环境通过 SWAGGER_ENABLED=false 在 springdoc 层禁用，此处仅白名单静态资源
                         .requestMatchers("/doc.html", "/webjars/**", "/v3/api-docs/**",
                                 "/swagger-ui/**", "/swagger-resources/**").permitAll()

@@ -37,6 +37,106 @@ test("dashboard redirects unauthenticated visitors", async ({ page }) => {
   await expect(page).toHaveURL(/\/login\?redirect=%2Fdashboard/)
 })
 
+test("level 4 can open and edit the mocked carousel management workspace", async ({
+  context,
+  page,
+}) => {
+  await context.addCookies([
+    {
+      name: "CSA_AUTH_TOKEN",
+      value: "playwright-carousel-session",
+      url: "http://127.0.0.1:3000",
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ])
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "csa-auth-storage",
+      JSON.stringify({
+        state: { user: { username: "president", roleLevel: 4 } },
+        version: 3,
+      })
+    )
+  })
+
+  const corsHeaders = {
+    "access-control-allow-origin": "http://127.0.0.1:3000",
+    "access-control-allow-credentials": "true",
+  }
+  await page.route("**/api/sys/user/info", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: corsHeaders,
+      body: JSON.stringify({
+        code: 200,
+        message: "Success",
+        data: {
+          id: 1,
+          username: "president",
+          realName: "测试会长",
+          avatar: null,
+          email: null,
+          phone: null,
+          contact: null,
+          positionType: 1,
+          roleLevel: 4,
+          balance: 0,
+          college: null,
+          className: null,
+          studentId: null,
+        },
+      }),
+    })
+  )
+  await page.route("**/api/sys/carousel/list", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: corsHeaders,
+      body: JSON.stringify({
+        code: 200,
+        message: "Success",
+        data: [
+          {
+            id: 7,
+            title: "招新开放日",
+            imgUrl: "https://assets.example.test/carousel.png",
+            targetUrl: "/register",
+            sortOrder: 2,
+            status: 1,
+            createTime: "2026-08-27T09:00:00",
+            updateTime: "2026-08-27T09:30:00",
+          },
+        ],
+      }),
+    })
+  )
+  await page.route("https://assets.example.test/carousel.png", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "image/png",
+      body: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        "base64"
+      ),
+    })
+  )
+
+  await page.goto("/dashboard/carousels")
+
+  await expect(page.getByRole("heading", { name: "首页轮播管理" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "招新开放日" })).toBeVisible()
+  await expect(page.getByText("已启用")).toBeVisible()
+
+  await page.getByRole("button", { name: "编辑" }).click()
+  await expect(page.getByLabel("标题")).toHaveValue("招新开放日")
+  await expect(page.getByRole("textbox", { name: "跳转地址", exact: true })).toHaveValue(
+    "/register"
+  )
+})
+
 test.describe("authenticated security boundary", () => {
   test.skip(!hasCredentials, "Set E2E_USERNAME and E2E_PASSWORD for the authenticated flow")
 

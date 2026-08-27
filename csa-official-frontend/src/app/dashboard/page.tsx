@@ -8,6 +8,7 @@ import {
   FileText,
   FileSpreadsheet,
   HardDrive,
+  Images,
   ScrollText,
   Settings,
   Trophy,
@@ -88,6 +89,13 @@ export default function DashboardPage() {
       title: "成员导出",
       description: "按条件筛选成员并选择字段导出 Excel。",
       icon: FileSpreadsheet,
+      minLevel: 4,
+    },
+    {
+      href: "/dashboard/carousels",
+      title: "轮播管理",
+      description: "维护首页轮播图片、顺序、跳转和启停状态。",
+      icon: Images,
       minLevel: 4,
     },
     {

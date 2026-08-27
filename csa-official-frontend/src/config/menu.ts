@@ -5,6 +5,7 @@ import {
   FileText,
   FileSpreadsheet,
   HardDrive,
+  Images,
   LayoutDashboard,
   ScrollText,
   Settings,
@@ -86,6 +87,12 @@ export const dashboardMenu: MenuItem[] = [
     title: "成员导出",
     href: "/dashboard/member-export",
     icon: FileSpreadsheet,
+    minLevel: 4,
+  },
+  {
+    title: "轮播管理",
+    href: "/dashboard/carousels",
+    icon: Images,
     minLevel: 4,
   },
   {

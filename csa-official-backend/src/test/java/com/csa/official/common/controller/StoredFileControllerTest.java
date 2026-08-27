@@ -3,6 +3,7 @@ package com.csa.official.common.controller;
 import com.csa.official.common.constant.RoleConsts;
 import com.csa.official.modules.sys.entity.User;
 import com.csa.official.modules.sys.entity.StoredFile;
+import com.csa.official.modules.sys.mapper.CarouselMapper;
 import com.csa.official.modules.sys.mapper.ResourceMapper;
 import com.csa.official.modules.sys.mapper.UserMapper;
 import com.csa.official.modules.sys.mapper.StoredFileMapper;
@@ -55,6 +56,9 @@ class StoredFileControllerTest {
 
     @MockBean
     private ResourceMapper resourceMapper;
+
+    @MockBean
+    private CarouselMapper carouselMapper;
 
     @MockBean
     private StoredFileMapper storedFileMapper;
@@ -125,6 +129,36 @@ class StoredFileControllerTest {
     }
 
     @Test
+    void anonymousVisitorCanReadActiveCarouselImage() throws Exception {
+        when(carouselMapper.exists(any())).thenReturn(true);
+
+        mockMvc.perform(get("/files/1/note.txt"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("inline")))
+                .andExpect(content().bytes("hello".getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    void anonymousVisitorCannotReadPrivateFile() throws Exception {
+        when(carouselMapper.exists(any())).thenReturn(false);
+
+        mockMvc.perform(get("/files/1/note.txt"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(401));
+    }
+
+    @Test
+    @WithMockUser(username = "president", authorities = { "ROLE_LEVEL_4" })
+    void presidentCanPreviewDisabledCarouselImage() throws Exception {
+        when(userMapper.selectOne(any())).thenReturn(buildUser(9L, "president", RoleConsts.PRESIDENT));
+        when(carouselMapper.exists(any())).thenReturn(false, true);
+
+        mockMvc.perform(get("/files/1/note.txt"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, containsString("inline")));
+    }
+
+    @Test
     @WithMockUser(username = "owner", authorities = { "ROLE_LEVEL_1" })
     void rejectsPathWhoseActiveMetadataNamesAnotherOwner() throws Exception {
         when(userMapper.selectOne(any())).thenReturn(buildUser(1L, "owner"));
@@ -152,10 +186,14 @@ class StoredFileControllerTest {
     }
 
     private User buildUser(Long id, String username) {
+        return buildUser(id, username, RoleConsts.MEMBER);
+    }
+
+    private User buildUser(Long id, String username, int roleLevel) {
         User user = new User();
         user.setId(id);
         user.setUsername(username);
-        user.setRoleLevel(RoleConsts.MEMBER);
+        user.setRoleLevel(roleLevel);
         user.setDeleted(0);
         return user;
     }

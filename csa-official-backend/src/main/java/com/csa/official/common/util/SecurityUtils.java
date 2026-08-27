@@ -6,6 +6,7 @@ import com.csa.official.common.security.LoginUser;
 import com.csa.official.modules.sys.entity.User;
 import com.csa.official.modules.sys.mapper.UserMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -34,7 +35,10 @@ public class SecurityUtils {
      */
     public static User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getPrincipal() == null) {
+        if (authentication == null
+                || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken
+                || authentication.getPrincipal() == null) {
             throw new CsaException(401, "登录已过期");
         }
 
