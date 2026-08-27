@@ -41,6 +41,9 @@ public class UserExportService {
     @Autowired
     private UserMapper userMapper;
 
+    @Autowired
+    private AuditService auditService;
+
     // 🔒 1. 补全白名单定义
     private static final Set<String> SUPPORTED_COLUMNS = new HashSet<>(Arrays.asList(
             "college", "className", "realName", "studentId", "phone",
@@ -59,6 +62,18 @@ public class UserExportService {
         List<String> targetColumns = rawColumns.stream()
                 .filter(SUPPORTED_COLUMNS::contains)
                 .collect(Collectors.toList());
+
+        if (!targetColumns.isEmpty()) {
+            auditService.recordBestEffort("DATA_EXPORT", "USER_DIRECTORY", null,
+                    "SUCCESS", null, Map.of(
+                            "columns", targetColumns,
+                            "hasDateFilter", dto.getStartTime() != null || dto.getEndTime() != null,
+                            "hasOrganizationFilter", StringUtils.hasText(dto.getCollege())
+                                    || StringUtils.hasText(dto.getClassName()),
+                            "hasIdentityFilter", StringUtils.hasText(dto.getStudentId())
+                                    || StringUtils.hasText(dto.getRealName()),
+                            "hasRoleFilter", dto.getRoleLevel() != null));
+        }
 
         if (targetColumns.isEmpty()) {
             throw new RuntimeException("请选择有效的导出列");

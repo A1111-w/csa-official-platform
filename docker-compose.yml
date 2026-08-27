@@ -1,0 +1,146 @@
+# CSA 官方站点开发编排文件。生产环境使用 compose.production.yml。
+#
+# 用法：
+#   docker compose up --build        # 首次构建并启动全部服务
+#   docker compose down              # 停止并移除容器（保留数据卷）
+#   docker compose down -v           # 停止并清空数据卷（重置数据库）
+#
+# 默认口令只服务于回环地址上的一次性本地环境，不得用于公网部署。
+
+services:
+  # ---------------------------------------------------------------------------
+  # MySQL 8 —— 业务数据库
+  # 首次启动时会自动执行 /docker-entrypoint-initdb.d 下的脚本（按文件名字母序）。
+  # 因此 schema 用 01- 前缀，seed 用 02- 前缀，保证先建表后灌数据。
+  # ---------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: csa-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-local-dev-root-only}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-csa_db}
+      MYSQL_USER: ${MYSQL_APP_USER:-csa_app}
+      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD:-local-dev-app-only}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Redis 7 —— 验证码 / 限流 / Token 黑名单等 KeyValueStore 实现
+  # 这是一个纯明文（非 TLS）的本地实例，所以后端必须 REDIS_SSL=false。
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: csa-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # 后端 —— Spring Boot 3.5.8（Java 17），端口 8080
+  # 等 mysql / redis 健康后再启动。所有环境变量名与 application.yml 严格对应。
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./csa-official-backend
+      dockerfile: Dockerfile
+    container_name: csa-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8080
+      SPRING_PROFILES_ACTIVE: dev
+      # --- 数据源：注意用服务名 mysql 作为主机，容器内网络可解析 ---
+      DB_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-csa_db}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&sslMode=DISABLED&allowPublicKeyRetrieval=true"
+      DB_USERNAME: ${MYSQL_APP_USER:-csa_app}
+      DB_PASSWORD: ${MYSQL_APP_PASSWORD:-local-dev-app-only}
+      FLYWAY_BASELINE_ON_MIGRATE: "false"
+      DEMO_SEED_ENABLED: ${DEMO_SEED_ENABLED:-false}
+      DEMO_SEED_LOCATION: file:/app/db/seed.sql
+      DEMO_SEED_PASSWORD: ${DEMO_SEED_PASSWORD:-}
+      # --- 缓存：走 Redis（对齐生产）；如需省事可改 memory ---
+      CSA_CACHE_TYPE: ${CSA_CACHE_TYPE:-redis}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # application.yml 里 REDIS_SSL 默认 true，本地 redis 容器是明文的，
+      # 若不显式设为 false 会握手失败，务必保留下面这行。
+      REDIS_SSL: "false"
+      # --- 鉴权：HS256 要求密钥至少 32 字节，默认值已满足 ---
+      JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret-not-for-production-0001}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-604800000}
+      # --- 跨域：浏览器从 http://localhost:3000 访问 ---
+      CORS_ALLOWED_ORIGIN_PATTERNS: ${CORS_ALLOWED_ORIGIN_PATTERNS:-http://localhost:3000,http://127.0.0.1:3000}
+      # --- 上传目录：挂到命名卷，重启后文件仍在 ---
+      UPLOAD_PATH: /app/uploads/
+      TZ: Asia/Shanghai
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - backend-uploads:/app/uploads
+      - ./db/seed.sql:/app/db/seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # ---------------------------------------------------------------------------
+  # 前端 —— Next.js 16（Node 20），端口 3000
+  # NEXT_PUBLIC_API_URL 会在 next build 阶段被内联进浏览器包（构建期，而非运行期），
+  # 因此必须作为 build arg 传入。它指向浏览器可达的地址 http://localhost:8080，
+  # 而不是容器网络里的 http://backend:8080（浏览器在宿主机上，解析不到服务名）。
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./csa-official-frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    container_name: csa-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NODE_ENV: production
+      # 同名运行期变量供中间件 / 服务端组件读取（proxy.ts 用它拼 CSP connect-src）
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  mysql-data:
+  redis-data:
+  backend-uploads:

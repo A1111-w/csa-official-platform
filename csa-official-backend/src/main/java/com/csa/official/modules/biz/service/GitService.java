@@ -1,76 +1,278 @@
 package com.csa.official.modules.biz.service;
 
+import com.csa.official.common.exception.ApiErrorCode;
 import com.csa.official.common.exception.CsaException;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.PullResult;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.storage.file.WindowCacheConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
 import java.io.IOException;
+import java.net.IDN;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Locale;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 @Service
 public class GitService {
 
-    // 之前你在 application.yml 配置的上传路径
-    @Value("${csa.upload-path}") 
-    private String basePath;
+    private final Path repositoryRoot;
+    private final Set<String> allowedHosts;
+    private final int timeoutSeconds;
+    private final long maxRepositorySizeBytes;
+    private final ConcurrentHashMap<Long, ReentrantLock> userLocks = new ConcurrentHashMap<>();
 
-    /**
-     * 同步代码仓库 (Clone 或 Pull)
-     * @param userId 用户ID
-     * @param repoUrl 仓库地址 (如 https://github.com/xxx/xxx.git)
-     */
-    public void syncRepository(Long userId, String repoUrl) {
-        if (!repoUrl.startsWith("http")) {
-            throw new CsaException("仅支持 HTTP/HTTPS 协议的仓库地址");
+    public GitService(
+            @Value("${csa.upload-path}") String basePath,
+            @Value("${csa.git.allowed-hosts:github.com,gitee.com,gitlab.com}") String allowedHostsConfig,
+            @Value("${csa.git.timeout-seconds:30}") int configuredTimeoutSeconds,
+            @Value("${csa.git.max-repository-size-bytes:209715200}") long configuredMaxRepositorySizeBytes) {
+        this.repositoryRoot = Path.of(basePath).toAbsolutePath().normalize().resolve("git-repos");
+        this.allowedHosts = Arrays.stream(allowedHostsConfig.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .map(value -> IDN.toASCII(value).toLowerCase(Locale.ROOT))
+                .collect(Collectors.toUnmodifiableSet());
+        this.timeoutSeconds = Math.max(5, Math.min(configuredTimeoutSeconds, 300));
+        this.maxRepositorySizeBytes = Math.max(1L, configuredMaxRepositorySizeBytes);
+    }
+
+    public GitSyncResult syncRepository(Long userId, String repoUrl) {
+        if (userId == null || userId <= 0) {
+            throw new CsaException(ApiErrorCode.BAD_REQUEST, "User id is required");
         }
 
-        // 存放路径: /csa-upload/git-repos/{userId}/
-        // 这样每个用户的代码都独立分开
-        File localPath = new File(basePath + File.separator + "git-repos" + File.separator + userId);
-
+        URI repositoryUri = validateRepositoryUrl(repoUrl);
+        Path localPath = repositoryPath(userId);
+        ReentrantLock lock = userLocks.computeIfAbsent(userId, ignored -> new ReentrantLock());
+        lock.lock();
         try {
-            if (localPath.exists() && new File(localPath, ".git").exists()) {
-                // === 情况1：仓库已存在，执行 git pull ===
-                log.info("仓库已存在，开始更新: {}", localPath.getAbsolutePath());
-                try (Git git = Git.open(localPath)) {
-                    git.pull().call(); // 相当于 git pull
-                    log.info("更新成功");
-                }
-            } else {
-                // === 情况2：仓库不存在，执行 git clone ===
-                log.info("仓库不存在，开始克隆: {} -> {}", repoUrl, localPath.getAbsolutePath());
-                
-                // 为了防坑，如果目录存在但没 .git，先删干净
-                if (localPath.exists()) {
-                    deleteDir(localPath);
-                }
-                localPath.mkdirs();
-
-                Git.cloneRepository()
-                        .setURI(repoUrl)
-                        .setDirectory(localPath)
-                        .setDepth(1) // 💡 优化：只拉取最后一次提交，省流量省空间！
-                        .call();
-                log.info("克隆成功");
-            }
-        } catch (GitAPIException | IOException e) {
-            log.error("Git操作失败", e);
-            throw new CsaException("代码同步失败，请检查仓库地址是否公开，或网络是否通畅");
+            return syncLocked(userId, repositoryUri, localPath);
+        } finally {
+            lock.unlock();
         }
     }
 
-    // 辅助：递归删除文件夹
-    private void deleteDir(File file) {
-        File[] contents = file.listFiles();
-        if (contents != null) {
-            for (File f : contents) {
-                deleteDir(f);
+    public URI validateRepositoryUrl(String repoUrl) {
+        if (repoUrl == null || repoUrl.isBlank()) {
+            throw new CsaException(ApiErrorCode.BAD_REQUEST, "Repository URL is required");
+        }
+
+        final URI uri;
+        try {
+            uri = new URI(repoUrl.trim()).normalize();
+        } catch (URISyntaxException e) {
+            throw new CsaException(ApiErrorCode.BAD_REQUEST, "Invalid repository URL");
+        }
+
+        if (!"https".equalsIgnoreCase(uri.getScheme())) {
+            throw new CsaException(ApiErrorCode.BAD_REQUEST, "Only HTTPS repository URLs are supported");
+        }
+        if (uri.getHost() == null || uri.getUserInfo() != null
+                || uri.getQuery() != null || uri.getFragment() != null) {
+            throw new CsaException(ApiErrorCode.BAD_REQUEST, "Invalid repository URL");
+        }
+        if (uri.getPort() != -1 && uri.getPort() != 443) {
+            throw new CsaException(ApiErrorCode.BAD_REQUEST, "Repository URL port is not allowed");
+        }
+
+        String host = IDN.toASCII(uri.getHost()).toLowerCase(Locale.ROOT);
+        boolean allowed = allowedHosts.stream()
+                .anyMatch(value -> host.equals(value) || host.endsWith("." + value));
+        if (!allowed) {
+            throw new CsaException(ApiErrorCode.BAD_REQUEST, "Repository host is not allowed");
+        }
+        return uri;
+    }
+
+    private GitSyncResult syncLocked(Long userId, URI repositoryUri, Path localPath) {
+        try {
+            if (isGitRepository(localPath)) {
+                boolean sameRepository;
+                Git git = Git.open(localPath.toFile());
+                try {
+                    String configuredUrl = git.getRepository().getConfig()
+                            .getString("remote", "origin", "url");
+                    sameRepository = repositoryUri.toASCIIString().equals(configuredUrl);
+                    if (sameRepository) {
+                        PullResult pull = git.pull()
+                                .setTimeout(timeoutSeconds)
+                                .call();
+                        if (!pull.isSuccessful()) {
+                            throw new CsaException(ApiErrorCode.UPSTREAM_ERROR,
+                                    "Repository update could not be applied cleanly");
+                        }
+                    }
+                } finally {
+                    closeObjectDatabase(git);
+                    git.close();
+                }
+                if (sameRepository) {
+                    return inspectRepository(localPath);
+                }
+            }
+
+            deleteDirectory(localPath);
+            Files.createDirectories(repositoryRoot);
+            log.info("Cloning repository from approved host {} for userId={}",
+                    repositoryUri.getHost(), userId);
+            Git cloned = Git.cloneRepository()
+                    .setURI(repositoryUri.toASCIIString())
+                    .setDirectory(localPath.toFile())
+                    .setDepth(1)
+                    .setTimeout(timeoutSeconds)
+                    .call();
+            try {
+                // Clone command has completed; release all pack handles before
+                // size enforcement or a future repository replacement.
+            } finally {
+                closeObjectDatabase(cloned);
+                cloned.close();
+            }
+            try {
+                return inspectRepository(localPath);
+            } catch (IOException | RuntimeException e) {
+                deleteAfterFailedClone(localPath, e);
+                throw e;
+            }
+        } catch (CsaException e) {
+            throw e;
+        } catch (GitAPIException | IOException e) {
+            log.error("Git synchronization failed for userId={}", userId, e);
+            throw new CsaException(ApiErrorCode.UPSTREAM_ERROR,
+                    "Repository synchronization failed", e);
+        }
+    }
+
+    private GitSyncResult inspectRepository(Path localPath) throws IOException {
+        long sizeBytes = directorySize(localPath);
+        if (sizeBytes > maxRepositorySizeBytes) {
+            deleteDirectory(localPath);
+            throw new CsaException(413, "GIT_REPOSITORY_TOO_LARGE",
+                    "Repository exceeds the configured size limit");
+        }
+
+        Git git = Git.open(localPath.toFile());
+        try {
+            String branch = git.getRepository().getBranch();
+            ObjectId head = git.getRepository().resolve(Constants.HEAD);
+            if (head == null) {
+                throw new CsaException(ApiErrorCode.UPSTREAM_ERROR,
+                        "Repository does not contain a commit");
+            }
+            return new GitSyncResult(branch, head.name(), sizeBytes);
+        } finally {
+            closeObjectDatabase(git);
+            git.close();
+        }
+    }
+
+    private void closeObjectDatabase(Git git) {
+        git.getRepository().getObjectDatabase().close();
+    }
+
+    private Path repositoryPath(Long userId) {
+        Path localPath = repositoryRoot.resolve(String.valueOf(userId)).normalize();
+        if (!localPath.startsWith(repositoryRoot)) {
+            throw new CsaException(ApiErrorCode.BAD_REQUEST, "Invalid repository path");
+        }
+        return localPath;
+    }
+
+    private boolean isGitRepository(Path path) {
+        return Files.isDirectory(path) && Files.isDirectory(path.resolve(Constants.DOT_GIT));
+    }
+
+    private long directorySize(Path path) throws IOException {
+        if (!Files.exists(path)) {
+            return 0L;
+        }
+        try (Stream<Path> paths = Files.walk(path)) {
+            return paths.filter(Files::isRegularFile)
+                    .mapToLong(file -> {
+                        try {
+                            return Files.size(file);
+                        } catch (IOException e) {
+                            throw new DirectoryReadException(e);
+                        }
+                    })
+                    .sum();
+        } catch (DirectoryReadException e) {
+            throw e.getCause();
+        }
+    }
+
+    private void deleteAfterFailedClone(Path localPath, Throwable failure) {
+        try {
+            deleteDirectory(localPath);
+        } catch (IOException cleanupFailure) {
+            failure.addSuppressed(cleanupFailure);
+            log.warn("Failed to clean incomplete Git repository at {}", localPath, cleanupFailure);
+        }
+    }
+
+    private void deleteDirectory(Path path) throws IOException {
+        if (!Files.exists(path)) {
+            return;
+        }
+        Path normalized = path.toAbsolutePath().normalize();
+        if (!normalized.startsWith(repositoryRoot) || normalized.equals(repositoryRoot)) {
+            throw new IOException("Refusing to delete outside the Git repository root");
+        }
+        // JGit keeps pack windows globally cached; flush them before deletion so
+        // Windows can release pack-file handles used by a completed clone/pull.
+        new WindowCacheConfig().install();
+        IOException finalFailure = null;
+        for (int attempt = 0; attempt < 10; attempt++) {
+            try (Stream<Path> paths = Files.walk(normalized)) {
+                for (Path candidate : paths.sorted(Comparator.reverseOrder()).toList()) {
+                    candidate.toFile().setWritable(true);
+                    Files.deleteIfExists(candidate);
+                }
+                return;
+            } catch (IOException e) {
+                finalFailure = e;
+                if (attempt == 9) {
+                    break;
+                }
+                try {
+                    Thread.sleep(100L);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    e.addSuppressed(interrupted);
+                    throw e;
+                }
             }
         }
-        file.delete();
+        throw finalFailure;
+    }
+
+    public record GitSyncResult(String branch, String commit, long sizeBytes) {
+    }
+
+    private static final class DirectoryReadException extends RuntimeException {
+        private DirectoryReadException(IOException cause) {
+            super(cause);
+        }
+
+        @Override
+        public synchronized IOException getCause() {
+            return (IOException) super.getCause();
+        }
     }
 }

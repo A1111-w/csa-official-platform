@@ -17,6 +17,15 @@ public class User implements Serializable {
     private String password;
     private String realName;
     private String email;
+    private String accountStatus;
+    private Long sessionVersion;
+    private LocalDateTime passwordChangedAt;
+    private LocalDateTime lastLoginAt;
+    private LocalDateTime deactivatedAt;
+    private LocalDateTime deletionRequestedAt;
+    private LocalDateTime anonymizedAt;
+    private String privacyConsentVersion;
+    private LocalDateTime privacyConsentAt;
 
     // 权限与职位
     private Integer roleLevel;    // 0-99

@@ -1,31 +1,53 @@
 package com.csa.official.config;
 
+import com.csa.official.common.exception.ApiErrorCode;
+import com.csa.official.common.security.SecurityResponseWriter;
+import com.csa.official.common.security.JwtRevocationService;
 import com.csa.official.common.util.JwtUtils;
 import com.csa.official.modules.sys.service.UserDetailsServiceImpl;
+import io.jsonwebtoken.JwtException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.util.StringUtils;
 import org.springframework.lang.NonNull;
 
 import java.io.IOException;
+import java.util.Objects;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    public static final String AUTH_TOKEN_SOURCE_ATTRIBUTE = "csa.authTokenSource";
+    public static final String TOKEN_SOURCE_BEARER = "bearer";
+    public static final String TOKEN_SOURCE_COOKIE = "cookie";
 
     @Autowired
     private JwtUtils jwtUtils;
 
     @Autowired
+    private JwtRevocationService jwtRevocationService;
+
+    @Autowired
     private UserDetailsServiceImpl userDetailsService;
+
+    @Autowired
+    private SecurityResponseWriter securityResponseWriter;
+
+    @Value("${csa.security.cookie.name:CSA_AUTH_TOKEN}")
+    private String authCookieName;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -33,43 +55,76 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
-        // 1. 从请求头获取 Token
-        // 格式通常是: "Authorization: Bearer xxxxx.yyyyy.zzzzz"
-        String authHeader = request.getHeader("Authorization");
+        ResolvedToken resolvedToken = resolveToken(request);
+        String token = resolvedToken.token();
 
-        if (StringUtils.hasText(authHeader) && authHeader.startsWith("Bearer ")) {
-            // 2. 截取 "Bearer " 之后的部分，拿到真正的 Token
-            String token = authHeader.substring(7);
-
+        if (StringUtils.hasText(token)) {
             try {
-                // 3. 检查 Token 是否过期/合法
-                if (!jwtUtils.isTokenExpired(token)) {
-                    // 4. 从 Token 里解析出用户名
+                if (!jwtUtils.isTokenExpired(token) && !jwtRevocationService.isRevoked(token)) {
                     String username = jwtUtils.getUsernameFromToken(token);
 
-                    // 5. 确保当前上下文中没有认证信息 (避免重复认证)
                     if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                        // 6. 从数据库加载用户详细信息 (查库确保用户真的存在，且没被封号)
                         UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-                        // 7. 生成 Spring Security
-                        UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities());
-                        authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        Long tokenSessionVersion = jwtUtils.getSessionVersionFromToken(token);
+                        Long currentSessionVersion = ((com.csa.official.common.security.LoginUser) userDetails)
+                                .getUser().getSessionVersion();
+                        boolean sessionIsCurrent = tokenSessionVersion != null
+                                && Objects.equals(tokenSessionVersion,
+                                currentSessionVersion == null ? 0L : currentSessionVersion);
 
-                        SecurityContextHolder.getContext().setAuthentication(authToken);
+                        if (userDetails.isEnabled() && sessionIsCurrent) {
+                            UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities());
+                            authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                            SecurityContextHolder.getContext().setAuthentication(authToken);
+                            request.setAttribute(AUTH_TOKEN_SOURCE_ATTRIBUTE, resolvedToken.source());
+                        } else {
+                            SecurityContextHolder.clearContext();
+                        }
                     }
                 }
+            } catch (JwtException | IllegalArgumentException | UsernameNotFoundException e) {
+                SecurityContextHolder.clearContext();
+                logger.debug("Token 验证失败，已按未认证处理", e);
             } catch (Exception e) {
-                // Token 解析失败（比如被篡改、过期），这里暂时不抛异常，直接放行
-                // 后面的 Security 拦截器发现 SecurityContext 里没票据，自然会报 403
-                logger.error("Token 验证失败: {}", e);
+                SecurityContextHolder.clearContext();
+                logger.error("鉴权依赖访问失败", e);
+                securityResponseWriter.write(response, HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                        ApiErrorCode.INTERNAL_ERROR, "系统繁忙，请稍后再试");
+                return;
             }
         }
 
-        // 9. 继续执行下一个过滤器 (放行)
         filterChain.doFilter(request, response);
+    }
+
+    private ResolvedToken resolveToken(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (StringUtils.hasText(authHeader) && authHeader.startsWith("Bearer ")) {
+            return new ResolvedToken(authHeader.substring(7), TOKEN_SOURCE_BEARER);
+        }
+
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return ResolvedToken.empty();
+        }
+
+        for (Cookie cookie : cookies) {
+            if (authCookieName.equals(cookie.getName()) && StringUtils.hasText(cookie.getValue())) {
+                return new ResolvedToken(cookie.getValue(), TOKEN_SOURCE_COOKIE);
+            }
+        }
+
+        return ResolvedToken.empty();
+    }
+
+    private record ResolvedToken(String token, String source) {
+        private static ResolvedToken empty() {
+            return new ResolvedToken(null, null);
+        }
     }
 }

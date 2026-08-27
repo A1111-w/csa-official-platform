@@ -1,0 +1,16 @@
+# Local secrets. Commit only redacted examples.
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Runtime and disaster-recovery artifacts.
+backups/
+restore-work/
+*.log
+
+# IDE and OS files.
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

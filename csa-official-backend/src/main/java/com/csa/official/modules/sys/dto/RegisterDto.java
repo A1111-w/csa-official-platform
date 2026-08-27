@@ -14,10 +14,12 @@ public class RegisterDto {
     @NotBlank(message = "密码不能为空")
     @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{6,20}$", message = "密码必须包含字母和数字，长度6-20位")
     private String password;
+    @NotBlank(message = "邮箱不能为空")
     @Email(message = "邮箱格式不正确")
     private String email;
     private String realName;
 
+    @Pattern(regexp = "^$|^[A-Za-z0-9_-]{4,32}$", message = "学号格式不正确")
     private String studentId;
     private String college;
     private String className;
@@ -27,5 +29,8 @@ public class RegisterDto {
 
     @NotBlank(message = "验证码不能为空")
     private String code; // 新增：邮箱验证码
+
+    @NotBlank(message = "必须同意隐私政策")
+    private String privacyConsentVersion;
 
 }

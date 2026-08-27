@@ -1,57 +1,59 @@
 package com.csa.official.modules.sys.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.csa.official.common.annotation.LogContribution;
 import com.csa.official.common.result.R;
 import com.csa.official.common.util.SecurityUtils;
-import com.csa.official.modules.sys.entity.Resource;
 import com.csa.official.modules.sys.enums.ContributionType;
-import com.csa.official.modules.sys.mapper.ResourceMapper;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.csa.official.modules.sys.service.ResourceService;
+import com.csa.official.modules.sys.vo.ResourceVO;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/sys/resource")
 public class ResourceController {
 
-    @Autowired
-    private ResourceMapper resourceMapper;
+    private final ResourceService resourceService;
+
+    public ResourceController(ResourceService resourceService) {
+        this.resourceService = resourceService;
+    }
 
     // 1. 资源列表 (Level 1 会员及以上可看)
     @PreAuthorize("hasRole('LEVEL_1')")
     @GetMapping("/list")
-    public R<Page<Resource>> list(
+    public R<Page<ResourceVO>> list(
             @RequestParam(defaultValue = "1") Integer page,
-            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String category) { // 支持按分类筛选
+        return R.ok(resourceService.listResources(page, size, category));
+    }
 
-        Page<Resource> pageParam = new Page<>(page, size);
-        LambdaQueryWrapper<Resource> query = new LambdaQueryWrapper<>();
-
-        if (StringUtils.hasText(category)) {
-            query.eq(Resource::getCategory, category);
-        }
-        query.orderByDesc(Resource::getCreateTime);
-
-        return R.ok(resourceMapper.selectPage(pageParam, query));
+    @PreAuthorize("hasRole('LEVEL_1')")
+    @GetMapping("/categories")
+    public R<List<String>> categories() {
+        return R.ok(resourceService.listCategories());
     }
 
     // 2. 发布资源 (Level 3 部长及以上)
     @PreAuthorize("hasRole('LEVEL_3')")
     @LogContribution(type = ContributionType.RES, detail = "上传资源")
     @PostMapping("/save")
-    public R<String> save(@RequestBody Resource resource) {
-        // 如果是新增，设置初始下载量和上传者
-        if (resource.getId() == null) {
-            resource.setDownloadCount(0);
-            resource.setUploaderId(SecurityUtils.getUserId());
-            resourceMapper.insert(resource);
-        } else {
-            resourceMapper.updateById(resource);
-        }
+    public R<String> save(@RequestBody @Valid SaveResourceDto dto) {
+        resourceService.saveResource(
+                dto.getId(),
+                dto.getTitle(),
+                dto.getSummary(),
+                dto.getFileUrl(),
+                dto.getCategory(),
+                SecurityUtils.getCurrentUser());
         return R.ok("发布成功");
     }
 
@@ -59,7 +61,7 @@ public class ResourceController {
     @PreAuthorize("hasRole('LEVEL_3')")
     @PostMapping("/delete")
     public R<String> delete(@RequestParam Long id) {
-        resourceMapper.deleteById(id);
+        resourceService.deleteResource(id, SecurityUtils.getCurrentUser());
         return R.ok("删除成功");
     }
 
@@ -67,11 +69,26 @@ public class ResourceController {
     @PreAuthorize("hasRole('LEVEL_1')")
     @PostMapping("/download")
     public R<String> download(@RequestParam Long id) {
-        Resource res = resourceMapper.selectById(id);
-        if (res != null) {
-            res.setDownloadCount(res.getDownloadCount() + 1);
-            resourceMapper.updateById(res);
-        }
+        resourceService.increaseDownloadCount(id);
         return R.ok("下载计数+1");
+    }
+
+    @Data
+    static class SaveResourceDto {
+        private Long id;
+
+        @NotBlank(message = "资源标题不能为空")
+        @Size(max = 200, message = "资源标题不能超过 200 个字符")
+        private String title;
+
+        @Size(max = 1000, message = "资源摘要不能超过 1000 个字符")
+        private String summary;
+
+        @NotBlank(message = "文件地址不能为空")
+        @Size(max = 500, message = "文件地址不能超过 500 个字符")
+        private String fileUrl;
+
+        @Size(max = 64, message = "资源分类不能超过 64 个字符")
+        private String category;
     }
 }

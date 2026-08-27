@@ -1,85 +1,157 @@
 package com.csa.official.modules.sys.service;
 
+import com.csa.official.common.cache.KeyValueStore;
+import com.csa.official.common.exception.ApiErrorCode;
 import com.csa.official.common.exception.CsaException;
+import com.csa.official.common.util.AccountNormalizer;
+import com.csa.official.modules.sys.entity.MailDelivery;
+import com.csa.official.modules.sys.mapper.MailDeliveryMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
-import java.util.Random;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
 public class MailService {
 
-    @Resource
-    private JavaMailSender mailSender;
+    public static final String REGISTRATION = "REGISTRATION";
+    public static final String PASSWORD_RESET = "PASSWORD_RESET";
+
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     @Resource
-    private RedisTemplate<String, Object> redisTemplate;
+    private KeyValueStore keyValueStore;
 
-    @Value("${spring.mail.username}")
-    private String from;
+    @Resource
+    private AsyncMailSender asyncMailSender;
 
-    /**
-     * 发送验证码
-     * 
-     * @param to 目标邮箱
-     */
-    @SuppressWarnings("null")
+    @Resource
+    private MailDeliveryMapper mailDeliveryMapper;
+
+    @Resource
+    private MailRecoveryStore mailRecoveryStore;
+
     public void sendCode(String to) {
-        // 1. 检查是否频繁发送 (60秒防刷)
-        String limitKey = "verify:limit:" + to;
-        if (Boolean.TRUE.equals(redisTemplate.hasKey(limitKey))) {
-            throw new CsaException("请勿频繁发送验证码");
+        sendCode(to, REGISTRATION);
+    }
+
+    public void sendPasswordResetCode(String to) {
+        sendCode(to, PASSWORD_RESET);
+    }
+
+    public void sendCode(String to, String messageType) {
+        String normalizedTo = AccountNormalizer.email(to);
+        String codeKey = codeKey(normalizedTo, messageType);
+        String limitKey = limitKey(normalizedTo, messageType);
+        if (keyValueStore.hasKey(limitKey)) {
+            throw new CsaException(ApiErrorCode.RATE_LIMITED, "请勿频繁发送验证码");
         }
 
-        // 2. 生成 6 位随机验证码
-        String code = String.valueOf(new Random().nextInt(900000) + 100000);
+        String code = String.valueOf(RANDOM.nextInt(900000) + 100000);
 
+        // 先落库验证码与限流标记（同步、快），再把耗时的 SMTP 发送交给异步线程池，
+        // 避免阻塞 HTTP 请求线程。验证码 5 分钟自动失效，发送失败用户可稍后重试。
+        keyValueStore.set(codeKey, code, 5, TimeUnit.MINUTES);
+        keyValueStore.set(limitKey, "1", 60, TimeUnit.SECONDS);
+
+        MailDelivery delivery = new MailDelivery();
+        delivery.setRecipientHash(sha256(normalizedTo));
+        delivery.setRecipientMasked(maskEmail(normalizedTo));
+        delivery.setMessageType(messageType);
+        delivery.setStatus("PENDING");
+        delivery.setAttemptCount(0);
         try {
-            // 3. 发送邮件
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(from);
-            message.setTo(to);
-            message.setSubject("【CSA计算机协会】注册验证码");
-            message.setText("您的验证码是：" + code + "，有效期5分钟。如非本人操作，请忽略。");
-            mailSender.send(message);
+            mailDeliveryMapper.insert(delivery);
+            mailRecoveryStore.save(
+                    delivery.getId(), normalizedTo, messageType, codeKey, limitKey, code);
+        } catch (RuntimeException e) {
+            keyValueStore.delete(codeKey);
+            keyValueStore.delete(limitKey);
+            markRecoveryUnavailable(delivery.getId());
+            throw new CsaException(ApiErrorCode.SERVICE_UNAVAILABLE, "邮件服务暂时不可用", e);
+        }
 
-            // 4. 存入 Redis (有效期 5 分钟)
-            // Key: verify:code:xxxx@qq.com
-            String codeKey = "verify:code:" + to;
-            redisTemplate.opsForValue().set(codeKey, code, 5, TimeUnit.MINUTES);
+        asyncMailSender.sendVerifyCode(normalizedTo, code, messageType, codeKey, limitKey, delivery.getId());
+    }
 
-            // 5. 设置 60秒 防刷限制
-            redisTemplate.opsForValue().set(limitKey, "1", 60, TimeUnit.SECONDS);
-
-            log.info("邮件发送成功: {} -> {}", to, code);
-        } catch (Exception e) {
-            log.error("邮件发送失败", e);
-            throw new CsaException("邮件发送失败，请检查邮箱是否正确");
+    private void markRecoveryUnavailable(Long deliveryId) {
+        if (deliveryId == null) {
+            return;
+        }
+        try {
+            MailDelivery failed = new MailDelivery();
+            failed.setId(deliveryId);
+            failed.setStatus("FAILED");
+            failed.setLastErrorCode("RECOVERY_STATE_UNAVAILABLE");
+            failed.setLastErrorMessage("Temporary recovery state could not be persisted");
+            mailDeliveryMapper.updateById(failed);
+        } catch (RuntimeException updateFailure) {
+            log.error("Mail recovery state failure could not be recorded: deliveryId={}", deliveryId,
+                    updateFailure);
         }
     }
 
-    /**
-     * 校验验证码 (注册时调用)
-     */
     public void verifyCode(String email, String inputCode) {
-        String codeKey = "verify:code:" + email;
-        String realCode = (String) redisTemplate.opsForValue().get(codeKey);
+        verifyCode(email, inputCode, REGISTRATION);
+    }
+
+    public void verifyPasswordResetCode(String email, String inputCode) {
+        verifyCode(email, inputCode, PASSWORD_RESET);
+    }
+
+    public void verifyCode(String email, String inputCode, String messageType) {
+        String normalizedEmail = AccountNormalizer.email(email);
+        String codeKey = codeKey(normalizedEmail, messageType);
+        String realCode = (String) keyValueStore.get(codeKey);
 
         if (realCode == null) {
-            throw new CsaException("验证码已过期，请重新获取");
+            throw new CsaException(ApiErrorCode.BAD_REQUEST, "验证码已过期，请重新获取");
         }
-        if (!realCode.equals(inputCode)) {
-            throw new CsaException("验证码错误");
+        if (inputCode == null || !constantTimeEquals(realCode, inputCode)) {
+            throw new CsaException(ApiErrorCode.BAD_REQUEST, "验证码错误");
         }
 
-        // 验证通过后删除，防止重复使用
-        redisTemplate.delete(codeKey);
+        keyValueStore.delete(codeKey);
+    }
+
+    private String codeKey(String email, String messageType) {
+        return "verify:code:" + messageType + ":" + email;
+    }
+
+    private String limitKey(String email, String messageType) {
+        return "verify:limit:" + messageType + ":" + email;
+    }
+
+    private String maskEmail(String email) {
+        int at = email.indexOf('@');
+        if (at <= 0) {
+            return "***";
+        }
+        String local = email.substring(0, at);
+        String visible = local.length() <= 2 ? local.substring(0, 1) : local.substring(0, 2);
+        return visible + "***" + email.substring(at);
+    }
+
+    private String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is not available", e);
+        }
+    }
+
+    /** 常量时间比较，避免通过响应耗时侧信道逐位猜测验证码 */
+    private boolean constantTimeEquals(String expected, String actual) {
+        return MessageDigest.isEqual(
+                expected.getBytes(StandardCharsets.UTF_8),
+                actual.getBytes(StandardCharsets.UTF_8));
     }
 }
