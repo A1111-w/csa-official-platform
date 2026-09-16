@@ -155,7 +155,7 @@ CSA Official 是我做的一个计算机协会官网和内部管理平台。前�
 
 安全上，我重点做了几件事：登录成功后使用 HttpOnly Cookie 保存 JWT，降低 XSS 读取 Token 的风险；因为 Cookie 会被浏览器自动携带，所以对 Cookie 登录的非 GET 请求增加 CSRF Token 校验；退出登录时把 JWT 放入吊销缓存；Redis 不可用时本地可以切到内存缓存；文件访问不是简单静态目录，而是校验 owner 或资源发布状态；富文本内容用后端 Jsoup 和前端 DOMPurify 双层清洗，减少 XSS 风险。
 
-工程化上，项目有 .env.example、本地启动文档、接口地图、架构说明、安全说明、后端测试和前端构建验证。数据库结构由 Flyway V1-V5 migration 版本化，db/seed.sql 只做 dev/test 演示；开发 Compose 会起 MySQL、Redis、前后端，生产 Compose 则由 Caddy 提供同源入口。我还写了一个一致性测试，把实体字段和全部 Flyway migration 做双向比对，改了实体忘改 DDL 会直接构建失败，而不是等到换环境时才在运行时报 Unknown column。
+工程化上，项目有 .env.example、本地启动文档、接口地图、架构说明、安全说明、后端测试和前端构建验证。数据库结构由 Flyway V1-V6 migration 版本化，db/seed.sql 只做 dev/test 演示；开发 Compose 会起 MySQL、Redis、前后端，生产 Compose 则由 Caddy 提供同源入口。我还写了一个一致性测试，把实体字段和全部 Flyway migration 做双向比对，改了实体忘改 DDL 会直接构建失败，而不是等到换环境时才在运行时报 Unknown column。
 
 我也做过几轮针对性优化：分页接口原来 size 没有上限，一个 ?size=1000000 就能把数据库和堆打满，现在统一收敛；竞赛列表原来把整段富文本正文都发给前端，而列表只显示 120 字摘要，现在列表只返回服务端截断的摘要，正文改由详情接口按需取；资源模块的业务逻辑从 Controller 抽到了 Service，这样才能加事务、才能脱离 Web 环境做单元测试。
 
@@ -1411,6 +1411,7 @@ Controller 的职责应收敛为“接参、授权注解、触发校验、调 Se
 → GET /api/public/competitions
 → PublicCompetitionController.list
 → CompetitionService.getPublicCompetitionPage
+→ 先读版本化列表缓存；未命中时查询数据库并按 TTL 抖动回填
 → 排除 status=UNPUBLISHED
 → CompetitionListVO(summary)
 → Axios 拆 R 外壳
@@ -1466,6 +1467,8 @@ Controller 的职责应收敛为“接参、授权注解、触发校验、调 Se
 4. 用没有权限的账号直接调用 `POST /api/biz/comp/save`，不要依赖页面按钮；记录 403 和 `ACCESS_DENIED`。
 5. 在正文中输入合法 `<strong>` 和危险 `<script>`，保存后读取详情，记录 Jsoup 清洗结果。
 6. 编辑一条长正文，确认弹窗先出现“加载中”，随后填入完整正文，而不是列表摘要。
+7. 清空公开竞赛详情缓存后并发访问同一 ID：确认热点回源使用 `SETNX`、二次检查和
+   token 校验释放；不存在 ID 只在短 TTL 内回源一次。
 
 #### 自测题
 
@@ -2354,8 +2357,9 @@ npm run test:e2e
 | V3 | `csa-official-backend/src/main/resources/db/migration/V3__resume_review_queue_index.sql` | 给现有 `biz_resume` 增加 `(status, update_time)` 索引，服务部长审核队列 |
 | V4 | `csa-official-backend/src/main/resources/db/migration/V4__account_storage_and_git_sync.sql` | 增加账号匿名化时间、`sys_file_usage` 原子配额计数表、邮件恢复索引和简历 Git 同步字段 |
 | V5 | `csa-official-backend/src/main/resources/db/migration/V5__contribution_award_audit.sql` | 为贡献流水增加 `source`、`awarded_by` 和后台历史索引 |
+| V6 | `csa-official-backend/src/main/resources/db/migration/V6__resume_review_compare_and_set.sql` | 为简历审核增加 `version` 和 `status + version` 条件更新 |
 
-V3 和 V5 不增加新表，V4 新增 `sys_file_usage`，所以当前是 **17 张表**。其中 16 张有对应 Entity；配额计数表只由 `FileUsageMapper` 执行定向 SQL，不需要把计数行暴露成业务 Entity。`db/schema.sql`、Flyway 运维文档和 `FlywayMySqlRedisIntegrationTest` 已同步到 V5；真实 MySQL 验证仍要在 Docker 恢复后重跑。
+V3、V5 和 V6 不增加新表，V4 新增 `sys_file_usage`，所以当前仍是 **17 张表**。其中 16 张有对应 Entity；配额计数表只由 `FileUsageMapper` 执行定向 SQL，不需要把计数行暴露成业务 Entity。`db/schema.sql`、Flyway 运维文档和集成测试目标已同步到 V6；真实 MySQL 验证仍要在健康 Docker 或 staging 重跑。
 
 #### 17 张表怎么分类
 
@@ -2396,10 +2400,12 @@ V3 和 V5 不增加新表，V4 新增 `sys_file_usage`，所以当前是 **17 �
 5. 看 V3：它只有一次 `ALTER TABLE ... ADD INDEX`，说明 migration 不一定每版都建新表。
 6. 看 V4：它新建 `sys_file_usage`，并在已有表上增加匿名化、邮件恢复和 Git 同步字段；再追 `FileAccountingService` 的条件更新。
 7. 看 V5：它只为贡献流水增加来源和操作人字段，理解为什么旧数据统一为 `LEGACY`。
-8. 用 `rg -n "@TableName|@TableLogic|@EnumValue" modules` 对照 Entity，确认哪些列由注解决定。
-9. 打开 `SchemaConsistencyTest`，看它如何解析 `CREATE TABLE` 和 `ALTER TABLE ADD COLUMN`。注意它当前比较列，不验证索引、类型、默认值或外键。
-10. 打开 `db/seed.sql` 和 `DevSeedDataInitializer`，确认 seed 只在 dev/test、显式开关和至少 12 字符临时密码下执行。
-11. 最后读 `flyway.md` 的空库、baseline 和失败恢复。先理解流程，再背命令。
+8. 看 V6：它为 `biz_resume` 增加 `version`，审核提交使用 `status + version` 条件更新，
+   受影响行数不是 1 就返回冲突，数据库 CAS 才是最终一致性边界。
+9. 用 `rg -n "@TableName|@TableLogic|@EnumValue" modules` 对照 Entity，确认哪些列由注解决定。
+10. 打开 `SchemaConsistencyTest`，看它如何解析 `CREATE TABLE` 和 `ALTER TABLE ADD COLUMN`。注意它当前比较列，不验证索引、类型、默认值或外键。
+11. 打开 `db/seed.sql` 和 `DevSeedDataInitializer`，确认 seed 只在 dev/test、显式开关和至少 12 字符临时密码下执行。
+12. 最后读 `flyway.md` 的空库、baseline 和失败恢复。先理解流程，再背命令。
 
 #### 空库启动链路
 
@@ -2409,7 +2415,7 @@ V3 和 V5 不增加新表，V4 新增 `sys_file_usage`，所以当前是 **17 �
 → Spring Boot 读取 spring.flyway 配置
 → Flyway 连接目标数据库
 → 没有 flyway_schema_history：创建 history
-→ 按版本执行 V1 → V2 → V3 → V4 → V5
+→ 按版本执行 V1 → V2 → V3 → V4 → V5 → V6
 → 每个成功版本写 history 和 checksum
 → migration 全部成功后应用继续启动
 → migration 失败则 readiness 不应通过
@@ -2530,7 +2536,7 @@ Entity 仍需声明 `@TableLogic`。配置告诉框架字段名，注解告诉�
 #### Seed 与生产 migration 的边界
 
 ```text
-生产结构：Flyway V1-V5
+生产结构：Flyway V1-V6
 开发/测试演示数据：db/seed.sql
 执行者：DevSeedDataInitializer
 启用条件：profile 为 dev/test 且 csa.seed.enabled=true
@@ -2538,7 +2544,7 @@ Entity 仍需声明 `@TableLogic`。配置告诉框架字段名，注解告诉�
 处理方式：运行时 BCrypt → 替换 __DEMO_PASSWORD_HASH__ → 执行 SQL
 ```
 
-生产 profile 不创建共享演示账号，seed 也不能混进 V1-V5。结构迁移必须在任何环境都安全；演示数据只服务本地学习和测试。
+生产 profile 不创建共享演示账号，seed 也不能混进 V1-V6。结构迁移必须在任何环境都安全；演示数据只服务本地学习和测试。
 
 #### 迁移失败怎么处理
 
@@ -2568,7 +2574,7 @@ FROM flyway_schema_history
 ORDER BY installed_rank;
 ```
 
-当前源码期望依次看到 1、2、3、4、5，而不是只到 2 或 3。
+当前源码期望依次看到 1、2、3、4、5、6，而不是只到 2 或 3。
 
 7. 只在 dev/test 开启 seed，确认缺少或短于 12 字符的 `DEMO_SEED_PASSWORD` 会拒绝启动。
 8. Docker 可用后显式跑 Testcontainers；确认最新版本断言为 V5，并验证 `idx_resume_status_update`、`sys_file_usage` 和贡献流水的 `source` / `awarded_by` 在真实 MySQL 中存在。
@@ -2576,7 +2582,7 @@ ORDER BY installed_rank;
 #### 自测题
 
 1. Flyway、migration、`flyway_schema_history`、checksum 分别是什么？
-2. 当前为什么是 V1→V2→V3→V4→V5？每一版分别做了什么？
+2. 当前为什么是 V1→V2→V3→V4→V5→V6？每一版分别做了什么？
 3. 当前有多少张表？sys、biz、resume 各多少张？
 4. V2 为什么先规范化 email/studentId，再创建唯一约束？反过来有什么风险？
 5. `db/schema.sql`、`db/seed.sql`、Flyway migration 三者用途有什么区别？
@@ -2593,7 +2599,7 @@ ORDER BY installed_rank;
 
 #### 完成标准
 
-能不看答案列出 V1-V5 的职责和 17 张表分类；能从一个 Entity 字段追到 migration 列、类型和索引；能解释逻辑删除、唯一约束、联合索引、无物理外键、baseline、checksum、forward-only 和 seed 边界；能在空库查询 Flyway history 并判断当前是否真正迁到 V5。
+能不看答案列出 V1-V6 的职责和 17 张表分类；能从一个 Entity 字段追到 migration 列、类型和索引；能解释逻辑删除、唯一约束、联合索引、无物理外键、baseline、checksum、forward-only 和 seed 边界；能在空库查询 Flyway history 并判断当前是否真正迁到 V6。
 
 ### Day 14：一键启动和部署
 
@@ -2663,7 +2669,7 @@ deploy/backup.ps1、deploy/restore.ps1      # 备份和恢复脚本
 | `readiness` | “现在能接流量吗”的探针 | `/actuator/health/readiness` 生产还纳入数据库和 Redis 状态 |
 | Actuator | Spring Boot 的运行状态和指标端点模块 | 提供 health、info、Prometheus；生产不直接暴露给公网 |
 | Prometheus | 通过定期抓取指标端点收集时间序列监控数据的系统/格式 | Actuator 可提供 Prometheus 指标给内部监控抓取；“端点能打开”不等于告警规则已经配置完成 |
-| `Flyway` | 数据库版本迁移工具 | backend 启动时按 V1→V2→V3→V4→V5 执行未落地 SQL |
+| `Flyway` | 数据库版本迁移工具 | backend 启动时按 V1→V2→V3→V4→V5→V6 执行未落地 SQL |
 | `flyway_schema_history` | Flyway 的迁移历史表 | 记录已执行版本、checksum 和成功状态，决定下次从哪版继续 |
 | `seed` | 开发/测试演示数据 | `db/seed.sql` 不是生产结构迁移，生产 profile 不执行 |
 | `DevSeedDataInitializer` | Spring `ApplicationRunner` 实现类 | 仅在 `dev`/`test` 且 `csa.seed.enabled=true` 时，用临时密码生成 BCrypt 后执行 seed |
@@ -2846,11 +2852,12 @@ MySQL 容器创建数据库和应用账号
 → V3__resume_review_queue_index.sql
 → V4__account_storage_and_git_sync.sql
 → V5__contribution_award_audit.sql
+→ V6__resume_review_compare_and_set.sql
 → 写入 flyway_schema_history
 → migration 成功后 readiness 才能通过
 ```
 
-MySQL 容器不负责把 `db/schema.sql` 当作生产结构入口；当前结构以 Flyway V1-V5 为准。`db/seed.sql` 是演示数据，生产 Compose 不挂载它，也使用 `production` profile。只有 `DevSeedDataInitializer` 同时满足以下条件才执行 seed：
+MySQL 容器不负责把 `db/schema.sql` 当作生产结构入口；当前结构以 Flyway V1-V6 为准。`db/seed.sql` 是演示数据，生产 Compose 不挂载它，也使用 `production` profile。只有 `DevSeedDataInitializer` 同时满足以下条件才执行 seed：
 
 ```text
 profile = dev 或 test
@@ -2910,7 +2917,7 @@ docker compose --env-file C:\secure\csa-production.env -f compose.production.yml
 6. 画出“浏览器 → Caddy → backend/frontend”和“backend → mysql/redis”的两条网络路径。
 7. 在隔离开发卷中验证 `down` 保留数据、`down -v` 清空数据；不要对生产项目执行 `down -v`。
 8. 只在 dev/test 临时设置 `DEMO_SEED_ENABLED=true` 和随机 `DEMO_SEED_PASSWORD`，确认缺密码或少于 12 字符时启动器拒绝执行。
-9. 检查当前 Flyway history 应到 V5；看到旧文档只写 V2/V3 时，以 migration 文件和真实 history 为准并记下漂移。
+9. 检查当前 Flyway history 应到 V6；看到旧文档只写 V2/V3/V5 时，以 migration 文件和真实 history 为准并记下漂移。
 10. 在 staging/隔离环境运行一次 backup → checksum 校验 → restore → liveness/readiness 验收，记录数据库行数、上传文件和耗时。
 
 #### 自测题
@@ -2927,14 +2934,14 @@ docker compose --env-file C:\secure\csa-production.env -f compose.production.yml
 10. Caddyfile 中 `/api/*`、`/files/*` 和其它路径分别走哪条 `handle`？为什么不能把所有路径都转给 backend？
 11. liveness 和 readiness 的故障含义有什么区别？为什么生产 readiness 还包含 `db`、`redis`？
 12. `JwtUtils.validateSecret()`、`SecurityStartupValidator`、`ProductionStartupValidator` 各自在哪个启动阶段阻止什么错误？JWT 密钥检查的是字符数还是 UTF-8 字节数？
-13. 当前 V1-V5 分别做什么？`flyway_schema_history` 在启动链中扮演什么角色？
+13. 当前 V1-V6 分别做什么？`flyway_schema_history` 在启动链中扮演什么角色？
 14. 为什么 `db/seed.sql` 不能混进生产 migration？`DevSeedDataInitializer` 的 profile、开关和密码条件是什么？
 15. `docker compose down`、`down -v`、应用镜像回滚、数据库恢复分别会不会删除命名卷？哪些只能在隔离环境做？
 16. backup 生成哪几个文件？SHA-256 能证明什么、不能证明什么？restore 为什么必须显式 `-ConfirmDestructiveRestore`？
 
 #### 完成标准
 
-能不看答案画出开发四服务和生产五服务的启动/网络图；能从两个 Dockerfile 指出每个阶段、构建期变量和非 root 运行点；能解释 healthcheck、liveness/readiness、Caddy 路由、`REDIS_SSL`、`NEXT_PUBLIC_API_URL`、JWT 32 字节校验、Flyway V1-V5、seed 边界和备份恢复风险；能在隔离环境完成一次 `config → up → health → backup/checksum → restore` 验收，并明确说出哪些操作绝不能对生产数据卷执行。
+能不看答案画出开发四服务和生产五服务的启动/网络图；能从两个 Dockerfile 指出每个阶段、构建期变量和非 root 运行点；能解释 healthcheck、liveness/readiness、Caddy 路由、`REDIS_SSL`、`NEXT_PUBLIC_API_URL`、JWT 32 字节校验、Flyway V1-V6、seed 边界和备份恢复风险；能在隔离环境完成一次 `config → up → health → backup/checksum → restore` 验收，并明确说出哪些操作绝不能对生产数据卷执行。
 
 ## 6. 演示脚本
 
@@ -2989,7 +2996,7 @@ docker compose --env-file C:\secure\csa-production.env -f compose.production.yml
 最后讲三件事：
 
 1. 打开 `csa-official-backend/src/main/resources/db/migration/`，说明生产结构由
-   Flyway V1-V5 版本链管理；`db/schema.sql` 只是学习快照，`db/seed.sql` 只给 dev/test
+   Flyway V1-V6 版本链管理；`db/schema.sql` 只是学习快照，`db/seed.sql` 只给 dev/test
    使用。再打开 SchemaConsistencyTest，说明实体和全部 migration 的列一致性是被测试守住的。
 
 2. 打开 docker-compose.yml，说明一条命令就能起 MySQL + Redis + 前后端，
@@ -3108,7 +3115,7 @@ RAG 主要是检索资料并基于资料回答，解决知识更新和引用来�
 第一类是可运行性。项目早期的表结构主要依赖手工创建，
 只存在于开发机上，换台机器很难稳定复现。
 我按实体整理了 db/schema.sql 结构快照和 seed.sql 演示数据，随后把生产结构迁入
-Flyway V1-V5 版本链，并用 docker-compose 把 MySQL、Redis、前端、后端串起来。
+Flyway V1-V6 版本链，并用 docker-compose 把 MySQL、Redis、前端、后端串起来。
 现在本地可以用 docker compose up 复现空库；需要演示账号时，再显式注入一次性 seed 密码。
 为了防止以后再漂移，我写了一个 SchemaConsistencyTest，
 它把实体字段转成下划线格式，和全部 Flyway migration 的列做双向 diff，对不上就构建失败。
@@ -3234,7 +3241,7 @@ JWT 里 jti 用的是随机 UUID，所以每次签名都不同 —— 随机性�
 - [ ] 我能看懂 `.env.example`。
 - [ ] 我能根据报错定位 CORS、CSRF、数据库、Redis 问题。
 - [ ] 我能用 `docker compose up --build` 启动开发四服务，并说清生产为什么增加 Caddy 形成五服务及其启动顺序。
-- [ ] 我能用 Flyway V1-V5 在空库初始化，并解释 `db/schema.sql` 为什么只保留为学习快照。
+- [ ] 我能用 Flyway V1-V6 在空库初始化，并解释 `db/schema.sql` 为什么只保留为学习快照。
 - [ ] 我能说清 `SchemaConsistencyTest` 防的是什么事故。
 
 ### 8.7 优化与排错（面试高频）
@@ -3732,8 +3739,8 @@ cd <project-root>\csa-official-backend
 这一轮改造不只是“把服务放进 Docker”。建议按下面顺序亲手跑一遍，并把每一步的输出留在自己的实验记录里：
 
 1. 读 `application.yml`、`application-production.yml` 和两个 Compose 文件，画出浏览器、Caddy、frontend、backend、MySQL、Redis 的网络边界。
-2. 用空 MySQL 卷启动 production profile，查询 `flyway_schema_history`，确认 V1-V5 成功且没有演示账号。
-3. 把旧版结构导入隔离数据库，使用一次性 `FLYWAY_BASELINE_ON_MIGRATE=true` 把旧结构登记为 V1，确认随后执行 V2-V5，再恢复为 `false`。
+2. 用空 MySQL 卷启动 production profile，查询 `flyway_schema_history`，确认 V1-V6 成功且没有演示账号。
+3. 把旧版结构导入隔离数据库，使用一次性 `FLYWAY_BASELINE_ON_MIGRATE=true` 把旧结构登记为 V1，确认随后执行 V2-V6，再恢复为 `false`。
 4. 手工制造一个失败 migration，观察 MySQL DDL 的非事务特征；理解为什么恢复路径必须依赖备份，而不是盲目 `repair`。
 5. 运行 `deploy/backup.ps1` 和 `deploy/restore.ps1`，验证数据库行数、上传文件 SHA-256 和应用健康状态恢复一致；恢复失败时应用应保持停止。
 6. 查看 `X-Request-ID`、JSON 日志、`/actuator/health/readiness`、`/actuator/health/liveness` 和 Prometheus 指标，分别说明它们服务于排错、编排还是告警。

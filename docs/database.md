@@ -15,6 +15,7 @@ csa-official-backend/src/main/resources/db/migration/V2__production_operations.s
 csa-official-backend/src/main/resources/db/migration/V3__resume_review_queue_index.sql  简历审核队列索引
 csa-official-backend/src/main/resources/db/migration/V4__account_storage_and_git_sync.sql  账号、文件配额和 Git 同步
 csa-official-backend/src/main/resources/db/migration/V5__contribution_award_audit.sql  贡献来源和操作人
+csa-official-backend/src/main/resources/db/migration/V6__resume_review_compare_and_set.sql  简历审核 CAS 版本
 db/schema.sql   历史/本地结构参考，不是生产迁移入口
 db/seed.sql     仅 dev/test 演示种子
 ```
@@ -141,6 +142,7 @@ erDiagram
 | `sys_file_usage` | `uk_file_usage_scope (scope_type, scope_id)` | UNIQUE | `FileAccountingService` 为个人/全站配额创建和定位唯一计数行 |
 | `sys_vote_record` | `uk_vote_proposal_voter (proposal_id, voter_id)` | UNIQUE | 防重复投票，见下方 5.1 |
 | `biz_resume` | `uk_resume_user (user_id)` | UNIQUE | `ResumeService.getMyResume` 用 `selectOne(user_id)`，唯一避免多行导致 `TooManyResultsException` |
+| `biz_resume` | `idx_resume_user_version (user_id, version)` | 普通 | 简历保存/提交和审核状态的版本条件更新 |
 | `sys_config` | `uk_config_key (config_key)` | UNIQUE | 按键取配置 `selectOne(config_key)`（如 `CSA_INTRO`），保证一键一值 |
 | `sys_invite_code` | `uk_invite_code (code)` | UNIQUE | 注册核销邀请码 `selectOne(code)` |
 | `sys_carousel` | `idx_carousel_status_sort (status, sort_order, create_time)` | 普通 | 首页轮播过滤 `status=1` 并按 `sort_order ASC, create_time DESC` 排序 |
@@ -164,7 +166,7 @@ if (voteRecordMapper.exists(new LambdaQueryWrapper<VoteRecord>()
 
 ### 6.1 生产与普通启动
 
-应用启动时 Flyway 自动执行 `V1`-`V5` 等未执行迁移：
+应用启动时 Flyway 自动执行 `V1`-`V6` 等未执行迁移：
 
 ```bash
 cd csa-official-backend

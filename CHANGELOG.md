@@ -13,6 +13,30 @@
 
 ## [Unreleased]
 
+### 20260916-cache-and-concurrency-hardening | 缓存与并发强化
+
+- 日期：2026-09-16；执行 agent：Codex；关联需求：
+  `03-计算机协会项目完善清单-20260917.md` 和
+  `specs/001-cache-concurrency-hardening/tasks.md`。
+- 状态：部分完成。公开竞赛 Cache-Aside、短 TTL 空值缓存、TTL 抖动、热点
+  `SETNX` 二次检查/Lua 安全释放、提交后 generation 失效、公开接口限流和
+  ready 后可失败预热已实现；简历审核增加 `status + version` CAS，投票事务锁定
+  提案行并把唯一键竞态转换为 409。
+- 代码/配置/数据库：新增 `common/cache` 策略组件、竞赛缓存链路和
+  `CACHE_WARMUP_ENABLED`；新增 Flyway `V6__resume_review_compare_and_set.sql`，
+  不修改 V1-V5。
+- 文档：同步 README、API 地图、架构、数据库、本地开发、模块完成度、项目状态、
+  Flyway 运维、学习指南；详细记录见
+  [`docs/change-records/2026-09-16-cache-and-concurrency-hardening.md`](docs/change-records/2026-09-16-cache-and-concurrency-hardening.md)。
+- 验证：`.\mvnw.cmd -q -DskipTests compile` 通过；定向
+  `CompetitionServiceTest,CacheTtlPolicyTest,VoteServiceTest,ResumeServiceTest`
+  通过；全量 `.\mvnw.cmd -q test` 通过。真实 Docker/Testcontainers、V1-V6
+  MySQL/Redis 和 staging 并发实验尚未执行，不能写成已通过。
+- 兼容性：公开接口 URL/VO 不变；`biz_resume` 新增默认 0 的内部 version 列；
+  新配置默认开启预热；memory 缓存仍仅适合本地单实例。
+- 回退：使用后续 `git revert`；V6 落地后只允许应用回退与数据库向前兼容，
+  不删除列或改写 migration。
+
 ### 2026-09-16 项目迁移与 agent 文档治理
 
 - 将实际 CSA 前后端项目及其既有未提交工作迁入当前目录的独立 Git 仓库，

@@ -1,6 +1,7 @@
 package com.csa.official.modules.sys.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.csa.official.common.constant.RoleConsts;
 import com.csa.official.common.exception.ApiErrorCode;
 import com.csa.official.common.exception.CsaException;
@@ -13,6 +14,7 @@ import com.csa.official.modules.sys.mapper.UserMapper;
 import com.csa.official.modules.sys.mapper.VoteRecordMapper;
 import com.csa.official.modules.sys.vo.VoteTallyVO;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,7 +57,9 @@ public class VoteService {
 
     @Transactional(rollbackFor = Exception.class)
     public String vote(Long proposalId, Long userId, boolean agree, String comment) {
-        Proposal proposal = proposalMapper.selectById(proposalId);
+        // Serialize votes for one proposal so the status check, insert and
+        // tally transition share one database transaction.
+        Proposal proposal = proposalMapper.selectForUpdate(proposalId);
         if (proposal == null || proposal.getStatus() != 0) {
             throw new CsaException(ApiErrorCode.CONFLICT, "Proposal not found or already closed");
         }
@@ -91,7 +95,14 @@ public class VoteService {
         record.setResult(agree ? VoteResultEnum.AGREE : VoteResultEnum.REJECT);
         record.setWeight(weight);
         record.setComment(comment);
-        voteRecordMapper.insert(record);
+        try {
+            voteRecordMapper.insert(record);
+        } catch (DuplicateKeyException e) {
+            // The unique proposal_id + voter_id index is the final
+            // concurrency boundary; the pre-check above is only an
+            // optimization for the common path.
+            throw new CsaException(ApiErrorCode.CONFLICT, "You have already voted");
+        }
 
         log.info("Vote received: proposalId={}, voter={}, agree={}, weight={}",
                 proposalId, voter.getUsername(), agree, weight);
@@ -116,11 +127,10 @@ public class VoteService {
                 currentAgreeWeight, passThreshold, totalPossibleWeight);
 
         if (currentAgreeWeight >= passThreshold) {
-            proposal.setStatus(1);
-            proposal.setFinalResultJson("agree:" + currentAgreeWeight
+            String finalResult = "agree:" + currentAgreeWeight
                     + ", reject:" + currentRejectWeight
-                    + ", threshold:" + passThreshold);
-            proposalMapper.updateById(proposal);
+                    + ", threshold:" + passThreshold;
+            updateFinalStatus(proposal, 1, finalResult);
 
             if (isRootApplyProposal(proposal.getType())) {
                 log.warn("ROOT_APPLY proposal {} passed but automatic elevation is disabled", proposal.getId());
@@ -130,15 +140,25 @@ public class VoteService {
         }
 
         if (currentRejectWeight >= passThreshold) {
-            proposal.setStatus(2);
-            proposal.setFinalResultJson("agree:" + currentAgreeWeight
+            String finalResult = "agree:" + currentAgreeWeight
                     + ", reject:" + currentRejectWeight
-                    + ", threshold:" + passThreshold);
-            proposalMapper.updateById(proposal);
+                    + ", threshold:" + passThreshold;
+            updateFinalStatus(proposal, 2, finalResult);
             return "Proposal rejected";
         }
 
         return "Vote recorded (" + currentAgreeWeight + "/" + passThreshold + ")";
+    }
+
+    private void updateFinalStatus(Proposal proposal, int status, String finalResult) {
+        int updated = proposalMapper.update(null, new UpdateWrapper<Proposal>()
+                .set("status", status)
+                .set("final_result_json", finalResult)
+                .eq("id", proposal.getId())
+                .eq("status", 0));
+        if (updated == 0) {
+            log.info("Proposal was finalized concurrently: proposalId={}", proposal.getId());
+        }
     }
 
     private boolean isRootApplyProposal(String type) {

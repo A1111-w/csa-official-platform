@@ -10,6 +10,7 @@ import com.csa.official.modules.sys.mapper.VoteRecordMapper;
 import com.csa.official.modules.sys.vo.VoteTallyVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.dao.DuplicateKeyException;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -62,7 +63,7 @@ class VoteServiceTest {
         tally.setAgreeWeight(2);
         tally.setRejectWeight(0);
 
-        when(proposalMapper.selectById(1L)).thenReturn(proposal);
+        when(proposalMapper.selectForUpdate(1L)).thenReturn(proposal);
         when(voteRecordMapper.exists(any())).thenReturn(false);
         when(userMapper.selectById(1L)).thenReturn(voter);
         when(voteRecordMapper.selectTally(1L)).thenReturn(tally);
@@ -72,5 +73,30 @@ class VoteServiceTest {
         String result = voteService.vote(1L, 1L, true, "approve");
 
         assertThat(result).contains("automatic elevation is disabled");
+    }
+
+    @Test
+    void duplicateKeyFromConcurrentInsertBecomesConflict() {
+        Proposal proposal = new Proposal();
+        proposal.setId(2L);
+        proposal.setType("CODE_DEPLOY");
+        proposal.setProposerId(9L);
+        proposal.setStatus(0);
+        proposal.setExpireTime(LocalDateTime.now().plusHours(1));
+
+        User voter = new User();
+        voter.setId(1L);
+        voter.setUsername("minister");
+        voter.setRoleLevel(RoleConsts.MINISTER);
+
+        when(proposalMapper.selectForUpdate(2L)).thenReturn(proposal);
+        when(voteRecordMapper.exists(any())).thenReturn(false);
+        when(userMapper.selectById(1L)).thenReturn(voter);
+        when(voteRecordMapper.insert(any())).thenThrow(new DuplicateKeyException("uk_vote_proposal_voter"));
+
+        assertThatThrownBy(() -> voteService.vote(2L, 1L, true, null))
+                .isInstanceOf(CsaException.class)
+                .extracting(error -> ((CsaException) error).getCode())
+                .isEqualTo(409);
     }
 }

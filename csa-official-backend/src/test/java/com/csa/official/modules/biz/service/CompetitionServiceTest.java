@@ -1,6 +1,10 @@
 package com.csa.official.modules.biz.service;
 
 import com.csa.official.common.constant.RoleConsts;
+import com.csa.official.common.cache.CacheTtlPolicy;
+import com.csa.official.common.cache.CacheValueCodec;
+import com.csa.official.common.cache.KeyValueStore;
+import com.csa.official.common.cache.MemoryKeyValueStore;
 import com.csa.official.common.exception.CsaException;
 import com.csa.official.modules.biz.entity.CompEditor;
 import com.csa.official.modules.biz.entity.Competition;
@@ -12,18 +16,25 @@ import com.csa.official.modules.sys.entity.User;
 import com.csa.official.modules.sys.mapper.UserMapper;
 import com.csa.official.modules.sys.service.AuditService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Random;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class CompetitionServiceTest {
@@ -40,8 +51,23 @@ class CompetitionServiceTest {
     @Mock
     private AuditService auditService;
 
+    @Mock
+    private KeyValueStore keyValueStore;
+
+    @Mock
+    private CacheValueCodec cacheValueCodec;
+
+    @Mock
+    private CacheTtlPolicy cacheTtlPolicy;
+
     @InjectMocks
     private CompetitionService competitionService;
+
+    @BeforeEach
+    void configureCacheLockMock() {
+        lenient().when(keyValueStore.setIfAbsent(anyString(), anyString(), anyLong(), any()))
+                .thenReturn(true);
+    }
 
     @Test
     void addEditorRejectsUnauthorizedOperator() {
@@ -152,6 +178,53 @@ class CompetitionServiceTest {
                 .isInstanceOf(CsaException.class)
                 .extracting(e -> ((CsaException) e).getCode())
                 .isEqualTo(404);
+    }
+
+    @Test
+    void publicDetailUsesCacheAfterFirstDatabaseRead() {
+        Competition published = buildCompetition(11L, 200L);
+        published.setStatus(CompetitionStatusEnum.ONGOING);
+        published.setContent("<p>缓存正文</p>");
+        when(competitionMapper.selectById(11L)).thenReturn(published);
+
+        CompetitionService cachedService = new CompetitionService(
+                competitionMapper,
+                editorMapper,
+                userMapper,
+                auditService,
+                new MemoryKeyValueStore(),
+                new CacheValueCodec(new ObjectMapper().findAndRegisterModules()),
+                new CacheTtlPolicy(new Random(1)));
+
+        assertThat(cachedService.getPublicCompetitionDetail(11L).getContent()).isEqualTo("<p>缓存正文</p>");
+        assertThat(cachedService.getPublicCompetitionDetail(11L).getContent()).isEqualTo("<p>缓存正文</p>");
+
+        verify(competitionMapper).selectById(11L);
+    }
+
+    @Test
+    void missingPublicDetailIsShortLivedNegativeCached() {
+        when(competitionMapper.selectById(12L)).thenReturn(null);
+
+        CompetitionService cachedService = new CompetitionService(
+                competitionMapper,
+                editorMapper,
+                userMapper,
+                auditService,
+                new MemoryKeyValueStore(),
+                new CacheValueCodec(new ObjectMapper().findAndRegisterModules()),
+                new CacheTtlPolicy(new Random(2)));
+
+        assertThatThrownBy(() -> cachedService.getPublicCompetitionDetail(12L))
+                .isInstanceOf(CsaException.class)
+                .extracting(e -> ((CsaException) e).getCode())
+                .isEqualTo(404);
+        assertThatThrownBy(() -> cachedService.getPublicCompetitionDetail(12L))
+                .isInstanceOf(CsaException.class)
+                .extracting(e -> ((CsaException) e).getCode())
+                .isEqualTo(404);
+
+        verify(competitionMapper).selectById(12L);
     }
 
     private Competition buildCompetition(Long id, Long publisherId) {

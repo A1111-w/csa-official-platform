@@ -31,6 +31,11 @@ public class Resume implements Serializable {
     // 状态 (使用枚举)
     private ResumeStatusEnum status;
 
+    /**
+     * Optimistic concurrency version for review state transitions.
+     */
+    private Long version;
+
     private String rejectReason;
 
     private Long auditBy;

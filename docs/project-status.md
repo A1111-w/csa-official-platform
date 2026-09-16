@@ -26,7 +26,8 @@
 - 登录、注册、验证码、密码找回/修改、Cookie JWT、CSRF、会话版本和账号生命周期。
 - 资源、竞赛、简历提交与审核、部门、提案投票、贡献记录、审计和成员导出。
 - 首页轮播管理、文件上传与受控访问、简历 Git 同步、邮件投递补偿。
-- MySQL + Flyway V1-V5、Redis/内存缓存、Prometheus 指标、健康探针和 Docker Compose。
+- MySQL + Flyway V1-V6、Redis/内存缓存、Prometheus 指标、健康探针和 Docker Compose。
+- 公开竞赛缓存已补齐版本化 JSON Cache-Aside、空值缓存、TTL 抖动、热点回源锁、失效 generation 和 ready 后可失败预热；简历审核和提案投票补齐数据库并发边界。
 - RAG/Agent、多学校 SaaS 和支付仍是规划或 ADR，不是已实现产品能力。
 
 ## 当前未提交工作

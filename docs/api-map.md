@@ -191,6 +191,10 @@ GET /api/public/contributors
 GET /api/public/competitions?page=1&size=10
 ```
 
+该公开列表按 IP 做接口限流。服务优先读取版本化 JSON Cache-Aside；
+缓存未命中时查询 MySQL，并写入带 TTL 抖动的列表缓存。竞赛写事务提交后只递增
+列表 generation，旧 Key 自然失效，避免在事务尚未提交时写入缓存。
+
 参数：
 
 | 参数 | 默认 | 说明 |
@@ -232,12 +236,20 @@ GET /api/public/competitions/{id}
 
 权限：公开，无需登录。
 
+该公开详情按 IP 和竞赛 ID 做接口限流。真实详情缓存 Key 为
+`csa:public:competition:detail:{id}:v1`；不存在或未发布的 ID 写入独立的
+`__NULL__` 短 TTL 标记并继续返回 404。热点 Key 失效时使用
+`csa:lock:competition:detail:{id}` 的 `SETNX` 互斥锁，抢锁后必须二次检查缓存，
+释放锁使用随机 token + Lua `GET == token -> DEL`，避免误删其他请求的锁。
+
 返回：`CompetitionDetailVO`，相比列表项多了完整的 `content` 正文（入库前已经过 Jsoup 白名单清洗）。
 
 注意：
 
 - 状态为 `UNPUBLISHED` 的竞赛在这里一律返回 404，避免未登录用户通过 id 探测到还没公开的活动。
 - `canEdit`、`canGrant` 在公开入口恒为 `false`。
+- Redis 读写异常时不伪造缓存命中；服务记录限频告警并回源 MySQL。若热点锁被其他请求持有，
+  服务有限等待缓存重建，超时返回 503，避免无限等待。
 
 失败：
 

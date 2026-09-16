@@ -70,7 +70,7 @@ modules
 | --- | --- | --- |
 | `annotation` | 自定义注解 | `RateLimit`、`LogContribution` |
 | `aspect` | 横切逻辑 | `RateLimitAspect`、`ContributionAspect` |
-| `cache` | 缓存抽象 | `KeyValueStore`、`RedisKeyValueStore`、`MemoryKeyValueStore` |
+| `cache` | 缓存抽象、Key/JSON/TTL 策略和启动预热 | `KeyValueStore`、`RedisKeyValueStore`、`MemoryKeyValueStore`、`CacheKeys`、`CacheValueCodec`、`CacheTtlPolicy`、`CacheWarmupRunner` |
 | `constant` | 全局常量 | `RoleConsts` |
 | `controller` | 通用接口 | `FileController`、`StoredFileController` |
 | `exception` | 异常 | `CsaException`、`GlobalExceptionHandler` |
@@ -454,7 +454,7 @@ Jackson 默认把 Java 枚举序列化成**名字**，所以 `Resume.status` 出
 
 ### 5.10 数据库结构进入版本控制
 
-生产数据库结构的唯一执行入口是 `csa-official-backend/src/main/resources/db/migration/` 下的 Flyway 版本链：当前版本为 V1-V5，V5 为贡献来源和操作人迁移。根目录的 `db/schema.sql` 保留为学习用结构快照，`db/seed.sql` 只允许 dev/test 在显式运行时口令下加载，不能当作生产迁移。
+生产数据库结构的唯一执行入口是 `csa-official-backend/src/main/resources/db/migration/` 下的 Flyway 版本链：当前版本为 V1-V6，V5 为贡献来源和操作人迁移，V6 为简历审核 CAS 版本列。根目录的 `db/schema.sql` 保留为学习用结构快照，`db/seed.sql` 只允许 dev/test 在显式运行时口令下加载，不能当作生产迁移。
 
 一个刻意的决定是**不建物理外键**：项目用逻辑删除（父行 `deleted=1` 但物理仍在）+ MyBatis-Plus，物理外键会和逻辑删除、框架的级联行为互相打架，所以表间关系只用注释描述，不加 `FOREIGN KEY` 约束（详见 `docs/database.md`）。
 
@@ -549,7 +549,7 @@ src/types/activity.ts
 
 - 列表接口统一最大 `size`：分页走 `PageUtils.of`（上限 100），非分页列表走 `PageUtils.clampLimit`（上限 200）。
 - 资源、竞赛、部门、轮播、提案、简历返回改为 VO，不再直接返回 Entity（详见 5.6）。
-- 保留 `db/schema.sql` 学习结构快照，生产结构由 Flyway V1-V5 管理，并用 `SchemaConsistencyTest` 防止实体与 migration 漂移。
+- 保留 `db/schema.sql` 学习结构快照，生产结构由 Flyway V1-V6 管理，并用 `SchemaConsistencyTest` 防止实体与 migration 漂移。
 
 仍待推进：
 

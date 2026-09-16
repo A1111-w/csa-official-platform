@@ -106,6 +106,9 @@ csa:
     password: ${DEMO_SEED_PASSWORD:}
   cache:
     type: ${CSA_CACHE_TYPE:redis}
+    validate-connection: ${REDIS_VALIDATE_CONNECTION:false}
+    warmup:
+      enabled: ${CACHE_WARMUP_ENABLED:true}
   security:
     cookie:
       name: ${AUTH_COOKIE_NAME:CSA_AUTH_TOKEN}

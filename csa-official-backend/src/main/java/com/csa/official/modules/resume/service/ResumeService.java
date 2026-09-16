@@ -134,11 +134,20 @@ public class ResumeService {
             throw new CsaException(ApiErrorCode.BAD_REQUEST, "Resume content or Git repository URL is required");
         }
 
-        resume.setStatus(ResumeStatusEnum.PENDING);
-        resume.setRejectReason(null);
-        resume.setAuditBy(null);
-        resume.setAuditTime(null);
-        resumeMapper.updateById(resume);
+        long version = resume.getVersion() == null ? 0L : resume.getVersion();
+        int updated = resumeMapper.update(null, new LambdaUpdateWrapper<Resume>()
+                .set(Resume::getStatus, ResumeStatusEnum.PENDING)
+                .set(Resume::getRejectReason, null)
+                .set(Resume::getAuditBy, null)
+                .set(Resume::getAuditTime, null)
+                .set(Resume::getVersion, version + 1)
+                .eq(Resume::getId, resume.getId())
+                .eq(Resume::getUserId, userId)
+                .eq(Resume::getStatus, resume.getStatus())
+                .eq(Resume::getVersion, version));
+        if (updated <= 0) {
+            throw new CsaException(ApiErrorCode.CONFLICT, "Resume state changed; refresh and retry");
+        }
     }
 
     public Page<ResumeReviewListVO> getReviewPage(Integer page, Integer size, Integer statusCode) {
@@ -204,19 +213,23 @@ public class ResumeService {
         }
 
         ResumeStatusEnum decision = pass ? ResumeStatusEnum.APPROVED : ResumeStatusEnum.REJECTED;
+        long version = resume.getVersion() == null ? 0L : resume.getVersion();
         int updated = resumeMapper.update(null, new LambdaUpdateWrapper<Resume>()
                 .set(Resume::getStatus, decision)
                 .set(Resume::getRejectReason, pass ? null : normalizedReason)
                 .set(Resume::getAuditBy, ministerId)
                 .set(Resume::getAuditTime, LocalDateTime.now())
+                .set(Resume::getVersion, version + 1)
                 .eq(Resume::getId, resumeId)
-                .eq(Resume::getStatus, ResumeStatusEnum.PENDING));
+                .eq(Resume::getStatus, ResumeStatusEnum.PENDING)
+                .eq(Resume::getVersion, version));
         if (updated <= 0) {
             throw new CsaException(ApiErrorCode.CONFLICT, "Resume review state changed; refresh and retry");
         }
 
         auditService.recordBestEffort("RESUME_REVIEW", "RESUME", String.valueOf(resumeId),
                 "SUCCESS", null, Map.of(
+                        "previousStatus", ResumeStatusEnum.PENDING.name(),
                         "decision", decision.name(),
                         "subjectUserId", resume.getUserId(),
                         "reviewerUserId", ministerId));

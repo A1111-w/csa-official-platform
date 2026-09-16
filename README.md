@@ -24,8 +24,8 @@ CSA Official 是一个面向计算机协会的官网与内部管理平台。它�
 | 安全 | 已有 Spring Security、JWT、HttpOnly Cookie、CSRF、CORS、稳定 HTTP status / `errorCode` / `traceId` |
 | 权限 | 已有 `roleLevel` 等级体系，前端菜单隐藏 + 后端 `@PreAuthorize` |
 | 数据访问 | 使用 MyBatis-Plus + MySQL |
-| 数据库迁移 | 生产使用 Flyway V1-V5；`db/schema.sql` 只是当前结构快照，`db/seed.sql` 仅供 dev/test 演示，`SchemaConsistencyTest` 防止实体与 migration 漂移 |
-| 缓存/限流 | 支持 Redis，也支持本地内存缓存降级 |
+| 数据库迁移 | 生产使用 Flyway V1-V6；`db/schema.sql` 只是当前结构快照，`db/seed.sql` 仅供 dev/test 演示，`SchemaConsistencyTest` 防止实体与 migration 漂移 |
+| 缓存/限流 | 支持 Redis，也支持本地内存缓存降级；公开竞赛读链路使用版本化 Cache-Aside、空值缓存、TTL 抖动、热点互斥锁和启动预热 |
 | 文件 | 支持上传、类型限制、大小限制、受控访问 |
 | 简历审核 | 已完成“成员提交 → 部长队列 → 详情 → 通过/驳回 → 状态回写”前后端闭环；接口和竞态规则见 `docs/api-map.md` |
 | 轮播管理 | 已完成“列表 → 上传/URL → 预览 → 新增/编辑 → 排序/启停 → 删除 → 首页生效”前后端闭环；仅 Level 4 可维护 |
@@ -469,6 +469,7 @@ csa-official-backend/.env.example
 | `DB_PASSWORD` | 是 | 数据库密码 |
 | `JWT_SECRET` | 是 | JWT 签名密钥 |
 | `CSA_CACHE_TYPE` | 否 | `redis` 或 `memory` |
+| `CACHE_WARMUP_ENABLED` | 否 | 是否在应用 ready 后预热公开竞赛首页，默认 `true` |
 | `REDIS_HOST` | Redis 模式必填 | Redis 地址 |
 | `REDIS_PASSWORD` | Redis 模式视情况 | Redis 密码 |
 | `MAIL_USERNAME` | 发验证码时需要 | 邮箱账号 |
@@ -627,7 +628,9 @@ cd <project-root>\csa-official-backend
 
 本轮已经落地：
 
-- 生产数据库改为 Flyway V1-V5 版本链；`db/schema.sql` 保留为学习快照，`db/seed.sql` 只允许 dev/test 显式注入运行时口令后加载。
+- 生产数据库改为 Flyway V1-V6 版本链；`db/schema.sql` 保留为学习快照，`db/seed.sql` 只允许 dev/test 显式注入运行时口令后加载。
+- 公开竞赛列表和详情补齐版本化 JSON Cache-Aside、短 TTL 空值缓存、TTL 抖动、热点 `SETNX` 二次检查/Lua 安全解锁、数据库不可用时的有限降级和 ready 后可失败预热。
+- 简历审核提交和审核结果使用 `biz_resume.version` 条件更新；提案投票在事务内锁定提案行，并由 `uk_vote_proposal_voter` 捕获并发重复投票。
 - 开发与生产 Compose 分离，生产只发布 Caddy 80/443；后端使用独立 MySQL 用户、Redis、Secure Cookie、可信代理和非 Root 容器。
 - 统一 HTTP status、`errorCode`、`traceId` 和 `X-Request-ID`，补齐 JSON 日志、指标、readiness/liveness、优雅停机、备份恢复和回滚 Runbook。
 - Phase 2 已加入账号生命周期、到期匿名化、密码找回/修改、会话吊销、审计、个人数据导出、原子上传配额、邮件有限重试/崩溃补偿和定时任务幂等。

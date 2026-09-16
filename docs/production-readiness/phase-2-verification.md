@@ -10,7 +10,7 @@
 | 检查 | 结果 | 证据 |
 | --- | --- | --- |
 | `mvnw.cmd test` | 通过 | 2026-08-26：174 tests，0 failures，0 errors，1 skipped |
-| 显式 Testcontainers | GitHub Actions 通过；本机待健康 Docker/staging 重跑 | 当前源码 `fcddab2` 的远端工作流 `#33010814757` 通过真实 MySQL、Redis 与 Flyway V1→V5；本机 Docker 仍不可用 |
+| 显式 Testcontainers | 本机待健康 Docker/staging 重跑 | 当前测试目标为真实 MySQL、Redis 与 Flyway V1→V6；本机 Docker 仍不可用 |
 | `npm run lint` | 通过 | ESLint exit code 0 |
 | `npm run test` | 通过 | Vitest 6 files、12 tests |
 | `npm ci` + `npm audit` | 通过 | 干净安装完成；完整与 production audit 均为 0 vulnerabilities |
@@ -23,7 +23,7 @@
 | 当前备份恢复复演 | 未完成 | Docker 数据盘故障后停止，保护已有卷 |
 | Trivy / GitHub Actions 远端运行 | 通过 | `#33010814757` 在 `fcddab2` 上全绿：后端单测、真实 MySQL/Redis/Flyway、前端 lint/build/test/audit、Compose fail-fast、依赖/配置扫描、前后端镜像 Trivy 和关键 Playwright E2E 全部通过。此前 `#33009147368` 的前端镜像全局 npm `node-tar` 和 Alpine 漏洞已由移除 npm/npx、用 `node` 直接启动 Next.js、执行 Alpine 升级修复 |
 
-默认后端全测跳过的 1 项就是 Testcontainers。历史记录曾在 V2 版本链上通过；当前测试已更新到 V5，并断言 V3 审核索引、V4 `sys_file_usage` 和 V5 贡献来源列。GitHub Actions `#33010814757` 已提供当前源码的真实依赖证据；健康 staging 仍需复演生产升级与备份恢复，不能把旧 V2 结果或 CI 结果冒充真实生产恢复证据。
+默认后端全测跳过的 1 项就是 Testcontainers。历史记录曾在 V2 版本链上通过；当前测试目标已更新到 V6，并断言 V3 审核索引、V4 `sys_file_usage`、V5 贡献来源列和 V6 简历审核版本列。健康 Docker 或 staging 仍需复演生产升级与备份恢复，不能把旧 V2 结果或单元测试结果冒充真实生产恢复证据。
 
 CI Redis 根因已复核：GitHub Actions 日志中 `test` profile 实际已经激活；空 `REDIS_HOST` 时，Redis 自动配置仍尝试创建连接工厂并失败。本 checkpoint 只在测试 profile 排除 Redis 自动配置，并在应用上下文测试中断言没有 `RedisConnectionFactory`。首轮远端工作流已通过后端单测、Testcontainers、前端检查、Compose 与 Playwright E2E；它还确认私有仓库未启用 GHAS 时不能使用 `dependency-review-action`，并从 Trivy 报告提取了有修复版本的镜像依赖。后端修复将 Spring Boot 提升至 3.5.14，并以 patch-level 覆盖 Spring Framework、Spring Data、Tomcat、Micrometer、Netty、Jackson、Commons IO，同时在 runner stage 执行 Alpine 包升级。随后 `#33009147368` 只剩前端镜像扫描失败：漏洞来自最终镜像全局 npm 的 `node-tar`，而非应用 `node_modules`。前端 runner 移除构建后不需要的 npm/npx、用 `node` 直接启动 Next.js，并执行 Alpine 升级；`#33010814757` 已验证前后端镜像 Trivy 均通过。没有新增 Flyway migration、生产配置或数据库影响。
 
@@ -57,7 +57,7 @@ Playwright 当前共有 5 个用例。缺少 `E2E_USERNAME/E2E_PASSWORD` 时，3
 - 规范化邮箱/学号，建立 `uk_user_email` 和 `uk_user_student_id`。
 - 新增 `sys_audit_log`、`sys_stored_file`、`sys_mail_delivery`、`sys_scheduled_job_execution`。
 
-真实 MySQL 历史测试已验证 V1 旧用户升级到 V2 后数据保留、规范化和默认状态；GitHub Actions `#33010814757` 进一步验证当前 V1-V5 版本链及 V3 审核队列索引、V4 账号匿名化/原子配额/邮件恢复/Git 同步结构和 V5 贡献来源/操作人字段。生产迁移前仍必须先查重，迁移后不得修改已执行的 V2-V5 SQL。
+真实 MySQL 历史测试已验证 V1 旧用户升级到 V2 后数据保留、规范化和默认状态；当前源码的版本链已扩展到 V6，V6 增加简历审核 `version` 并支持 `status + version` 条件更新。生产迁移前仍必须先查重，迁移后不得修改已执行的 V2-V6 SQL。
 
 ## 5. 新增或重要环境变量
 
@@ -70,7 +70,7 @@ Playwright 当前共有 5 个用例。缺少 `E2E_USERNAME/E2E_PASSWORD` 时，3
 ## 6. 部署步骤
 
 1. 修复/更换健康的 Docker 主机，在 staging 恢复一份脱敏数据库副本。
-2. 运行 V1→V5 查重和迁移演练，确认 `flyway_schema_history` 到 5，并存在 `idx_resume_status_update`、`sys_file_usage`、`source` 和 `awarded_by`。
+2. 运行 V1→V6 查重和迁移演练，确认 `flyway_schema_history` 到 6，并存在 `idx_resume_status_update`、`sys_file_usage`、`source`、`awarded_by` 和 `biz_resume.version`。
 3. 执行后端全测、显式 Testcontainers、前端 lint/test/build。
 4. 用受保护 env 文件执行生产 Compose config，确认只发布 Caddy 80/443。
 5. 构建并扫描 backend/frontend 镜像，记录不可变 digest。
@@ -79,8 +79,8 @@ Playwright 当前共有 5 个用例。缺少 `E2E_USERNAME/E2E_PASSWORD` 时，3
 
 ## 7. 回滚
 
-- 应用失败：切回上一组已验证镜像，保留 V2-V5 结构；旧应用通常可忽略新增表、列和索引，回滚前仍要核对其读写契约。
-- V2 失败：停写、保留日志和 history，从备份恢复副本或发布新的向前修复迁移；不原地修改 V2。
+- 应用失败：切回上一组已验证镜像，保留 V2-V6 结构；旧应用通常可忽略新增表、列和索引，回滚前仍要核对其读写契约。
+- V2 或 V6 失败：停写、保留日志和 history，从备份恢复副本或发布新的向前修复迁移；不原地修改已执行 migration。
 - 上传回滚：保留上传卷和 `sys_stored_file`，旧应用必须能读取现有路径；对象存储切换需要双读/离线迁移。
 - 邮件故障：停发送入口或降低重试，保留投递状态；不得通过删除状态表无限重发。
 - 定时任务故障：停止调度并保留幂等记录，用新 key 或补偿任务恢复。

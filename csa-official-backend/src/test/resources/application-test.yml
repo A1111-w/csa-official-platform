@@ -16,6 +16,8 @@ csa:
     enabled: false
   cache:
     type: memory
+    warmup:
+      enabled: false
   jwt:
     secret: test-only-jwt-secret-at-least-32-chars
   upload-path: ${java.io.tmpdir}/csa-test-upload/

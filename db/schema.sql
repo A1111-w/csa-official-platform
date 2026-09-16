@@ -298,6 +298,7 @@ CREATE TABLE IF NOT EXISTS biz_resume (
     content       TEXT             NULL               COMMENT '简历内容（Markdown/自我介绍）',
     git_repo_url  VARCHAR(255)     NULL               COMMENT '硬核模式 Git 仓库地址',
     status        INT          NOT NULL DEFAULT 0     COMMENT '状态 0草稿/1待审核/2已通过/3已驳回（ResumeStatusEnum @EnumValue code）',
+    version       BIGINT       NOT NULL DEFAULT 0     COMMENT '审核状态 CAS 版本',
     reject_reason VARCHAR(500)     NULL               COMMENT '驳回原因',
     audit_by      BIGINT           NULL               COMMENT '审核人用户ID（逻辑关联 sys_user.id）',
     audit_time    DATETIME         NULL               COMMENT '审核时间',
@@ -309,7 +310,8 @@ CREATE TABLE IF NOT EXISTS biz_resume (
     -- selectOne 不会因多行抛 TooManyResultsException
     UNIQUE KEY uk_resume_user (user_id),
     -- 部长审核队列按 status 过滤并按 update_time 倒序分页
-    KEY idx_resume_status_update (status, update_time)
+    KEY idx_resume_status_update (status, update_time),
+    KEY idx_resume_user_version (user_id, version)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='简历表';
 
 -- =====================================================================

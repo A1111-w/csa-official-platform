@@ -159,7 +159,7 @@ npm run test:e2e
 ### 2026-08-26 实际结果
 
 - 后端默认全测：2026-08-26 为 174 tests，0 failures，0 errors，1 skipped。
-- 显式 Testcontainers：当前测试目标为 MySQL 8.0.36、Redis 7.2 和 Flyway V1→V5；GitHub Actions `#33010814757` 已在 `fcddab2` 上通过该真实依赖测试。本机 Docker 不可用时仍必须标记为待重跑，不能把远端 CI 结果冒充本机备份恢复或 staging 部署演练。
+- 显式 Testcontainers：当前测试目标为 MySQL 8.0.36、Redis 7.2 和 Flyway V1→V6；本机 Docker 不可用时仍必须标记为待重跑，不能把单元测试结果冒充真实依赖、备份恢复或 staging 部署演练。
 - 前端：干净 `npm ci` 后 Vitest **6 files、12 tests**、lint（0 errors、1 既有 warning）、Next.js 16.3.3 build 全部通过；build 页面生成数据为 **25/25**，完整与 production `npm audit` 为 0 vulnerabilities。
 - CI Redis 修复：不要把“test profile 未激活”当作结论。实际日志已显示 profile 为 `test`；空 `REDIS_HOST` 下失败是测试上下文仍自动创建 Redis 连接工厂。测试 profile 排除 Redis 自动配置，并用 `CsaOfficialApplicationTests` 的 Bean 断言防止回归；生产 Redis 配置不受影响。
 - Compose：缺必填变量按预期失败；临时值展开通过，只有 Caddy 发布端口。
@@ -167,7 +167,7 @@ npm run test:e2e
 
 ## 9. Phase 2 验收与迁移回滚清单
 
-- [x] GitHub Actions `#33010814757` 已验证当前 V1→V5、`idx_resume_status_update`、`sys_file_usage` 和 V5 贡献来源列。
+- [ ] 健康 Docker 或 staging 仍需验证当前 V1→V6、`idx_resume_status_update`、`sys_file_usage`、V5 贡献来源列和 V6 简历审核版本列。
 - [ ] 健康 staging 仍需使用脱敏数据库复演已有库升级、失败回滚与备份恢复；CI 通过不替代该部署演练。
 - [x] 账号邮箱/学号约束、改密、会话吊销、停用和删除申请有测试。
 - [x] 导出 JSON 是白名单，负向断言没有密码、Token 和 storage key。
@@ -182,4 +182,4 @@ npm run test:e2e
 - [x] 到期账号匿名化执行器、审计和单元测试已实现。
 - [ ] 匿名化任务、运营审批/豁免和备份保留仍需在健康 staging 做恢复演练。
 
-Phase 2 数据库回滚原则仍是“应用可回滚、数据库向前兼容”。如果 V2-V5 迁移已经落地，不原地删除列或改写已执行 SQL；先停写、备份、修复并发布新的向前迁移。完整操作入口见 [`runbook.md`](runbook.md)、[`flyway.md`](flyway.md) 和 [`backup-restore.md`](backup-restore.md)。
+Phase 2 数据库回滚原则仍是“应用可回滚、数据库向前兼容”。如果 V2-V6 迁移已经落地，不原地删除列或改写已执行 SQL；先停写、备份、修复并发布新的向前迁移。完整操作入口见 [`runbook.md`](runbook.md)、[`flyway.md`](flyway.md) 和 [`backup-restore.md`](backup-restore.md)。
