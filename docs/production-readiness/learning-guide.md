@@ -30,14 +30,16 @@
 
 ## 7. Redis 对象序列化故障
 
-阅读 `RedisConfig` 和 `UserAccountCacheService`，理解 `auth_user` 缓存为什么能减少每次登录的数据库读取，也理解缓存格式本身是一个运行时契约。
+阅读 `RedisConfig`、`UserDetailsServiceImpl` 和业务缓存实现，理解 Redis
+主要保存验证码、限流、吊销标记及业务读缓存；登录认证当前直查数据库，不依赖
+`auth_user` 账号缓存，从而让已提交的状态、角色和会话版本立即生效。
 
 复现步骤：
 
-1. 启用 `CSA_CACHE_TYPE=redis`，让一个包含 `BigDecimal` 字段的 `User` 写入缓存。
+1. 启用 `CSA_CACHE_TYPE=redis`，让一个包含 `BigDecimal` 字段的业务对象写入缓存。
 2. 用受限的 `BasicPolymorphicTypeValidator` 读取同一条缓存，观察 `java.math.BigDecimal` 被拒绝时登录会变成 500。
 3. 只允许必要的 `java.math`、`java.time`、`java.util` 和本项目包，运行 `RedisConfigSerializerTest`。
-4. 清理隔离 Redis 后连续登录两次：第一次写缓存，第二次命中缓存；再跑 HTTP E2E，确认登录、CSRF 和上传都恢复。
+4. 清理隔离 Redis 后验证业务缓存读写和登录流程；登录认证即使没有账号缓存也必须读取数据库并成功，再跑 HTTP E2E，确认登录、CSRF 和上传都恢复。
 
 这个实验的重点不是“把所有包都放行”。`LaissezFaireSubTypeValidator` 会扩大反序列化边界；生产配置应保持最小白名单，并为实体字段变更准备缓存失效或版本化策略。
 

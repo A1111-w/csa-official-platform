@@ -2,8 +2,9 @@
 
 这份文档的目标是把 CSA Official 从“AI 帮我写过的项目”变成“我能讲清楚、能排错、能继续开发、能写进简历”的项目。
 
-它对应当前项目和学习记录仓库里的训练思路。项目源码根目录是 `D:\CSA-Project`，学习记录仓库是
-`C:\Users\27719\Documents\java康复训练`。文档里的路径、版本和回答必须以当前源码为准，不能沿用旧截图或旧线程答案。
+它对应当前项目和学习记录仓库里的训练思路。项目源码根目录是当前文档所在仓库；
+外部学习记录不属于本仓库的事实来源。文档里的路径、版本和回答必须以当前源码为准，
+不能沿用旧截图或旧线程答案。
 
 ```text
 先看结构
@@ -46,11 +47,11 @@
 1. 重新读取当前任务目标和 `docs/study-and-demo-guide.md`，不能把压缩摘要当成已经完成的证明
 2. 能读取任务历史时，分页读回本任务的原始用户回答和批注；不能读取时，必须使用用户保存的导出文本/附件，并明确记录缺失范围
 3. 重新读取持久化学习记录：
-   C:\Users\27719\Documents\java康复训练\learning-log\day-01-project-overview.md
-   C:\Users\27719\Documents\java康复训练\learning-log\day-02-request-chain.md
-   C:\Users\27719\Documents\java康复训练\learning-log\day-03-unified-response-and-errors.md
+   <external-learning-log>\day-01-project-overview.md
+   <external-learning-log>\day-02-request-chain.md
+   <external-learning-log>\day-03-unified-response-and-errors.md
 4. 如果旧线程有导出文本或附件，完整读取原文，不能只靠压缩摘要转述
-5. 查看 `D:\CSA-Project` 当前分支、commit、`git status` 和相关 diff，避免覆盖用户尚未提交的修改
+5. 查看当前项目分支、commit、`git status` 和相关 diff，避免覆盖用户尚未提交的修改
 6. 对本次涉及的类、方法、接口、版本重新从当前源码取证；历史日志只能证明“当时答过什么”，不能证明现在代码仍然如此
 7. 把每个结论拆成“用户原回答 / 纠正后的理解 / 当前源码证据 / 当前掌握等级”，不能由标准答案倒推用户已经掌握
 8. 修改后搜索整份文档中的旧关键词，再完整回读被改章节，并至少运行一项与改动内容对应的测试或可重复检查
@@ -88,12 +89,12 @@
 
 | 材料 | 覆盖内容 | 使用方式 |
 | --- | --- | --- |
-| `C:\Users\27719\.codex\attachments\369db1ee-4576-4a77-b7e4-13d5707e6b30\pasted-text.txt` | 7 月文档对账、Day 1 初次验收和八个补强问题 | 恢复用户当时的真实回答和“不在材料里”的异议 |
+| `<external-attachment>\pasted-text.txt` | 历史文档对账、Day 1 初次验收和补强问题 | 仅在该外部材料可用时恢复用户当时的真实回答，不能作为当前源码证据 |
 | `learning-log/day-01-project-overview.md` | Day 1 阅读范围、模块理解和当时掌握状态 | 作为历史学习证据，不直接覆盖当前版本和接口 |
 | `learning-log/day-02-request-chain.md` | 重构后的资源列表主链路 | 与当前 `ResourceLibrary`、`ResourceService`、Axios 源码逐箭头复核 |
 | `learning-log/day-03-unified-response-and-errors.md` | 统一返回、MVC 异常、Validation、401/403 和逐题掌握状态 | 压缩后恢复 Day 3 真实验收进度，不把标准答案当作已掌握 |
 | 当前任务中的批注和逐题回答 | Day 1 后半段、Day 2 请求链路、Day 3 异常链路 | 用于区分独立找到、经提示掌握和术语仍混淆的部分 |
-| `D:\CSA-Project` 当前工作区 | 最终事实来源 | 每次以 `git status --short --branch` 和 `git rev-parse HEAD` 重新取证；不把本文件中的旧分支或 commit 当作当前事实 |
+| 当前项目工作区 | 最终事实来源 | 每次以 `git status --short --branch` 和 `git rev-parse HEAD` 重新取证；不把本文件中的旧分支或 commit 当作当前事实 |
 
 历史材料里已经确认存在下列旧口径。它们保留的是学习过程，不能复制回当前答案：
 
@@ -207,7 +208,7 @@ csa-official-frontend/src/app
 当前版本要对得上源码：
 
 ```text
-Spring Boot 3.5.12
+Spring Boot 3.5.14
 Java 17
 MyBatis-Plus 3.5.5
 JJWT 0.12.6
@@ -223,7 +224,7 @@ isomorphic-dompurify 3.18.0
 你要能回答：
 
 1. Spring Boot 版本在哪里查？
-   `csa-official-backend/pom.xml` 的 `<parent><version>`，当前是 `3.5.12`。
+   `csa-official-backend/pom.xml` 的 `<parent><version>`，当前是 `3.5.14`。
 2. Java 版本在哪里查？
    同一个 `pom.xml` 的 `<properties><java.version>`，当前是 `17`。
 3. Next.js、React、React DOM、TypeScript 版本在哪里查？
@@ -261,7 +262,8 @@ isomorphic-dompurify 3.18.0
 7. `CsaOfficialApplication.java` 中三个启动注解各自做什么？
    `@SpringBootApplication` 组合启动配置、自动配置和组件扫描；
    `@MapperScan("com.csa.official.modules.*.mapper")` 扫描 `sys`、`biz`、`resume` 三个模块的 Mapper；
-   `@EnableScheduling` 开启 `@Scheduled` 定时任务，例如 `ContributionTask.settleIntroContribution()`。
+   `SchedulingConfig` 的 `@EnableScheduling` 开启 `@Scheduled` 定时任务，例如
+   `ContributionTask.settleIntroContribution()`；启动类本身不再直接声明该注解。
 
 产出：
 
@@ -316,7 +318,7 @@ csa-official-backend/src/main/java/com/csa/official/config/JwtAuthenticationFilt
 6. **MyBatis-Plus、MySQL、Mapper 的关系是什么？**
    MySQL 保存数据；MyBatis-Plus 是 Java 数据访问框架；Mapper 是 Java 层的数据访问接口，继承 `BaseMapper<T>` 后获得 CRUD，Service 调用 Mapper 最终执行 SQL。
 7. **Redis/内存缓存主要存什么？**
-   至少包括验证码、限流计数、JWT 吊销标记；项目还用 Spring Cache 保存 `auth_user`、部门、公开介绍、贡献墙和轮播图等读缓存，并用缓存实现定时任务锁。
+   至少包括验证码、限流计数、JWT 吊销标记；项目还用 Spring Cache 保存部门、公开介绍、贡献墙和轮播图等读缓存，并用缓存实现定时任务锁。登录认证和 JWT 鉴权会直查数据库中的当前账号状态。
 8. **Spring Security 为什么在 Controller 前？**
    请求先经过 Security Filter Chain；未认证或不满足 URL 规则时可在进入 MVC 前结束。方法级 `@PreAuthorize` 则在 Controller 方法调用前由 Spring AOP 做授权，失败时方法体也不会执行。核心不是单纯“节省资源”，而是建立统一的安全边界。
 
@@ -654,7 +656,7 @@ Day 1–3 是已学习背景。从 Day 4 开始，本指南不再把一串类名
 - 能区分：能分清容易混淆的两个概念，例如认证与授权、Entity 与 VO、前端隐藏与后端鉴权。
 - 能验证：至少亲手跑过一个请求、页面操作或测试，并记录实际结果。
 
-下面所有路径都相对于项目根目录 `D:\CSA-Project`。
+下面所有路径都相对于当前项目根目录 `<project-root>`。
 
 ### Day 4：登录、会话恢复和退出链路
 
@@ -680,7 +682,7 @@ Day 1–3 是已学习背景。从 Day 4 开始，本指南不再把一串类名
 | `HttpOnly` | Cookie 属性。设为 true 后前端 JavaScript 不能读取该 Cookie，可降低 XSS 直接偷取 JWT 的风险。 |
 | Zustand | 前端轻量状态库。这里只保存渲染页面需要的 `username` 和 `roleLevel`，不保存认证 JWT。 |
 | `localStorage` | 浏览器可被 JavaScript 读取的持久化存储。项目只用它持久化 Zustand 的 user 状态，并主动删除旧版 token。 |
-| 缓存 | 把常用查询结果临时保存，减少重复访问数据库。`auth_user` 缓存的是登录查询到的 `User`，不是永久真相；账号修改后必须清缓存。 |
+| 缓存 | 把常用查询结果临时保存，减少重复访问数据库。登录认证不依赖账号缓存，使用当前数据库状态；业务读缓存仍需按对应 Service 的失效规则维护。 |
 | Token 吊销 | JWT 尚未自然过期时，服务端额外记录“这个 Token 不再可用”。退出登录会把当前 Token 标记到剩余有效期结束。 |
 | `sessionVersion` | 用户表和 JWT 里共同保存的会话版本。修改密码或停用账号时可提高数据库版本，使旧 Token 即使签名正确也失效。 |
 
@@ -700,7 +702,7 @@ Day 1–3 是已学习背景。从 Day 4 开始，本指南不再把一串类名
 | `AuthenticationManager` | Spring Security 框架接口，由 `SecurityConfig` 暴露为 Bean | 接收未认证的 `UsernamePasswordAuthenticationToken`，调认证提供者完成用户名密码认证 | `AuthController.login` 调 `authenticate`；框架再找 `UserDetailsService` 和 `PasswordEncoder` |
 | `UsernamePasswordAuthenticationToken` | Spring Security 的 `Authentication` 实现 | 登录前承载用户名密码；认证后也可承载已认证主体和权限 | `login` 创建未认证对象；`JwtAuthenticationFilter` 为后续请求创建已认证对象 |
 | `csa-official-backend/src/main/java/com/csa/official/modules/sys/service/UserDetailsServiceImpl.java` | `UserDetailsService` 的项目实现 | `loadUserByUsername` 根据用户名取 `User`，并包装成 `LoginUser` | `AuthenticationManager` 和 JWT Filter 会调用 |
-| `csa-official-backend/src/main/java/com/csa/official/modules/sys/service/UserAccountCacheService.java` | 账号查询缓存 Service | `findByUsername` 先查 `auth_user` 缓存，未命中才调 `UserMapper`；`evict`/`evictAll` 清缓存 | `UserDetailsServiceImpl` 调它；它再调 `UserMapper` |
+| `csa-official-backend/src/main/java/com/csa/official/modules/sys/service/UserDetailsServiceImpl.java` | 账号认证查询 Service | `loadUserByUsername` 直接用 `UserMapper` 读取当前账号，避免认证依赖过期的缓存快照 | `AuthenticationManager` 和 `JwtAuthenticationFilter` 调它 |
 | `csa-official-backend/src/main/java/com/csa/official/common/security/LoginUser.java` | `UserDetails` 实现类 | 把项目 `User` 适配给 Spring Security；提供密码摘要、账号可用状态和角色权限 | `UserDetailsServiceImpl` 创建；认证框架和 JWT Filter 使用 |
 | `csa-official-backend/src/main/java/com/csa/official/common/util/JwtUtils.java` | JWT 工具组件 | `generateToken` 生成签名 JWT；解析 subject、userId、jti、sessionVersion 和过期时间；启动时检查 secret 至少 32 字节 | `AuthController` 生成；Filter 和吊销 Service 解析 |
 | `csa-official-backend/src/main/java/com/csa/official/common/security/AuthCookieService.java` | Cookie 生命周期 Service | `issueAuth` 写 HttpOnly 认证 Cookie；`issueCsrf` 写非 HttpOnly CSRF Cookie；`clear` 清两者；`resolveToken` 可从 Bearer 或 Cookie 取 Token | `AuthController` 的 login/logout 调用 |
@@ -718,9 +720,9 @@ Day 1–3 是已学习背景。从 Day 4 开始，本指南不再把一串类名
 3. 打开 `axios.ts` 的 `axios.create`：确认 `baseURL`、`timeout` 和 `withCredentials`；再读响应拦截器，确认成功时返回 `payload.data`，而不是完整 `AxiosResponse`。
 4. 打开 `LoginDto`：分清 DTO 是参数对象，`@NotBlank` 是字段规则，`AuthController` 参数上的 `@Valid` 才触发 Bean Validation。
 5. 打开 `AuthController.login`：从 `AccountNormalizer.username` 开始，追到 `authenticationManager.authenticate`。
-6. 顺着框架认证关系读 `UserDetailsServiceImpl.loadUserByUsername` → `UserAccountCacheService.findByUsername` → `UserMapper.selectOne`。
+6. 顺着框架认证关系读 `UserDetailsServiceImpl.loadUserByUsername` → `UserMapper.selectOne`。
 7. 读 `LoginUser.getPassword`、`getAuthorities` 和 `isEnabled`；`PasswordEncoder` 读取数据库 BCrypt 摘要完成比较。不要在 Controller 中寻找手写 `equals`。
-8. 回到 `AuthController.login`：认证成功后把 `Authentication` 放入 `SecurityContext`，再读取 `User`，更新最后登录时间。
+8. 回到 `AuthController.login`：认证成功后把 `Authentication` 放入 `SecurityContext`，写入带 `deferredLastLogin` 标记的登录审计；`LoginTrackingService` 再异步投影最后登录时间。
 9. 读 `JwtUtils.generateToken`：逐个找出 `roleLevel`、`userId`、`sessionVersion`、jti、subject、issuedAt、expiration 和签名。
 10. 读 `AuthCookieService.issueAuth` 与 `issueCsrf`：确认认证 Cookie 的 `httpOnly=true`，CSRF Cookie 的 `httpOnly=false`。
 11. 回到 login 响应：确认响应体没有 `jwt`/`token` 字段，只有 `csrfToken`、`username`、`roleLevel`。
@@ -740,8 +742,8 @@ LoginForm.onSubmit
 → AuthController.login
 → AuthenticationManager.authenticate
 → UserDetailsServiceImpl.loadUserByUsername
-→ UserAccountCacheService.findByUsername
-→ UserMapper.selectOne / auth_user 缓存
+→ UserDetailsServiceImpl.loadUserByUsername
+→ UserMapper.selectOne（当前账号直查）
 → LoginUser 提供密码摘要、账号状态和 authorities
 → PasswordEncoder 比较 BCrypt
 → 返回已认证 Authentication
@@ -793,7 +795,7 @@ authService.logout
 - `AuthCookieService` 能读写 Cookie，但后续请求真正执行认证的是 `JwtAuthenticationFilter`。
 - `JwtAuthenticationFilter` 不负责所有 401。它无法建立认证时通常继续链路，受保护资源最终由 `JwtAuthenticationEntryPoint` 写 401。
 - `HttpOnly` 降低 JavaScript 读取风险，但浏览器仍会自动携带 Cookie，所以 Day 5 还需要 CSRF。
-- `auth_user` 缓存减少重复查库，但修改账号、密码、角色或状态后必须驱逐缓存，否则会继续读旧账号信息。
+- 登录认证不依赖 `auth_user` 缓存；`UserDetailsServiceImpl` 每次读取当前账号状态、密码、角色和会话版本。其它业务缓存仍必须由对应 Service 在写操作后失效。
 
 #### 动手验证
 
@@ -829,7 +831,7 @@ authService.logout
 6. `proxy.ts` 和 `DashboardGuard` 各能证明什么，不能证明什么？
 7. 刷新页面时，哪一个 Filter 把 `Authentication` 写入哪里？
 8. 退出时为什么只清 Cookie 还不够？吊销记录为什么只保存剩余有效期？
-9. `auth_user` 缓存的收益和失效风险分别是什么？
+9. 为什么认证链路要直查当前账号，而其它业务查询仍可以使用缓存？
 10. `MailService` 与 `AsyncMailSender` 为什么拆成两个 Bean？
 
 #### 完成标准
@@ -1713,7 +1715,7 @@ WHERE id = ? AND status = 1
 → sys_dept.leader_id 改成新部长 ID
 → 写 best-effort 审计
 → 事务提交
-→ 清 dept_list、auth_user、public_contributors 缓存
+→ 清 dept_list、public_contributors 缓存
 → 前端重新 loadData 展示新结果
 ```
 
@@ -1728,7 +1730,7 @@ WHERE id = ? AND status = 1
 → 只更新 role_level < CORE_MEMBER 的用户
 → 统一设 roleLevel=2、positionType=1、departmentId=目标部门
 → 记录请求人数和实际更新人数
-→ 清 auth_user、public_contributors 缓存
+→ 清 public_contributors 缓存
 ```
 
 它当前只是 Service 能力，没有对应 Controller 接口和前端按钮。验收时必须明确说“源码有方法，但当前产品入口未接出”。
@@ -1815,7 +1817,7 @@ WHERE proposal_id = 当前提案;
 8. 运行：
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 .\mvnw.cmd "-Dtest=DeptServiceTest,VoteServiceTest,PageUtilsTest" test
 ```
 
@@ -1824,7 +1826,7 @@ cd D:\CSA-Project\csa-official-backend
 1. `DeptController` 和 `DeptService` 各负责什么？为什么不能把任命的多步更新全塞进 Controller？
 2. `appointLeader` 会查询和更新哪些记录？原部长与新部长分别变成什么状态？
 3. `@Transactional(rollbackFor = Exception.class)` 在这条链路中防止哪种半成功状态？
-4. 任命完成后为什么要同时清 `dept_list`、`auth_user`、`public_contributors`？
+4. 任命完成后为什么要同时清 `dept_list`、`public_contributors`？
 5. `batchPromoteToMember` 为什么使用一条条件 UPDATE？哪些用户不会被它降级或覆盖？它当前有没有 HTTP 入口？
 6. `ProposalDto`、`Proposal`、`ProposalVO` 三者分别处在哪一层？
 7. 谁能进入提案接口，谁最终能被 `VoteService` 认定为合法投票人？Root 为什么是一个特殊边界？
@@ -2027,7 +2029,7 @@ Redis 锁解决多个实例同时执行，数据库幂等键解决锁过期、�
 9. 运行：
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 .\mvnw.cmd "-Dtest=AuditServiceTest,AsyncMailSenderTest,ScheduledJobServiceTest" test
 ```
 
@@ -2226,7 +2228,7 @@ npm run test:e2e → playwright test
 后端全部测试：
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 .\mvnw.cmd test
 ```
 
@@ -2246,7 +2248,7 @@ cd D:\CSA-Project\csa-official-backend
 前端：
 
 ```powershell
-cd D:\CSA-Project\csa-official-frontend
+cd <project-root>\csa-official-frontend
 npm test
 npm run lint
 npm run build
@@ -3514,7 +3516,7 @@ CSA 协会智能管理平台
 2. 前端 `src/lib/axios.ts` 不再拼 Bearer Token，只负责 `withCredentials`、CSRF Header、401 跳转和统一错误包装。
 3. `src/proxy.ts` 新增了 `/dashboard` 未登录跳转、CSP nonce、CSP Header 和生产环境 HSTS。
 4. 前端富文本展示和设置预览增加 `isomorphic-dompurify`，后端仍用 Jsoup 做入库清洗，属于前后端双层 XSS 防护。
-5. 登录查询链路新增 `UserAccountCacheService` 的 `auth_user` 缓存；验证码发送改为同步写验证码/限流缓存，再由 `AsyncMailSender` 异步发 SMTP。
+5. 登录查询链路改为 `UserDetailsServiceImpl` 直查数据库，确保已提交的密码、账号状态、角色和会话版本立即生效；验证码发送仍同步写验证码/限流缓存，再由 `AsyncMailSender` 异步发 SMTP。
 6. 竞赛保存接口使用 `SaveCompetitionDto`，权限表达式按 `#dto.id` 区分新建和编辑，title/content 有 `@NotBlank` 校验。
 7. 贡献墙不再在 Controller 里 Java Stream 聚合，而是走 `ContributionLogMapper.selectWall(limit)` 返回 `ContributionWallVO`，limit 被限制在 1-200。
 8. 投票列表新增 size 上限和 createTime 倒序；投票统计用 `VoteTallyVO` 表达同意/反对/总权重。
@@ -3697,7 +3699,7 @@ rg -n "token|Bearer|CSRF|LEVEL_3|LEVEL_4|proxy\\.ts|SWAGGER_ENABLED" README.md d
 实体和建表脚本是否漂移，现在不用靠人肉检查，跑测试就行：
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 .\mvnw.cmd test -Dtest=SchemaConsistencyTest
 ```
 

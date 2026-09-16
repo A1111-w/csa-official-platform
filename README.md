@@ -58,7 +58,7 @@ CSA Official 是一个面向计算机协会的官网与内部管理平台。它�
 ## 目录结构
 
 ```text
-D:\CSA-Project
+<project-root>
 ├─ .github                GitHub 工作流/仓库配置
 ├─ .vscode                编辑器配置
 ├─ csa-official-backend
@@ -527,7 +527,7 @@ docker compose up --build
 后端：
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 Copy-Item .env.example .env
 # 编辑 .env
 .\mvnw.cmd spring-boot:run
@@ -536,7 +536,7 @@ Copy-Item .env.example .env
 前端：
 
 ```powershell
-cd D:\CSA-Project\csa-official-frontend
+cd <project-root>\csa-official-frontend
 npm install
 npm run dev
 ```
@@ -554,14 +554,14 @@ npm run dev
 后端测试：
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 .\mvnw.cmd test
 ```
 
 前端测试、lint 和生产构建：
 
 ```powershell
-cd D:\CSA-Project\csa-official-frontend
+cd <project-root>\csa-official-frontend
 npm ci
 npm run test
 npm run lint
@@ -572,7 +572,7 @@ npm audit --audit-level=high
 真实依赖迁移测试（需要 Docker）：
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 .\mvnw.cmd "-Dit.containers=true" "-Dtest=FlywayMySqlRedisIntegrationTest" test
 ```
 
@@ -593,6 +593,9 @@ cd D:\CSA-Project\csa-official-backend
 
 ## 文档入口
 
+- [当前项目状态](docs/project-status.md)
+- [开发约束与 agent 交付规则](docs/development-constraints.md)
+- [修改记录模板](docs/templates/change-record.md)
 - [本地启动和环境变量](docs/local-dev.md)
 - [接口地图和请求示例](docs/api-map.md)
 - [架构和模块说明](docs/architecture.md)

@@ -31,7 +31,7 @@
 ### 演练
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 .\mvnw.cmd test -Dtest=AccountServiceTest,AccountControllerTest,AuthControllerTest
 ```
 
@@ -136,11 +136,11 @@ UPLOAD_CLEANUP_BATCH_SIZE
 本地快速检查：
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 .\mvnw.cmd test
 .\mvnw.cmd "-Dit.containers=true" "-Dtest=FlywayMySqlRedisIntegrationTest" test
 
-cd D:\CSA-Project\csa-official-frontend
+cd <project-root>\csa-official-frontend
 npm run lint
 npm run test
 npm run build

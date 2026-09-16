@@ -122,7 +122,7 @@ Require-Contains $deniedHandler "ApiErrorCode.ACCESS_DENIED" "403 error code"
 
 Require-Contains $guide "### 0.1" "Compression recovery section"
 Require-Contains $guide "### 0.3" "Historical drift ledger"
-Require-Contains $guide "D:\CSA-Project" "Source priority"
+Require-Contains $guide "<project-root>" "Source priority"
 Require-Contains $guide "MethodArgumentNotValidException" "Validation exception terminology"
 Require-Contains $guide "JwtAuthenticationEntryPoint" "401 terminology"
 Require-Contains $guide "JwtAccessDeniedHandler" "403 terminology"

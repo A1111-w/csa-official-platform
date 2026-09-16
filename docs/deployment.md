@@ -38,6 +38,8 @@ MySQL 容器只负责创建空数据库和独立应用用户。后端启动后�
 csa-official-backend/src/main/resources/db/migration/V1__initial_schema.sql
 csa-official-backend/src/main/resources/db/migration/V2__production_operations.sql
 csa-official-backend/src/main/resources/db/migration/V3__resume_review_queue_index.sql
+csa-official-backend/src/main/resources/db/migration/V4__account_storage_and_git_sync.sql
+csa-official-backend/src/main/resources/db/migration/V5__contribution_award_audit.sql
 ```
 
 `db/seed.sql` 只用于 dev/test 演示。开发 Compose 默认不加载 seed；确实需要演示账号时，运行前临时设置 `DEMO_SEED_ENABLED=true` 和随机生成的 `DEMO_SEED_PASSWORD`。固定口令不得写入 Compose、文档、命令脚本或 Git。

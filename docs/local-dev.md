@@ -5,8 +5,8 @@
 项目分为两个服务：
 
 ```text
-前端：D:\CSA-Project\csa-official-frontend   Next.js，默认端口 3000
-后端：D:\CSA-Project\csa-official-backend    Spring Boot，默认端口 8080
+前端：<project-root>\csa-official-frontend   Next.js，默认端口 3000
+后端：<project-root>\csa-official-backend    Spring Boot，默认端口 8080
 ```
 
 ## 1. 准备环境
@@ -44,7 +44,7 @@ csa-official-backend\mvnw.cmd
 进入后端目录：
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 ```
 
 复制环境变量模板：
@@ -170,7 +170,7 @@ Table 'csa_db.xxx' doesn't exist
 运行：
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 .\mvnw.cmd spring-boot:run
 ```
 
@@ -206,7 +206,7 @@ http://localhost:8080/actuator/health
 运行测试：
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 .\mvnw.cmd test
 ```
 
@@ -236,7 +236,7 @@ BUILD SUCCESS
 进入前端目录：
 
 ```powershell
-cd D:\CSA-Project\csa-official-frontend
+cd <project-root>\csa-official-frontend
 ```
 
 本地联调时 `.env.local` 应该写：
@@ -391,7 +391,7 @@ Could not resolve placeholder 'DB_URL'
 处理：
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 Copy-Item .env.example .env
 ```
 

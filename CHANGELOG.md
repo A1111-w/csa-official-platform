@@ -13,6 +13,21 @@
 
 ## [Unreleased]
 
+### 2026-09-16 项目迁移与 agent 文档治理
+
+- 将实际 CSA 前后端项目及其既有未提交工作迁入当前目录的独立 Git 仓库，
+  迁移证据、文件清单和完整记录见
+  [`docs/change-records/2026-09-16-repository-migration-and-document-governance.md`](docs/change-records/2026-09-16-repository-migration-and-document-governance.md)。
+- 新增 `AGENTS.md`、`agent.md`、`docs/development-constraints.md`、
+  `docs/project-status.md` 和 `docs/templates/change-record.md`，明确每个
+  agent 完成功能必须同步实际文档、验证结果和独立修改记录。
+- 对账并修正 README、本地开发、Docker 部署和 Spec Kit 章程中的项目路径、
+  migration 版本和实际代码链路。
+- 兼容性/数据库：无业务接口、数据库结构或部署变量变更；本次只迁移代码和治理文档。
+- 验证：前端 9 个测试文件/25 个测试、Next.js production build 通过；后端
+  198 tests 通过、2 skipped（本机 Docker 不可用导致真实依赖测试不运行）。
+- 回退：按独立记录回退文档治理变更；不 reset、clean 或覆盖迁入时已有业务修改。
+
 ### Added
 
 - 完成此前模块审计列出的产品缺口：到期账号匿名化、贡献排行、邮件崩溃补偿、上传配额原子计数、简历 Git 同步、首页轮播、审计日志页面和成员导出页面。

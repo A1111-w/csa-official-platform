@@ -146,7 +146,7 @@
 推荐非破坏性回退：
 
 ```powershell
-cd D:\CSA-Project
+cd <project-root>
 git revert f295e24
 ```
 

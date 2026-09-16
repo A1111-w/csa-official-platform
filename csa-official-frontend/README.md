@@ -38,7 +38,7 @@
 ## 本地开发
 
 ```powershell
-cd D:\CSA-Project\csa-official-frontend
+cd <project-root>\csa-official-frontend
 npm install
 npm run dev
 ```

@@ -82,7 +82,7 @@ MySQL 多数 DDL 不具备完整事务回滚能力。标准处理顺序：
 ## 验证命令
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 .\mvnw.cmd test
 .\mvnw.cmd "-Dit.containers=true" "-Dtest=FlywayMySqlRedisIntegrationTest" test
 ```

@@ -150,10 +150,10 @@ SHOW COLUMNS FROM sys_contribution_log LIKE 'awarded_by';
 ## 9. 验证命令
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 .\mvnw.cmd test
 
-cd D:\CSA-Project\csa-official-frontend
+cd <project-root>\csa-official-frontend
 npm run test
 npm run lint
 npm run build
@@ -168,10 +168,10 @@ Git 同步专项测试：
 轮播管理专项测试：
 
 ```powershell
-cd D:\CSA-Project\csa-official-backend
+cd <project-root>\csa-official-backend
 .\mvnw.cmd "-Dtest=CarouselControllerAuthorizationTest,StoredFileControllerTest" test
 
-cd D:\CSA-Project\csa-official-frontend
+cd <project-root>\csa-official-frontend
 npm run test -- src/services/carousel.test.ts src/services/public.test.ts
 npm run test:e2e -- e2e/critical-workflows.spec.ts
 ```

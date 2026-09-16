@@ -110,7 +110,7 @@ packed-project.xml
 | --- | --- | --- |
 | `csa-official-backend\\mvnw.cmd test` | 通过 | 87 tests，0 failures，0 errors，0 skipped；17.787 秒 |
 | `npm run lint` | 通过 | ESLint exit code 0；86.1 秒 |
-| `npm run build` | 通过 | Next.js 16.2.10，18 个静态页面单元，16 个业务路由；137.7 秒 |
+| `npm run build` | 历史证据 | 当时使用 Next.js 16.2.10；当前版本和本次复验结果以 `docs/project-status.md` 为准 |
 | 前端测试 | 缺失 | `package.json` 没有 `test` 脚本 |
 | `docker compose config` | 通过但不满足生产要求 | 当前单文件 Compose 可解析，但包含默认秘密、root 数据库用户，并公开 MySQL/Redis 端口 |
 
