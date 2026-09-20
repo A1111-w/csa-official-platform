@@ -70,13 +70,19 @@ modules
 | --- | --- | --- |
 | `annotation` | 自定义注解 | `RateLimit`、`LogContribution` |
 | `aspect` | 横切逻辑 | `RateLimitAspect`、`ContributionAspect` |
-| `cache` | 缓存抽象、Key/JSON/TTL 策略和启动预热 | `KeyValueStore`、`RedisKeyValueStore`、`MemoryKeyValueStore`、`CacheKeys`、`CacheValueCodec`、`CacheTtlPolicy`、`CacheWarmupRunner` |
+| `cache` | 缓存抽象、公开读 Cache-Aside、Key/JSON/TTL 策略和启动预热 | `KeyValueStore`、`RedisKeyValueStore`、`MemoryKeyValueStore`、`PublicReadCache`、`PublicReadFallback`、`CacheKeys`、`CacheValueCodec`、`CacheTtlPolicy`、`CacheWarmupRunner` |
 | `constant` | 全局常量 | `RoleConsts` |
 | `controller` | 通用接口 | `FileController`、`StoredFileController` |
 | `exception` | 异常 | `CsaException`、`GlobalExceptionHandler` |
 | `result` | 统一返回 | `R<T>` |
 | `security` | 安全辅助 | `CsrfTokenService`、`JwtRevocationService`、`SecurityResponseWriter` |
 | `util` | 工具 | `JwtUtils`、`SecurityUtils`、`PageUtils`（分页参数收敛） |
+
+公开读缓存由 `PublicReadCache` 统一处理，调用方包括 `CompetitionService`、
+`PublicAboutService` 和 `CarouselService`。数据键附加 scope generation；写事务提交后
+更换 generation，使后续请求使用新键。轮播与协会介绍的写逻辑已移到 Service 事务中，
+缓存失效审计通过独立事务记录。Redis 故障时公共 GET 可使用本地短缓存及本地限流，
+认证接口不启用该限流降级。
 
 什么时候放 common：
 

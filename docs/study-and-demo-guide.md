@@ -2577,7 +2577,7 @@ ORDER BY installed_rank;
 当前源码期望依次看到 1、2、3、4、5、6，而不是只到 2 或 3。
 
 7. 只在 dev/test 开启 seed，确认缺少或短于 12 字符的 `DEMO_SEED_PASSWORD` 会拒绝启动。
-8. Docker 可用后显式跑 Testcontainers；确认最新版本断言为 V5，并验证 `idx_resume_status_update`、`sys_file_usage` 和贡献流水的 `source` / `awarded_by` 在真实 MySQL 中存在。
+8. Docker 可用后显式跑 Testcontainers；确认最新版本断言为 V6，并验证 `idx_resume_status_update`、`sys_file_usage`、`biz_resume.version` 和贡献流水的 `source` / `awarded_by` 在真实 MySQL 中存在。
 
 #### 自测题
 

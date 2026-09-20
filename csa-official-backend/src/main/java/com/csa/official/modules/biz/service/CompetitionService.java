@@ -4,9 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.csa.official.common.cache.CacheKeys;
 import com.csa.official.common.cache.CacheTtlPolicy;
-import com.csa.official.common.cache.CacheValueCodec;
 import com.csa.official.common.cache.CachedCompetitionPage;
-import com.csa.official.common.cache.KeyValueStore;
+import com.csa.official.common.cache.PublicReadCache;
 import com.csa.official.common.exception.ApiErrorCode;
 import com.csa.official.common.util.PageUtils;
 import com.csa.official.common.util.SecurityUtils;
@@ -28,8 +27,6 @@ import org.jsoup.safety.Safelist;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Collections;
@@ -37,8 +34,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -50,34 +45,26 @@ public class CompetitionService {
     private static final TypeReference<CachedCompetitionPage> COMPETITION_PAGE_TYPE =
             new TypeReference<>() {
             };
-    private static final long DETAIL_LOCK_SECONDS = 4;
-    private static final int DETAIL_LOCK_RETRIES = 6;
-    private static final long DETAIL_LOCK_WAIT_MILLIS = 50;
 
     private final CompetitionMapper competitionMapper;
     private final CompEditorMapper editorMapper;
     private final UserMapper userMapper;
     private final AuditService auditService;
-    private final KeyValueStore keyValueStore;
-    private final CacheValueCodec cacheValueCodec;
+    private final PublicReadCache publicCache;
     private final CacheTtlPolicy cacheTtlPolicy;
-
-    private volatile long lastCacheWarningAt;
 
     public CompetitionService(
             CompetitionMapper competitionMapper,
             CompEditorMapper editorMapper,
             UserMapper userMapper,
             AuditService auditService,
-            KeyValueStore keyValueStore,
-            CacheValueCodec cacheValueCodec,
+            PublicReadCache publicCache,
             CacheTtlPolicy cacheTtlPolicy) {
         this.competitionMapper = competitionMapper;
         this.editorMapper = editorMapper;
         this.userMapper = userMapper;
         this.auditService = auditService;
-        this.keyValueStore = keyValueStore;
-        this.cacheValueCodec = cacheValueCodec;
+        this.publicCache = publicCache;
         this.cacheTtlPolicy = cacheTtlPolicy;
     }
 
@@ -103,7 +90,7 @@ public class CompetitionService {
             }
         }
 
-        registerCacheInvalidation(comp.getId());
+        publicCache.invalidateAfterCommit("competition", String.valueOf(comp.getId()));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -166,18 +153,18 @@ public class CompetitionService {
     }
 
     public Page<CompetitionListVO> getPublicCompetitionPage(Integer page, Integer size) {
+        if ((page != null && page < 1) || (size != null && (size < 1 || size > PageUtils.MAX_PAGE_SIZE))) {
+            throw new CsaException(ApiErrorCode.BAD_REQUEST, "Invalid public pagination parameters");
+        }
         Page<Competition> pageParam = PageUtils.of(page, size);
-        long generation = readCompetitionListGeneration();
         String cacheKey = CacheKeys.competitionList(
                 Math.toIntExact(pageParam.getCurrent()),
-                Math.toIntExact(pageParam.getSize()),
-                generation);
+                Math.toIntExact(pageParam.getSize()));
+        return toCompetitionPage(publicCache.get("competition", cacheKey, null, COMPETITION_PAGE_TYPE,
+                cacheTtlPolicy.competitionListSeconds(), () -> loadPublicPage(pageParam)));
+    }
 
-        CachedCompetitionPage cached = readCache(cacheKey, COMPETITION_PAGE_TYPE);
-        if (cached != null) {
-            return toCompetitionPage(cached);
-        }
-
+    private CachedCompetitionPage loadPublicPage(Page<Competition> pageParam) {
         Page<Competition> competitionPage = competitionMapper.selectPage(
                 pageParam,
                 new LambdaQueryWrapper<Competition>()
@@ -192,14 +179,7 @@ public class CompetitionService {
         result.setRecords(competitionPage.getRecords().stream()
                 .map(competition -> toCompetitionListVO(competition, false, null, null))
                 .collect(Collectors.toList()));
-        writeCache(cacheKey,
-                new CachedCompetitionPage(
-                        result.getCurrent(),
-                        result.getSize(),
-                        result.getTotal(),
-                        result.getRecords()),
-                cacheTtlPolicy.competitionListSeconds());
-        return result;
+        return new CachedCompetitionPage(result.getCurrent(), result.getSize(), result.getTotal(), result.getRecords());
     }
 
     private boolean canGrantEditor(Competition competition, Long operatorId) {
@@ -238,54 +218,13 @@ public class CompetitionService {
      */
     public CompetitionDetailVO getPublicCompetitionDetail(Long id) {
         requireValidPublicId(id);
-
-        CompetitionDetailVO cached = readCache(CacheKeys.competitionDetail(id), CompetitionDetailVO.class);
-        if (cached != null) {
-            return cached;
-        }
-        if (hasCacheMarker(CacheKeys.competitionDetailNull(id))) {
+        CompetitionDetailVO detail = publicCache.get("competition", CacheKeys.competitionDetail(id),
+                CacheKeys.competitionDetailNull(id), new TypeReference<CompetitionDetailVO>() {},
+                cacheTtlPolicy.competitionDetailSeconds(), () -> loadPublicDetail(id));
+        if (detail == null) {
             throw notFound();
         }
-
-        String lockKey = CacheKeys.competitionDetailLock(id);
-        String lockToken = UUID.randomUUID().toString();
-        LockAttempt lockAttempt = tryAcquireLock(lockKey, lockToken);
-        if (lockAttempt == LockAttempt.ACQUIRED) {
-            try {
-                // Another request may have rebuilt the value between the first
-                // miss and SETNX; never query MySQL before this second check.
-                CompetitionDetailVO secondCheck = readCache(CacheKeys.competitionDetail(id),
-                        CompetitionDetailVO.class);
-                if (secondCheck != null) {
-                    return secondCheck;
-                }
-                if (hasCacheMarker(CacheKeys.competitionDetailNull(id))) {
-                    throw notFound();
-                }
-                return loadAndCachePublicDetail(id);
-            } finally {
-                releaseLock(lockKey, lockToken);
-            }
-        }
-
-        if (lockAttempt == LockAttempt.UNAVAILABLE) {
-            return loadAndCachePublicDetail(id);
-        }
-
-        for (int attempt = 0; attempt < DETAIL_LOCK_RETRIES; attempt++) {
-            sleepBeforeRetry();
-            CompetitionDetailVO rebuilt = readCache(CacheKeys.competitionDetail(id),
-                    CompetitionDetailVO.class);
-            if (rebuilt != null) {
-                return rebuilt;
-            }
-            if (hasCacheMarker(CacheKeys.competitionDetailNull(id))) {
-                throw notFound();
-            }
-        }
-
-        throw new CsaException(ApiErrorCode.SERVICE_UNAVAILABLE,
-                "Competition detail is being rebuilt; please retry");
+        return detail;
     }
 
     private Competition requireCompetition(Long id) {
@@ -299,18 +238,13 @@ public class CompetitionService {
         return competition;
     }
 
-    private CompetitionDetailVO loadAndCachePublicDetail(Long id) {
+    private CompetitionDetailVO loadPublicDetail(Long id) {
         Competition competition = competitionMapper.selectById(id);
         if (competition == null || competition.getStatus() == CompetitionStatusEnum.UNPUBLISHED) {
-            writeCache(CacheKeys.competitionDetailNull(id),
-                    CacheValueCodec.NULL_MARKER,
-                    cacheTtlPolicy.competitionNullSeconds());
-            throw notFound();
+            return null;
         }
 
-        CompetitionDetailVO detail = toCompetitionDetailVO(competition, false, null, null);
-        writeCache(CacheKeys.competitionDetail(id), detail, cacheTtlPolicy.competitionDetailSeconds());
-        return detail;
+        return toCompetitionDetailVO(competition, false, null, null);
     }
 
     private void requireValidPublicId(Long id) {
@@ -323,160 +257,12 @@ public class CompetitionService {
         return new CsaException(ApiErrorCode.RESOURCE_NOT_FOUND, "Competition not found");
     }
 
-    private LockAttempt tryAcquireLock(String lockKey, String lockToken) {
-        try {
-            return keyValueStore.setIfAbsent(lockKey, lockToken, DETAIL_LOCK_SECONDS, TimeUnit.SECONDS)
-                    ? LockAttempt.ACQUIRED
-                    : LockAttempt.BUSY;
-        } catch (RuntimeException e) {
-            warnCacheUnavailable("lock acquisition", e);
-            // Redis failure must not make a public read impossible. The
-            // bounded cache path falls back to MySQL without pretending a hit.
-            return LockAttempt.UNAVAILABLE;
-        }
-    }
-
-    private void releaseLock(String lockKey, String lockToken) {
-        try {
-            keyValueStore.deleteIfValue(lockKey, lockToken);
-        } catch (RuntimeException e) {
-            warnCacheUnavailable("lock release", e);
-        }
-    }
-
-    private void sleepBeforeRetry() {
-        try {
-            Thread.sleep(DETAIL_LOCK_WAIT_MILLIS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new CsaException(ApiErrorCode.SERVICE_UNAVAILABLE,
-                    "Competition detail rebuild was interrupted");
-        }
-    }
-
-    private long readCompetitionListGeneration() {
-        try {
-            String value = keyValueStore.getString(CacheKeys.COMPETITION_LIST_GENERATION);
-            if (value == null) {
-                keyValueStore.setIfAbsent(
-                        CacheKeys.COMPETITION_LIST_GENERATION,
-                        "0",
-                        365,
-                        TimeUnit.DAYS);
-                return 0;
-            }
-            return Long.parseLong(value);
-        } catch (RuntimeException e) {
-            warnCacheUnavailable("list generation read", e);
-            return 0;
-        }
-    }
-
-    private <T> T readCache(String key, Class<T> type) {
-        try {
-            String value = keyValueStore.getString(key);
-            if (value == null || CacheValueCodec.NULL_MARKER.equals(value)) {
-                return null;
-            }
-            return cacheValueCodec.read(value, type);
-        } catch (RuntimeException e) {
-            warnCacheUnavailable("cache read for " + key, e);
-            return null;
-        }
-    }
-
-    private <T> T readCache(String key, TypeReference<T> type) {
-        try {
-            String value = keyValueStore.getString(key);
-            if (value == null || CacheValueCodec.NULL_MARKER.equals(value)) {
-                return null;
-            }
-            return cacheValueCodec.read(value, type);
-        } catch (RuntimeException e) {
-            warnCacheUnavailable("cache read for " + key, e);
-            return null;
-        }
-    }
-
-    private boolean hasCacheMarker(String key) {
-        try {
-            return CacheValueCodec.NULL_MARKER.equals(keyValueStore.getString(key));
-        } catch (RuntimeException e) {
-            warnCacheUnavailable("null cache read for " + key, e);
-            return false;
-        }
-    }
-
-    private void writeCache(String key, Object value, long ttlSeconds) {
-        try {
-            String encoded = value instanceof String stringValue
-                    ? stringValue
-                    : cacheValueCodec.write(value);
-            keyValueStore.setString(key, encoded, ttlSeconds, TimeUnit.SECONDS);
-        } catch (RuntimeException e) {
-            warnCacheUnavailable("cache write for " + key, e);
-        }
-    }
-
-    private void invalidateCompetitionCaches(Long competitionId) {
-        try {
-            keyValueStore.increment(CacheKeys.COMPETITION_LIST_GENERATION);
-            if (competitionId != null) {
-                keyValueStore.delete(CacheKeys.competitionDetail(competitionId));
-                keyValueStore.delete(CacheKeys.competitionDetailNull(competitionId));
-            }
-            auditService.recordBestEffort(
-                    "CACHE_INVALIDATION",
-                    "COMPETITION",
-                    competitionId == null ? null : String.valueOf(competitionId),
-                    "SUCCESS",
-                    null,
-                    Map.of("cacheVersion", CacheKeys.VERSION, "scope", "public-competition"));
-        } catch (RuntimeException e) {
-            warnCacheUnavailable("cache invalidation", e);
-            auditService.recordBestEffort(
-                    "CACHE_INVALIDATION",
-                    "COMPETITION",
-                    competitionId == null ? null : String.valueOf(competitionId),
-                    "FAILED",
-                    null,
-                    Map.of("cacheVersion", CacheKeys.VERSION, "scope", "public-competition"));
-        }
-    }
-
-    private void registerCacheInvalidation(Long competitionId) {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    invalidateCompetitionCaches(competitionId);
-                }
-            });
-        } else {
-            invalidateCompetitionCaches(competitionId);
-        }
-    }
-
     private Page<CompetitionListVO> toCompetitionPage(CachedCompetitionPage cached) {
         Page<CompetitionListVO> page = new Page<>(cached.current(), cached.size(), cached.total());
         page.setRecords(cached.records() == null ? List.of() : cached.records());
         return page;
     }
 
-    private synchronized void warnCacheUnavailable(String operation, RuntimeException exception) {
-        long now = System.currentTimeMillis();
-        if (now - lastCacheWarningAt < 60_000) {
-            return;
-        }
-        lastCacheWarningAt = now;
-        log.warn("Competition cache unavailable during {}; falling back to database", operation, exception);
-    }
-
-    private enum LockAttempt {
-        ACQUIRED,
-        BUSY,
-        UNAVAILABLE
-    }
 
     /**
      * 把富文本正文压成纯文本摘要。

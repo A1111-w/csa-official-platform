@@ -4,21 +4,16 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.csa.official.common.constant.RoleConsts;
 import com.csa.official.common.result.R;
 import com.csa.official.common.util.PageUtils;
-import com.csa.official.common.util.SecurityUtils;
+import com.csa.official.common.annotation.RateLimit;
 import com.csa.official.modules.sys.entity.Dept;
-import com.csa.official.modules.sys.entity.SysConfig;
 import com.csa.official.modules.sys.entity.User;
 import com.csa.official.modules.sys.mapper.DeptMapper;
-import com.csa.official.modules.sys.mapper.SysConfigMapper;
 import com.csa.official.modules.sys.mapper.UserMapper;
-import com.csa.official.modules.sys.service.AuditService;
+import com.csa.official.modules.sys.service.PublicAboutService;
 import com.csa.official.modules.sys.vo.PrivacyNoticeVO;
 import lombok.Data;
-import org.jsoup.Jsoup;
-import org.jsoup.safety.Safelist;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -34,18 +29,12 @@ import java.util.stream.Collectors;
 @RequestMapping("/api")
 public class PublicController {
 
-    private static final Safelist ABOUT_CONTENT_SAFELIST = Safelist.basicWithImages()
-            .addTags("h1", "h2", "h3", "blockquote", "pre", "code")
-            .addAttributes("a", "target", "rel");
-
     @Autowired
-    private SysConfigMapper configMapper;
+    private PublicAboutService aboutService;
     @Autowired
     private UserMapper userMapper;
     @Autowired
     private DeptMapper deptMapper;
-    @Autowired
-    private AuditService auditService;
 
     @Value("${csa.privacy.current-version:2026-01}")
     private String privacyVersion;
@@ -62,11 +51,9 @@ public class PublicController {
      * 获取协会介绍 (公开)
      */
     @GetMapping("/public/about")
-    @Cacheable(value = "public_about", key = "'content'")
+    @RateLimit(key = "public_about", time = 60, count = 120, publicReadFallback = true)
     public R<String> getAbout() {
-        SysConfig config = configMapper.selectOne(new LambdaQueryWrapper<SysConfig>()
-                .eq(SysConfig::getConfigKey, "CSA_INTRO"));
-        return R.ok(config != null ? config.getConfigValue() : "");
+        return R.ok(aboutService.getAbout());
     }
 
     /**
@@ -74,27 +61,8 @@ public class PublicController {
      */
     @PreAuthorize("hasRole('LEVEL_4')")
     @PostMapping("/sys/config/update-about")
-    @CacheEvict(value = "public_about", allEntries = true)
     public R<String> updateAbout(@RequestBody ConfigDto dto) {
-        String safeContent = Jsoup.clean(dto.getContent() == null ? "" : dto.getContent(), ABOUT_CONTENT_SAFELIST);
-        SysConfig config = configMapper.selectOne(new LambdaQueryWrapper<SysConfig>()
-                .eq(SysConfig::getConfigKey, "CSA_INTRO"));
-
-        if (config == null) {
-            config = new SysConfig();
-            config.setConfigKey("CSA_INTRO");
-            config.setDescription("协会介绍");
-            config.setConfigValue(safeContent);
-            configMapper.insert(config);
-            auditService.recordBestEffort("CONFIG_UPDATE", "SYSTEM_CONFIG", "CSA_INTRO",
-                    "SUCCESS", null, Map.of("contentLength", safeContent.length()));
-        } else {
-            config.setConfigValue(safeContent);
-            config.setUpdateBy(SecurityUtils.getUserId());
-            configMapper.updateById(config);
-            auditService.recordBestEffort("CONFIG_UPDATE", "SYSTEM_CONFIG", "CSA_INTRO",
-                    "SUCCESS", null, Map.of("contentLength", safeContent.length()));
-        }
+        aboutService.updateAbout(dto.getContent());
         return R.ok("更新成功");
     }
 

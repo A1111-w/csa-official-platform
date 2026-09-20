@@ -1,7 +1,6 @@
 package com.csa.official.common.cache;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
@@ -66,18 +65,12 @@ public class RedisKeyValueStore implements KeyValueStore {
             return null;
         }
 
-        if (!looksLikeLegacyJson(value)) {
+        if (key.startsWith("csa:public:") || !looksLikeLegacyJson(value)) {
             return value;
         }
 
-        Object legacyValue = stringRedisTemplate.execute((RedisCallback<Object>) connection -> {
-            byte[] keyBytes = stringRedisTemplate.getStringSerializer().serialize(key);
-            if (keyBytes == null) {
-                return null;
-            }
-            byte[] rawValue = connection.get(keyBytes);
-            return rawValue == null ? null : legacyValueSerializer.deserialize(rawValue);
-        });
+        // Decode the value already read, avoiding a second GET racing with expiry.
+        Object legacyValue = legacyValueSerializer.deserialize(value.getBytes(StandardCharsets.UTF_8));
         return legacyValue == null ? value : stringify(legacyValue);
     }
 

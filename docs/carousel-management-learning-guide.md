@@ -45,7 +45,7 @@
 → CarouselSaveRequest 白名单校验
 → 图片归属/类型与 URL 校验
 → insert 或 updateManagedFields
-→ 清 public_carousel 缓存
+→ 事务提交后更换 carousel generation
 → CAROUSEL_SAVE 审计 + OPS 自动贡献
 → 页面重新加载管理列表
 ```
@@ -109,8 +109,8 @@
 
 ## 6. 缓存、审计和删除
 
-- 公开列表缓存名为 `public_carousel`。
-- 保存和删除都使用 `@CacheEvict(allEntries = true)`，下一次首页读取会重新查库。
+- 公开列表由 `CarouselService` 通过 `PublicReadCache` 读取，数据键为 `csa:public:carousel:active:v2:g{generation}`。
+- 保存和删除在 Service 事务提交后更换 carousel generation，后续首页读取使用新一代缓存；回滚不会触发失效。
 - 保存记录 `CAROUSEL_SAVE`，删除记录 `CAROUSEL_DELETE`。
 - 删除使用既有 MyBatis-Plus 逻辑删除，不物理删除 `sys_carousel` 行。
 - 孤儿文件清理 SQL会检查未删除轮播引用；轮播删除或换图后，旧上传文件经过宽限期才有资格被清理。

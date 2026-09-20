@@ -21,7 +21,7 @@ public class PublicCompetitionController {
     private CompetitionService competitionService;
 
     @GetMapping
-    @RateLimit(key = "public_competition_list", time = 60, count = 120)
+    @RateLimit(key = "public_competition_list", time = 60, count = 120, publicReadFallback = true)
     public R<Page<CompetitionListVO>> list(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(required = false) Integer size) {
@@ -32,7 +32,7 @@ public class PublicCompetitionController {
      * 公开竞赛详情。未发布的竞赛在这里会返回 404，不会泄露给未登录用户。
      */
     @GetMapping("/{id}")
-    @RateLimit(key = "public_competition_detail", time = 60, count = 120, identifiers = {"id"})
+    @RateLimit(key = "public_competition_detail", time = 60, count = 120, publicReadFallback = true)
     public R<CompetitionDetailVO> detail(@PathVariable Long id) {
         return R.ok(competitionService.getPublicCompetitionDetail(id));
     }

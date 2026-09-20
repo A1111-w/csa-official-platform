@@ -157,9 +157,11 @@ V2 还会增加 `sys_audit_log`、`sys_stored_file`、`sys_mail_delivery` 和
 `sys_scheduled_job_execution` 四张运营表；它们由 Flyway 迁移创建，不由本地手工 DDL 维护。
 V3 为简历审核队列增加索引，V4 新增 `sys_file_usage` 原子配额计数表并补齐账号匿名化、邮件恢复和简历 Git 同步字段，V5 补齐贡献来源和操作人字段，V6 为 `biz_resume.version` 增加审核状态 CAS。当前完整版本链和升级规则以 [`production-readiness/flyway.md`](production-readiness/flyway.md) 为准。
 
-公开竞赛接口使用独立的版本化 JSON Cache-Aside。默认会在应用 ready 后预热第一页；
+协会介绍、启用轮播和公开竞赛接口使用版本化 JSON Cache-Aside。默认会在应用 ready 后
+分别预热协会介绍、启用轮播和竞赛第一页；
 预热失败不会阻断启动。可通过 `CACHE_WARMUP_ENABLED=false` 关闭预热。详情不存在或未发布
-时写入短 TTL 空值标记，热点回源使用带随机 token 的 `SETNX` 锁和安全释放。
+时写入短 TTL 空值标记，热点回源使用带随机 token 的 `SETNX` 锁和安全释放。Redis 暂时不可用时，
+公开读使用 2 秒进程内短缓存；这只适合单实例降级，不能替代生产 Redis。
 
 如果启动时看到类似：
 

@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -88,12 +89,15 @@ public class ResumeService {
                 resume.setStatus(ResumeStatusEnum.DRAFT);
             }
 
-            if (resume.getStatus() == ResumeStatusEnum.PENDING) {
+            ResumeStatusEnum expectedStatus = resume.getStatus() == null
+                    ? ResumeStatusEnum.DRAFT
+                    : resume.getStatus();
+            if (expectedStatus == ResumeStatusEnum.PENDING) {
                 throw new CsaException(ApiErrorCode.CONFLICT, "Resume is under review and cannot be edited");
             }
 
-            if (resume.getStatus() == ResumeStatusEnum.APPROVED
-                    || resume.getStatus() == ResumeStatusEnum.REJECTED) {
+            if (expectedStatus == ResumeStatusEnum.APPROVED
+                    || expectedStatus == ResumeStatusEnum.REJECTED) {
                 resume.setStatus(ResumeStatusEnum.DRAFT);
                 resume.setRejectReason(null);
                 resume.setAuditBy(null);
@@ -101,17 +105,54 @@ public class ResumeService {
             }
 
             boolean gitUrlChanged = !Objects.equals(resume.getGitRepoUrl(), normalizedGitUrl);
-            resume.setContent(normalizedContent);
-            resume.setGitRepoUrl(normalizedGitUrl);
+            long version = resume.getVersion() == null ? 0L : resume.getVersion();
             if (gitUrlChanged) {
-                resetGitSync(resume);
+                resume.setGitSyncStatus("NOT_SYNCED");
+                resume.setGitSyncRunId(null);
+                resume.setGitSyncStartedAt(null);
+                resume.setGitSyncCompletedAt(null);
+                resume.setGitSyncErrorCode(null);
+                resume.setGitSyncBranch(null);
+                resume.setGitSyncCommit(null);
+                resume.setGitSyncSizeBytes(null);
             }
 
             if (resume.getId() == null) {
+                resume.setContent(normalizedContent);
+                resume.setGitRepoUrl(normalizedGitUrl);
+                resume.setVersion(0L);
                 resumeMapper.insert(resume);
             } else {
-                resumeMapper.updateById(resume);
+                LambdaUpdateWrapper<Resume> update = new LambdaUpdateWrapper<Resume>()
+                        .set(Resume::getContent, normalizedContent)
+                        .set(Resume::getGitRepoUrl, normalizedGitUrl)
+                        .set(Resume::getStatus, ResumeStatusEnum.DRAFT)
+                        .set(Resume::getRejectReason, null)
+                        .set(Resume::getAuditBy, null)
+                        .set(Resume::getAuditTime, null)
+                        .set(Resume::getVersion, version + 1)
+                        .set(Resume::getUpdateTime, LocalDateTime.now())
+                        .eq(Resume::getId, resume.getId())
+                        .eq(Resume::getUserId, userId)
+                        .eq(Resume::getStatus, expectedStatus)
+                        .eq(Resume::getVersion, version);
+                if (gitUrlChanged) {
+                    update.set(Resume::getGitSyncStatus, "NOT_SYNCED")
+                            .set(Resume::getGitSyncRunId, null)
+                            .set(Resume::getGitSyncStartedAt, null)
+                            .set(Resume::getGitSyncCompletedAt, null)
+                            .set(Resume::getGitSyncErrorCode, null)
+                            .set(Resume::getGitSyncBranch, null)
+                            .set(Resume::getGitSyncCommit, null)
+                            .set(Resume::getGitSyncSizeBytes, null);
+                }
+                if (resumeMapper.update(null, update) != 1) {
+                    throw new CsaException(ApiErrorCode.CONFLICT,
+                            "Resume state changed; refresh and retry");
+                }
             }
+        } catch (DuplicateKeyException e) {
+            throw new CsaException(ApiErrorCode.CONFLICT, "Resume already exists; refresh and retry");
         } finally {
             if (!releaseAfterTransaction) {
                 releaseLock(lockKey, lockToken);
@@ -121,32 +162,44 @@ public class ResumeService {
 
     @Transactional(rollbackFor = Exception.class)
     public void submitForAudit(Long userId) {
-        Resume resume = getMyResume(userId);
-        if (resume == null) {
-            throw new CsaException(HttpStatus.NOT_FOUND.value(), "Resume not found");
+        String lockKey = "lock:resume:user:" + userId;
+        String lockToken = UUID.randomUUID().toString();
+        if (!keyValueStore.setIfAbsent(lockKey, lockToken, 30, TimeUnit.SECONDS)) {
+            throw new CsaException(ApiErrorCode.CONFLICT, "Resume is being updated; please retry");
         }
 
-        if (resume.getStatus() == ResumeStatusEnum.PENDING) {
-            throw new CsaException(ApiErrorCode.CONFLICT, "Resume is already pending review");
-        }
+        boolean releaseAfterTransaction = registerLockRelease(lockKey, lockToken);
+        try {
+            Resume resume = getMyResume(userId);
+            if (resume == null) {
+                throw new CsaException(HttpStatus.NOT_FOUND.value(), "Resume not found");
+            }
+            if (resume.getStatus() != ResumeStatusEnum.DRAFT) {
+                throw new CsaException(ApiErrorCode.CONFLICT, "Only draft resumes can be submitted");
+            }
+            if (!StringUtils.hasText(resume.getContent()) && !StringUtils.hasText(resume.getGitRepoUrl())) {
+                throw new CsaException(ApiErrorCode.BAD_REQUEST, "Resume content or Git repository URL is required");
+            }
 
-        if (!StringUtils.hasText(resume.getContent()) && !StringUtils.hasText(resume.getGitRepoUrl())) {
-            throw new CsaException(ApiErrorCode.BAD_REQUEST, "Resume content or Git repository URL is required");
-        }
-
-        long version = resume.getVersion() == null ? 0L : resume.getVersion();
-        int updated = resumeMapper.update(null, new LambdaUpdateWrapper<Resume>()
-                .set(Resume::getStatus, ResumeStatusEnum.PENDING)
-                .set(Resume::getRejectReason, null)
-                .set(Resume::getAuditBy, null)
-                .set(Resume::getAuditTime, null)
-                .set(Resume::getVersion, version + 1)
-                .eq(Resume::getId, resume.getId())
-                .eq(Resume::getUserId, userId)
-                .eq(Resume::getStatus, resume.getStatus())
-                .eq(Resume::getVersion, version));
-        if (updated <= 0) {
-            throw new CsaException(ApiErrorCode.CONFLICT, "Resume state changed; refresh and retry");
+            long version = resume.getVersion() == null ? 0L : resume.getVersion();
+            int updated = resumeMapper.update(null, new LambdaUpdateWrapper<Resume>()
+                    .set(Resume::getStatus, ResumeStatusEnum.PENDING)
+                    .set(Resume::getRejectReason, null)
+                    .set(Resume::getAuditBy, null)
+                    .set(Resume::getAuditTime, null)
+                    .set(Resume::getVersion, version + 1)
+                    .set(Resume::getUpdateTime, LocalDateTime.now())
+                    .eq(Resume::getId, resume.getId())
+                    .eq(Resume::getUserId, userId)
+                    .eq(Resume::getStatus, ResumeStatusEnum.DRAFT)
+                    .eq(Resume::getVersion, version));
+            if (updated != 1) {
+                throw new CsaException(ApiErrorCode.CONFLICT, "Resume state changed; refresh and retry");
+            }
+        } finally {
+            if (!releaseAfterTransaction) {
+                releaseLock(lockKey, lockToken);
+            }
         }
     }
 
@@ -220,6 +273,7 @@ public class ResumeService {
                 .set(Resume::getAuditBy, ministerId)
                 .set(Resume::getAuditTime, LocalDateTime.now())
                 .set(Resume::getVersion, version + 1)
+                .set(Resume::getUpdateTime, LocalDateTime.now())
                 .eq(Resume::getId, resumeId)
                 .eq(Resume::getStatus, ResumeStatusEnum.PENDING)
                 .eq(Resume::getVersion, version));
@@ -227,12 +281,17 @@ public class ResumeService {
             throw new CsaException(ApiErrorCode.CONFLICT, "Resume review state changed; refresh and retry");
         }
 
+        Map<String, Object> auditDetails = new java.util.LinkedHashMap<>();
+        auditDetails.put("previousStatus", ResumeStatusEnum.PENDING.name());
+        auditDetails.put("decision", decision.name());
+        auditDetails.put("subjectUserId", resume.getUserId());
+        auditDetails.put("reviewerUserId", ministerId);
+        auditDetails.put("reviewedAt", LocalDateTime.now());
+        if (normalizedReason != null) {
+            auditDetails.put("reason", normalizedReason);
+        }
         auditService.recordBestEffort("RESUME_REVIEW", "RESUME", String.valueOf(resumeId),
-                "SUCCESS", null, Map.of(
-                        "previousStatus", ResumeStatusEnum.PENDING.name(),
-                        "decision", decision.name(),
-                        "subjectUserId", resume.getUserId(),
-                        "reviewerUserId", ministerId));
+                "SUCCESS", null, auditDetails);
     }
 
     static String buildContentSummary(String content) {

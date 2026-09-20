@@ -1,15 +1,16 @@
 # 当前项目状态
 
-核对日期：2026-09-16（Asia/Shanghai）
+核对日期：2026-09-20（Asia/Shanghai）
 
 ## 项目身份
 
 - 项目：CSA Official 计算机协会官网与协会管理平台。
 - 当前路径：`C:\Users\Administrator\Documents\ChatGPT\计算机协会`。
 - Git 根目录：当前路径。
-- Git 元数据：当前路径下独立的 `.git`，没有远程仓库。
+- Git 元数据：当前路径下独立的 `.git`。
+- GitHub 远程：`origin` 指向 `https://github.com/A1111-w/csa-official-platform.git`；2026-09-20 已核对远程保留迁移前提交 `fb1a2f9`。
 - 当前分支：`codex/development`。
-- 当前基线：`fb1a2f9`（轮播管理工作流完成后的 CSA 历史）。
+- 迁入基线：`fb1a2f9`（轮播管理工作流完成后的 CSA 历史）；后续提交以 Git log 为准。
 - 主体代码：`csa-official-backend/`（Spring Boot 3.5.14 / Java 17）和
   `csa-official-frontend/`（Next.js 16.3.3 / React 19.2.4）。
 
@@ -46,13 +47,25 @@
 | 前端 Vitest | 9 个测试文件、25 个测试通过 |
 | 前端 ESLint | 0 个错误，1 条既有 `window.location.href` warning |
 | 前端 Next.js production build | 通过，生成 26 个页面 |
-| 后端 Maven test | 198 tests，0 failures，0 errors，2 skipped |
-| 后端 skipped | 1 个 Docker/Testcontainers 集成测试因本机无可用 Docker；另 1 项由测试配置跳过 |
+| 后端 Maven test（2026-09-19，本轮） | 216 个用例；214 个实际执行通过，0 failures，0 errors，2 skipped |
+| 后端 skipped | `FlywayMySqlRedisIntegrationTest` 因本机无可用 Docker；`LoginTrackingMapperTest` 因未配置 `CSA_LOCAL_MYSQL_TEST_URL` |
 | Spec Kit integration | OK，Codex integration 完整 |
-| 生产/真实依赖 | 未由本次本机验证；需要健康 Docker 或 staging |
+| 生产/真实依赖 | 本轮未验证；V1-V6、真实 MySQL/Redis、备份恢复和 staging 仍需健康环境 |
+
+2026-09-19 还通过了以下后端验证：定向缓存、竞赛和简历测试；`-DskipTests test-compile`；
+以及 `git diff --check`。V6 集成测试代码已经包含最新版本、简历
+版本列和索引、CAS 更新、投票唯一约束及 Redis `SETNX` 断言，但因 Docker 不可用
+没有把这些断言写成真实依赖已通过。前端 9 个测试文件/25 个测试、lint 和生产构建
+仍沿用迁移阶段的独立记录，不冒充本轮前端重跑结果。
 
 历史 CI、远程 staging 和生产恢复记录保留在
 `docs/production-readiness/`，不能替代当前工作区验证。
+
+2026-09-20 的分支提交范围与独立快照验证见
+[GitHub 交付记录](change-records/2026-09-20-github-delivery.md)。上述 216 个用例来自
+2026-09-19 整个工作区，包含未随公共缓存功能提交的历史修改。
+2026-09-20 仅包含本次提交内容的快照测试为 203 个用例、202 通过、1 个 Docker
+集成测试跳过，0 失败/错误；没有用未暂存改动补齐提交依赖。
 
 ## 后续开发入口
 

@@ -8,16 +8,25 @@ package com.csa.official.common.cache;
  */
 public final class CacheKeys {
 
-    public static final String VERSION = "v1";
-    public static final String COMPETITION_LIST_GENERATION =
-            "csa:public:competition:list:generation:" + VERSION;
+    public static final String VERSION = "v2";
 
     private CacheKeys() {
     }
 
-    public static String competitionList(int page, int size, long generation) {
-        return "csa:public:competition:list:" + page + ":" + size + ":public:" + VERSION
-                + ":g" + generation;
+    public static String generation(String scope) {
+        return "csa:public:" + scope + ":generation:" + VERSION;
+    }
+
+    public static String about() {
+        return "csa:public:about:" + VERSION;
+    }
+
+    public static String carousel() {
+        return "csa:public:carousel:active:" + VERSION;
+    }
+
+    public static String competitionList(int page, int size) {
+        return "csa:public:competition:list:" + page + ":" + size + ":public:" + VERSION;
     }
 
     public static String competitionDetail(long id) {

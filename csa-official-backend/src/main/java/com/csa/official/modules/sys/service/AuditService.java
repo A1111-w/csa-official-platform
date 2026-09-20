@@ -11,6 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -79,6 +81,11 @@ public class AuditService {
             log.error("Audit write failed: action={}, targetType={}, requestId={}",
                     action, targetType, TraceContext.currentTraceId(), e);
         }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordCacheInvalidation(String scope, String targetId, String result, Map<String, ?> details) {
+        record("CACHE_INVALIDATION", scope, targetId, result, null, details);
     }
 
     private void validateDetails(Map<String, ?> details) {

@@ -13,6 +13,42 @@
 
 ## [Unreleased]
 
+### 20260920-github-delivery | GitHub 提交整理
+
+- 日期：2026-09-20（Asia/Shanghai）；执行 agent：Codex；关联任务：用户要求登录 GitHub 并提交更新。
+- 状态：已确认 `A1111-w/csa-official-platform` 与本地历史对应，`codex/development` 提交内容已完成独立快照验证；远程状态以分支为准。
+- 变更：整理公共缓存与简历 CAS 的代码、测试和文档；修正 Maven 命令、缓存键、预热范围与轮播提交后失效说明。完整范围与验证见 [独立记录](docs/change-records/2026-09-20-github-delivery.md)。
+- 兼容性：本轮整理不新增迁移；保留既有 V6、接口权限和未提交的其他工作。
+- 验证：独立提交快照后端测试 203 个用例，202 通过、1 个 Docker 集成测试跳过、0 失败/错误；文档漂移 52 项通过，暂存 diff 检查通过。Docker/staging 不作为已通过项。
+- 回退：后续 revert 对应提交；不强推、不删除 V6、不覆盖其他项目历史。
+
+### 20260919-cache-convergence-and-build-simplification | 缓存并发收敛与验证口径修正
+
+- 日期：2026-09-19（Asia/Shanghai）；执行 agent：Codex。
+- 关联需求/任务：`specs/001-cache-concurrency-hardening/tasks.md` 的 T015-T020；
+  收敛 2026-09-18 源码审计发现的缓存适配、公共读降级、generation 失效和简历
+  CAS 缺口。
+- 状态：代码、单元测试、文档和修改记录已完成；真实 Docker/Testcontainers 与
+  staging 验证仍待健康环境，因此 T014 保持未完成。
+- 实际变更：Redis 公共缓存保留版本化 JSON 并增加适配器回归测试；公共读 Redis
+  故障时使用 2 秒进程内短缓存和 generation epoch；详情回源保留 generation
+  复核、热点锁和提交后失效；简历保存/提交/审核补齐版本条件更新及非法状态测试；
+  V6 集成测试增加版本列、索引、CAS、唯一投票和 Redis `SETNX` 断言。移除了本地
+  fallback 中的分片锁、Semaphore、容量统计和总字符限制，简化维护；未测量构建
+  耗时改善。
+- 文档/任务：同步 `docs/project-status.md`、`docs/production-readiness/phase-1-verification.md`
+  和 `specs/001-cache-concurrency-hardening/tasks.md`；详细记录见
+  [`docs/change-records/2026-09-19-cache-convergence-and-build-simplification.md`](docs/change-records/2026-09-19-cache-convergence-and-build-simplification.md)。
+- 验证：后端 `.\mvnw.cmd -q test` 结果为 216 个用例、214 个实际执行通过、0 failures、
+  0 errors、2 skipped；跳过 Docker/Testcontainers 和未配置
+  `CSA_LOCAL_MYSQL_TEST_URL` 的本地 MySQL 测试。`-DskipTests test-compile`、定向
+  缓存/竞赛/简历测试、study-guide drift 检查（52 checks）和 `git diff --check`
+  通过。真实 V1-V6 MySQL/Redis 尚未执行。
+- 兼容性/数据/配置：公开接口 URL/VO 不变；V6 仍是向前迁移，不修改 V1-V5；进程内
+  fallback 只适合单实例故障降级，生产仍需要 Redis；没有新增秘密或生产数据。
+- 回退：应用代码和文档使用后续 `git revert`；若 V6 已执行，只能保留数据库列和
+  索引并通过新的向前 migration 修复，不能删除列或改写已执行 SQL。
+
 ### 20260916-cache-and-concurrency-hardening | 缓存与并发强化
 
 - 日期：2026-09-16；执行 agent：Codex；关联需求：

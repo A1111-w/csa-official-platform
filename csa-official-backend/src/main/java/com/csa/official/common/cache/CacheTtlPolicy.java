@@ -32,6 +32,14 @@ public class CacheTtlPolicy {
         return seconds(60, 30);
     }
 
+    public long aboutSeconds() {
+        return seconds(1800, 60);
+    }
+
+    public long carouselSeconds() {
+        return seconds(600, 30);
+    }
+
     public long competitionDetailSeconds() {
         return seconds(120, 60);
     }

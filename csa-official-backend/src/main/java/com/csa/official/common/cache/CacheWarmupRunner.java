@@ -1,6 +1,8 @@
 package com.csa.official.common.cache;
 
 import com.csa.official.modules.biz.service.CompetitionService;
+import com.csa.official.modules.sys.service.PublicAboutService;
+import com.csa.official.modules.sys.service.CarouselService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -17,18 +19,29 @@ import org.springframework.stereotype.Component;
 public class CacheWarmupRunner {
 
     private final CompetitionService competitionService;
+    private final PublicAboutService aboutService;
+    private final CarouselService carouselService;
 
-    public CacheWarmupRunner(CompetitionService competitionService) {
+    public CacheWarmupRunner(CompetitionService competitionService, PublicAboutService aboutService,
+                            CarouselService carouselService) {
         this.competitionService = competitionService;
+        this.aboutService = aboutService;
+        this.carouselService = carouselService;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void warmup() {
+        warm("about", () -> aboutService.getAbout());
+        warm("carousel", () -> carouselService.getPublicList());
+        warm("competition", () -> competitionService.getPublicCompetitionPage(1, 10));
+    }
+
+    private void warm(String scope, Runnable loader) {
         try {
-            competitionService.getPublicCompetitionPage(1, 10);
-            log.info("Public competition cache warmup completed");
+            loader.run();
+            log.info("Public {} cache warmup read completed", scope);
         } catch (RuntimeException e) {
-            log.warn("Public cache warmup failed; application remains available for cache-aside reads", e);
+            log.warn("Public {} warmup failed; continuing with remaining scopes", scope, e);
         }
     }
 }

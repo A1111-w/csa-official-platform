@@ -1,15 +1,18 @@
 # Phase 1 验证记录
 
 记录时间：2026-07-30（Asia/Shanghai）
-最后按当前工作区复核：2026-08-26（Asia/Shanghai）
+最后按当前工作区复核：2026-09-19（Asia/Shanghai）
 
-本记录区分两组证据：2026-07-29 完成的 Phase 1 隔离生产栈演练，以及 2026-08-26 对当前源码的重新验证。任何记录都不包含密码、Token、Cookie 或真实邮箱凭据。
+本记录区分历史证据和当前工作树证据：2026-07-29 完成的 Phase 1 隔离生产栈演练、
+2026-08-26 的旧版本复核，以及 2026-09-19 对当前 V1-V6 工作树的本机复核。任何
+记录都不包含密码、Token、Cookie 或真实邮箱凭据。旧的 V1-V5/174-test 结果只能说明
+当时的源码状态，不能替代当前 V1-V6 复验。
 
 ## 1. 当前源码验证
 
-- 后端 `mvnw.cmd test`（2026-08-26）：174 tests，0 failures，0 errors，1 skipped。跳过项是需要显式开关和 Docker 的 Testcontainers 用例。
-- 显式 Testcontainers 用例：本机 2026-08-26 未运行成功，因为 Docker 环境不可用；但 GitHub Actions `#33010814757` 已在 `fcddab2` 上通过当前 V1-V5 的真实 MySQL、Redis、Flyway 验收。staging 仍需在真实部署环境复演迁移和恢复，历史 V2 隔离栈不能替代当前 V5 证据。
-- 真实依赖版本：MySQL 8.0.36、Redis 7.2-alpine；历史演练先把空库迁到 V1、插入旧版用户、再迁到 V2。当前源码还会执行 V3 审核队列索引、V4 账号匿名化/原子配额/邮件恢复/Git 同步结构和 V5 贡献审计结构；GitHub Actions `#33010814757` 已验证当前版本链，健康 staging 仍需复演真实升级和恢复流程。
+- 后端 `mvnw.cmd test`（2026-09-19）：216 个用例，214 个实际执行通过，0 failures，0 errors，2 skipped。跳过项为 Docker/Testcontainers 集成测试，以及未配置 `CSA_LOCAL_MYSQL_TEST_URL` 的本地 MySQL 投影测试。
+- 显式 Testcontainers 用例：本机 2026-09-19 仍未执行，因为没有健康 Docker；当前工作树的 V1-V6 真实 MySQL、Redis 和 Flyway 复验仍待健康 Docker 或 staging。GitHub Actions 中的旧 V1-V5 证据不能替代当前 V1-V6 证据。
+- 真实依赖版本：MySQL 8.0.36、Redis 7.2-alpine。当前集成测试代码会校验 V1→V6、V6 的简历版本列和索引、CAS 更新、投票唯一约束和 Redis `SETNX`；这些断言已加入但本轮未在真实容器执行。
 - 前端 `npm run test`：6 files、12 tests 通过；`npm run lint` 通过。
 - 前端 `npm ci`：干净安装完成；`npm run test` 为 6 files、12 tests，`npm run lint` 为 0 errors、1 既有 warning，`npm run build`：Next.js 16.3.3 构建通过，页面生成数据 25/25；完整与 production `npm audit` 均为 0 vulnerabilities。
 - CI Redis 回归：2026-08-26 在无 `.env`、空 `REDIS_HOST` 的等价 CI 配置下复验。`test` profile 原本已经激活，实际失败点是 Redis 自动配置仍创建连接工厂；`application-test.yml` 现只排除测试用 Redis 自动配置，`CsaOfficialApplicationTests` 断言没有 `RedisConnectionFactory`。生产 Redis 配置没有变化。
@@ -22,7 +25,7 @@
 
 1. 空 MySQL 执行 `V1__initial_schema.sql` 后 `sys_user` 为空，生产迁移不创建共享密码账号。
 2. V1 旧数据升级到 `V2__production_operations.sql` 后仍保留，邮箱被 trim + lowercase，学号被 trim。
-3. 历史隔离演练中 `account_status=ACTIVE`、`session_version=0` 正确补齐，`flyway_schema_history` 当时最新成功版本为 2；当前源码版本链已到 V5，重跑后应为 5，并校验 V3 索引、V4 `sys_file_usage` 和 V5 贡献来源列。
+3. 历史隔离演练中 `account_status=ACTIVE`、`session_version=0` 正确补齐，`flyway_schema_history` 当时最新成功版本为 2；当前工作树版本链为 V1-V6，待健康环境重跑后应为 6，并校验 V3 索引、V4 `sys_file_usage`、V5 贡献来源列和 V6 简历版本列/索引。
 4. 同一轮测试完成 Redis 写入和读取 round trip。
 
 2026-07-29 的隔离栈还完成了已有库 baseline 和故意失败 migration 演练：MySQL 非事务 DDL 可能留下部分结构，恢复采用隔离库重建/备份恢复，没有把 `flyway repair` 当作数据回滚。
@@ -60,4 +63,7 @@
 
 ## 6. 结论
 
-Phase 1 代码、迁移、配置和历史隔离栈证据齐全；当前源码的单元测试、干净前端安装、Vitest/lint/build 和依赖审计通过。GitHub Actions `#33010814757` 已在 `fcddab2` 上通过 V1-V5 真实 MySQL/Redis/Flyway、前后端镜像 Trivy 和关键 Playwright E2E。仅本机 Docker 数据盘仍不可用；备份恢复和真实生产环境部署演练必须在健康 staging 单独完成。
+Phase 1 的历史代码、迁移、配置和隔离栈证据齐全；当前工作树本机后端单元测试
+通过，但 V1-V6 真实 MySQL/Redis/Testcontainers、当前镜像、备份恢复和 staging
+部署演练尚未完成。旧 V1-V5 CI/隔离栈记录保留为历史证据，不能写成当前 V1-V6
+已验证。上述遗留项必须在健康 Docker 或 staging 单独完成。

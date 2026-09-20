@@ -50,7 +50,7 @@ GROUP BY TRIM(student_id)
 HAVING COUNT(*) > 1;
 ```
 
-存在重复时先完成业务确认和数据修复，不能让生产启动时才撞唯一索引。V2 会规范化邮箱/学号、补齐账号状态和会话版本，再创建唯一索引及运营表；V3 增加简历审核队列索引；V4 回填原子文件配额计数并增加账号匿名化、邮件恢复和简历 Git 同步结构；V5 为贡献流水增加来源和操作人字段。
+存在重复时先完成业务确认和数据修复，不能让生产启动时才撞唯一索引。V2 会规范化邮箱/学号、补齐账号状态和会话版本，再创建唯一索引及运营表；V3 增加简历审核队列索引；V4 回填原子文件配额计数并增加账号匿名化、邮件恢复和简历 Git 同步结构；V5 为贡献流水增加来源和操作人字段；V6 为简历审核增加 `version` 条件更新列和索引。
 
 ## Flyway 之前的已有数据库
 
@@ -88,4 +88,4 @@ cd <project-root>\csa-official-backend
 .\mvnw.cmd "-Dit.containers=true" "-Dtest=FlywayMySqlRedisIntegrationTest" test
 ```
 
-2026-07-30 的 Testcontainers 验证使用 MySQL 8.0.36 和 Redis 7.2：空库迁到 V1、写入旧数据、升级 V2、校验规范化和 Redis round trip，1/1 通过。当前源码已扩展到 V6；真实依赖用例还需额外校验 `biz_resume.version` 和 `idx_resume_user_version`，并在健康 Docker 或 staging 重跑。生产发布还必须先处理上面的重复数据查询。
+2026-07-30 的 Testcontainers 验证使用 MySQL 8.0.36 和 Redis 7.2：空库迁到 V1、写入旧数据、升级 V2、校验规范化和 Redis round trip，1/1 通过。当前源码已扩展到 V6；集成测试现额外校验 `biz_resume.version`、`idx_resume_user_version`、CAS 条件更新、投票唯一约束和 Redis `SETNX`。这些断言仍需在健康 Docker 或 staging 实际执行；生产发布还必须先处理上面的重复数据查询。

@@ -21,6 +21,8 @@ public interface ResumeMapper extends BaseMapper<Resume> {
                 git_sync_branch = NULL,
                 git_sync_commit = NULL,
                 git_sync_size_bytes = NULL
+                ,version = version + 1
+                ,update_time = NOW()
             WHERE user_id = #{userId}
               AND deleted = 0
               AND git_repo_url IS NOT NULL

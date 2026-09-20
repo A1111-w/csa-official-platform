@@ -17,6 +17,7 @@ import com.csa.official.modules.sys.mapper.DeptMapper;
 import com.csa.official.modules.sys.mapper.UserMapper;
 import com.csa.official.modules.sys.service.AuditService;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -31,6 +32,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -61,6 +63,11 @@ class ResumeServiceTest {
 
     @InjectMocks
     private ResumeService resumeService;
+
+    @BeforeEach
+    void allowResumeLock() {
+        lenient().when(keyValueStore.setIfAbsent(any(), any(), any(Long.class), any())).thenReturn(true);
+    }
 
     @Test
     void reviewQueueLoadsApplicantsAndDepartmentsInBatches() {
@@ -157,11 +164,96 @@ class ResumeServiceTest {
         verify(auditService, never()).recordBestEffort(any(), any(), any(), any(), any(), any());
     }
 
+    @Test
+    void submitOnlyAllowsDraftAndUsesVersionedCas() {
+        Resume resume = buildResume(10L, 101L, ResumeStatusEnum.DRAFT);
+        resume.setContent("Java");
+        resume.setVersion(4L);
+        when(resumeMapper.selectOne(any())).thenReturn(resume);
+        when(resumeMapper.update(isNull(), any())).thenReturn(1);
+
+        resumeService.submitForAudit(101L);
+
+        verify(resumeMapper).update(isNull(), any());
+    }
+
+    @Test
+    void submitRejectsApprovedResumeInsteadOfResettingIt() {
+        Resume resume = buildResume(10L, 101L, ResumeStatusEnum.APPROVED);
+        resume.setContent("Java");
+        resume.setVersion(2L);
+        when(resumeMapper.selectOne(any())).thenReturn(resume);
+
+        assertThatThrownBy(() -> resumeService.submitForAudit(101L))
+                .isInstanceOf(CsaException.class)
+                .extracting(error -> ((CsaException) error).getCode())
+                .isEqualTo(409);
+
+        verify(resumeMapper, never()).update(isNull(), any());
+    }
+
+    @Test
+    void saveRejectsPendingResumeBeforeWriting() {
+        Resume resume = buildResume(10L, 101L, ResumeStatusEnum.PENDING);
+        resume.setVersion(1L);
+        when(resumeMapper.selectOne(any())).thenReturn(resume);
+
+        assertThatThrownBy(() -> resumeService.saveMyResume(101L, "new content", null))
+                .isInstanceOf(CsaException.class)
+                .extracting(error -> ((CsaException) error).getCode())
+                .isEqualTo(409);
+
+        verify(resumeMapper, never()).update(isNull(), any());
+    }
+
+    @Test
+    void saveTurnsApprovedResumeIntoDraftWithConditionalVersionUpdate() {
+        Resume resume = buildResume(10L, 101L, ResumeStatusEnum.APPROVED);
+        resume.setContent("old");
+        resume.setVersion(3L);
+        when(resumeMapper.selectOne(any())).thenReturn(resume);
+        when(resumeMapper.update(isNull(), any())).thenReturn(1);
+
+        resumeService.saveMyResume(101L, "new content", null);
+
+        verify(resumeMapper).update(isNull(), any());
+    }
+
+    @Test
+    void saveReturnsConflictWhenVersionChangedBeforeConditionalUpdate() {
+        Resume resume = buildResume(10L, 101L, ResumeStatusEnum.DRAFT);
+        resume.setContent("old");
+        resume.setVersion(3L);
+        when(resumeMapper.selectOne(any())).thenReturn(resume);
+        when(resumeMapper.update(isNull(), any())).thenReturn(0);
+
+        assertThatThrownBy(() -> resumeService.saveMyResume(101L, "new content", null))
+                .isInstanceOf(CsaException.class)
+                .extracting(error -> ((CsaException) error).getCode())
+                .isEqualTo(409);
+    }
+
+    @Test
+    void submitRejectsAlreadyPendingResumeBeforeConditionalUpdate() {
+        Resume resume = buildResume(10L, 101L, ResumeStatusEnum.PENDING);
+        resume.setContent("Java");
+        resume.setVersion(5L);
+        when(resumeMapper.selectOne(any())).thenReturn(resume);
+
+        assertThatThrownBy(() -> resumeService.submitForAudit(101L))
+                .isInstanceOf(CsaException.class)
+                .extracting(error -> ((CsaException) error).getCode())
+                .isEqualTo(409);
+
+        verify(resumeMapper, never()).update(isNull(), any());
+    }
+
     private Resume buildResume(Long id, Long userId, ResumeStatusEnum status) {
         Resume resume = new Resume();
         resume.setId(id);
         resume.setUserId(userId);
         resume.setStatus(status);
+        resume.setVersion(0L);
         return resume;
     }
 

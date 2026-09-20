@@ -2,6 +2,7 @@ package com.csa.official.common.aspect;
 
 import com.csa.official.common.annotation.RateLimit;
 import com.csa.official.common.cache.KeyValueStore;
+import com.csa.official.common.cache.PublicRateLimitFallback;
 import com.csa.official.common.exception.CsaException;
 import com.csa.official.modules.sys.service.AuditService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,6 +37,8 @@ public class RateLimitAspect {
     private final List<IpAddressMatcher> trustedProxies;
     private final String forwardedIpHeader;
     private final AuditService auditService;
+    private final PublicRateLimitFallback publicFallback = new PublicRateLimitFallback();
+    private final java.util.concurrent.atomic.AtomicLong lastPublicWarning = new java.util.concurrent.atomic.AtomicLong();
 
     public RateLimitAspect(
             KeyValueStore keyValueStore,
@@ -63,7 +66,24 @@ public class RateLimitAspect {
         String ip = getClientIp(request);
         String key = buildRateLimitKey(point, request, rateLimit, ip);
 
-        Long count = keyValueStore.increment(key, rateLimit.time(), TimeUnit.SECONDS);
+        Long count;
+        try {
+            count = keyValueStore.increment(key, rateLimit.time(), TimeUnit.SECONDS);
+            if (count == null) {
+                throw new IllegalStateException("Rate limit store returned no counter");
+            }
+        } catch (RuntimeException e) {
+            if (!rateLimit.publicReadFallback() || !"GET".equals(request.getMethod())
+                    || !request.getRequestURI().startsWith("/api/public/")) {
+                throw e;
+            }
+            count = publicFallback.increment(key, rateLimit.time());
+            long now = System.currentTimeMillis();
+            long previous = lastPublicWarning.get();
+            if (now - previous >= 60_000 && lastPublicWarning.compareAndSet(previous, now)) {
+                log.warn("Public Redis rate limiter unavailable; using bounded local counters", e);
+            }
+        }
         if (count != null && count > rateLimit.count()) {
             auditService.recordBestEffort("RATE_LIMIT_TRIGGERED", "ENDPOINT", request.getRequestURI(),
                     "REJECTED", null, Map.of(

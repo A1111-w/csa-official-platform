@@ -30,3 +30,19 @@
 
 `T001` and `T003` precede `T004-T009`; `T004-T009` precede `T010-T013`;
 `T014` depends on a healthy Docker environment.
+
+## Phase 5: Convergence
+
+The 2026-09-18 source audit found unmet requirements despite the earlier checks.
+The earlier checkmarks record the initial implementation, not final acceptance.
+
+- [x] T015 CRITICAL Correct completion claims and record the audit and current evidence in `docs/project-status.md`, `CHANGELOG.md` and a new change record per Constitution I/II/V (contradicts).
+- [x] T016 Preserve versioned JSON through `RedisKeyValueStore` and add actual adapter regression tests per FR-001 and US1/AC1 (contradicts).
+- [x] T017 Add bounded public-read local fallback and outage-aware public rate limiting without relaxing authentication endpoints per US1/AC4 and FR-007 (partial).
+- [x] T018 Fence detail refills with generation keys, verify after-commit/rollback invalidation and lock ownership, and run deterministic concurrent-miss tests per FR-003/004 and SC-003 (partial).
+- [x] T019 Close resume save/submit/review races with versioned conditional writes and illegal-transition tests per FR-008 and US3/AC1 (partial).
+- [x] T020 Update V6 integration assertions and add Redis/MySQL concurrency scenarios, keeping unavailable infrastructure explicitly pending per SC-004/005 and Constitution V (partial).
+
+T020 is complete as a code-and-test-definition task: the V6 schema, CAS, unique-vote,
+and Redis `SETNX` assertions are present. T014 remains open because this workstation
+still has no healthy Docker/Testcontainers or staging environment to execute them.

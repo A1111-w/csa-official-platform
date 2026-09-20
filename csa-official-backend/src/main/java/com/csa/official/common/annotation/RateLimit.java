@@ -15,4 +15,6 @@ public @interface RateLimit {
     int time() default 300;
 
     int count() default 10;
+
+    boolean publicReadFallback() default false;
 }

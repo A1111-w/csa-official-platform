@@ -5,6 +5,8 @@ import com.csa.official.common.cache.CacheTtlPolicy;
 import com.csa.official.common.cache.CacheValueCodec;
 import com.csa.official.common.cache.KeyValueStore;
 import com.csa.official.common.cache.MemoryKeyValueStore;
+import com.csa.official.common.cache.PublicReadCache;
+import com.csa.official.common.cache.PublicReadFallback;
 import com.csa.official.common.exception.CsaException;
 import com.csa.official.modules.biz.entity.CompEditor;
 import com.csa.official.modules.biz.entity.Competition;
@@ -51,22 +53,19 @@ class CompetitionServiceTest {
     @Mock
     private AuditService auditService;
 
-    @Mock
-    private KeyValueStore keyValueStore;
-
-    @Mock
-    private CacheValueCodec cacheValueCodec;
-
-    @Mock
-    private CacheTtlPolicy cacheTtlPolicy;
-
-    @InjectMocks
     private CompetitionService competitionService;
 
     @BeforeEach
-    void configureCacheLockMock() {
-        lenient().when(keyValueStore.setIfAbsent(anyString(), anyString(), anyLong(), any()))
-                .thenReturn(true);
+    void configureCache() {
+        competitionService = cachedService();
+    }
+
+    private CompetitionService cachedService() {
+        CacheTtlPolicy ttl = new CacheTtlPolicy(new Random(1));
+        return new CompetitionService(competitionMapper, editorMapper, userMapper, auditService,
+                new PublicReadCache(new MemoryKeyValueStore(),
+                        new CacheValueCodec(new ObjectMapper().findAndRegisterModules()),
+                        ttl, new PublicReadFallback(), auditService), ttl);
     }
 
     @Test
@@ -187,14 +186,7 @@ class CompetitionServiceTest {
         published.setContent("<p>缓存正文</p>");
         when(competitionMapper.selectById(11L)).thenReturn(published);
 
-        CompetitionService cachedService = new CompetitionService(
-                competitionMapper,
-                editorMapper,
-                userMapper,
-                auditService,
-                new MemoryKeyValueStore(),
-                new CacheValueCodec(new ObjectMapper().findAndRegisterModules()),
-                new CacheTtlPolicy(new Random(1)));
+        CompetitionService cachedService = cachedService();
 
         assertThat(cachedService.getPublicCompetitionDetail(11L).getContent()).isEqualTo("<p>缓存正文</p>");
         assertThat(cachedService.getPublicCompetitionDetail(11L).getContent()).isEqualTo("<p>缓存正文</p>");
@@ -206,14 +198,7 @@ class CompetitionServiceTest {
     void missingPublicDetailIsShortLivedNegativeCached() {
         when(competitionMapper.selectById(12L)).thenReturn(null);
 
-        CompetitionService cachedService = new CompetitionService(
-                competitionMapper,
-                editorMapper,
-                userMapper,
-                auditService,
-                new MemoryKeyValueStore(),
-                new CacheValueCodec(new ObjectMapper().findAndRegisterModules()),
-                new CacheTtlPolicy(new Random(2)));
+        CompetitionService cachedService = cachedService();
 
         assertThatThrownBy(() -> cachedService.getPublicCompetitionDetail(12L))
                 .isInstanceOf(CsaException.class)

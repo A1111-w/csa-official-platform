@@ -4,9 +4,9 @@ import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
-import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -17,6 +17,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -89,7 +90,7 @@ class FlywayMySqlRedisIntegrationTest {
             try (ResultSet history = statement.executeQuery(
                     "SELECT version FROM flyway_schema_history WHERE success = 1 ORDER BY installed_rank DESC LIMIT 1")) {
                 assertThat(history.next()).isTrue();
-                assertThat(history.getString(1)).isEqualTo("5");
+                assertThat(history.getString(1)).isEqualTo("6");
             }
             try (ResultSet reviewIndex = statement.executeQuery("""
                     SELECT COUNT(*)
@@ -117,6 +118,27 @@ class FlywayMySqlRedisIntegrationTest {
                 assertThat(contributionColumns.next()).isTrue();
                 assertThat(contributionColumns.getInt(1)).isEqualTo(2);
             }
+            try (ResultSet resumeVersion = statement.executeQuery("""
+                    SELECT COUNT(*)
+                    FROM information_schema.columns
+                    WHERE table_schema = DATABASE()
+                      AND table_name = 'biz_resume'
+                      AND column_name = 'version'
+                      AND column_default = '0'
+                    """)) {
+                assertThat(resumeVersion.next()).isTrue();
+                assertThat(resumeVersion.getInt(1)).isEqualTo(1);
+            }
+            try (ResultSet resumeVersionIndex = statement.executeQuery("""
+                    SELECT COUNT(*)
+                    FROM information_schema.statistics
+                    WHERE table_schema = DATABASE()
+                      AND table_name = 'biz_resume'
+                      AND index_name = 'idx_resume_user_version'
+                    """)) {
+                assertThat(resumeVersionIndex.next()).isTrue();
+                assertThat(resumeVersionIndex.getInt(1)).isEqualTo(2);
+            }
             try (ResultSet migratedUser = statement.executeQuery("""
                     SELECT email, student_id, account_status, session_version
                     FROM sys_user
@@ -129,6 +151,33 @@ class FlywayMySqlRedisIntegrationTest {
                 assertThat(migratedUser.getString("account_status")).isEqualTo("ACTIVE");
                 assertThat(migratedUser.getLong("session_version")).isZero();
             }
+
+            try (PreparedStatement insertResume = connection.prepareStatement("""
+                    INSERT INTO biz_resume (user_id, status, version, deleted)
+                    VALUES (?, 0, 0, 0)
+                    """)) {
+                insertResume.setLong(1, 60001L);
+                assertThat(insertResume.executeUpdate()).isEqualTo(1);
+            }
+            try (PreparedStatement updateResume = connection.prepareStatement("""
+                    UPDATE biz_resume
+                    SET status = 1, version = version + 1
+                    WHERE user_id = ? AND status = 0 AND version = 0 AND deleted = 0
+                    """)) {
+                updateResume.setLong(1, 60001L);
+                assertThat(updateResume.executeUpdate()).isEqualTo(1);
+                assertThat(updateResume.executeUpdate()).isZero();
+            }
+
+            try (PreparedStatement insertVote = connection.prepareStatement("""
+                    INSERT INTO sys_vote_record (proposal_id, voter_id, result, weight)
+                    VALUES (70001, 80001, 1, 1)
+                    """)) {
+                assertThat(insertVote.executeUpdate()).isEqualTo(1);
+                org.assertj.core.api.Assertions.assertThatThrownBy(insertVote::executeUpdate)
+                        .isInstanceOf(java.sql.SQLException.class)
+                        .hasMessageContaining("Duplicate");
+            }
         }
 
         RedisStandaloneConfiguration redisConfiguration = new RedisStandaloneConfiguration(
@@ -136,13 +185,13 @@ class FlywayMySqlRedisIntegrationTest {
         LettuceConnectionFactory connectionFactory = new LettuceConnectionFactory(redisConfiguration);
         connectionFactory.afterPropertiesSet();
         try {
-            RedisConnection connection = connectionFactory.getConnection();
-            try {
-                connection.set("csa:integration:key".getBytes(), "ok".getBytes());
-                assertThat(new String(connection.get("csa:integration:key".getBytes()))).isEqualTo("ok");
-            } finally {
-                connection.close();
-            }
+            StringRedisTemplate template = new StringRedisTemplate(connectionFactory);
+            template.afterPropertiesSet();
+            assertThat(template.opsForValue().setIfAbsent(
+                    "csa:integration:lock", "first", Duration.ofSeconds(30))).isTrue();
+            assertThat(template.opsForValue().setIfAbsent(
+                    "csa:integration:lock", "second", Duration.ofSeconds(30))).isFalse();
+            assertThat(template.opsForValue().get("csa:integration:lock")).isEqualTo("first");
         } finally {
             connectionFactory.destroy();
         }
