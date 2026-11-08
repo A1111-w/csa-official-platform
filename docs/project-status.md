@@ -9,7 +9,7 @@
 - 两个 worktree 的 Git common dir 均为本项目 D:/CSA-Project/.git。
 - GitHub：https://github.com/A1111-w/csa-official-platform 。
 - 原 D:/CSA-Project main 的用户修改保持原样。
-- 用户已明确要求将两个版本上传GitHub；React分支已推送，Vue分支在完成验证和审查后推送。最终结果见集成记录。
+- 两个版本均已按用户要求上传GitHub：React保留提交 bf1415c，Vue迁移提交 e4cc74a；已核对远程分支提交。最终验证及交付事实见集成记录。
 
 ## 当前实现
 

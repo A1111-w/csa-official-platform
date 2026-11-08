@@ -34,9 +34,9 @@
 
 - [x] T016 更新 csa-official-frontend/Dockerfile、docker-compose.yml、.github/workflows/ 与相关部署配置。
 - [x] T017 更新 README.md、csa-official-frontend/README.md、docs/project-status.md、docs/local-dev.md、docs/deployment.md、docs/architecture.md、docs/security-design.md、docs/module-completeness.md、CHANGELOG.md 及主记录。
-- [ ] T018 执行前端测试、类型检查、lint/build、tools/check-study-guide-drift.ps1 和 git diff --check，记录真实结果。
+- [x] T018 执行前端测试、类型检查、lint/build、tools/check-study-guide-drift.ps1 和 git diff --check，记录真实结果。
 - [x] T019 执行隔离浏览器验收并记录截图/限制，不将失败或未执行写成通过。
-- [ ] T020 审阅显式暂存 diff 后提交，将两个用户授权分支推送 GitHub 并核对远程提交。
+- [x] T020 审阅显式暂存 diff 后提交，将两个用户授权分支推送 GitHub 并核对远程提交。
 
 ## Dependencies and parallel execution
 

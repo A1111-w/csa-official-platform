@@ -61,7 +61,7 @@ React 旧版为 Next.js 16.3.3 / React 19.2.4，工作目录 `D:/CSA-Project-age
 
 **练习**：会员打开 AI 页面，再直接输入 /dashboard/audit；比较 /api/sys/user/info 的 roleLevel 与菜单；退出后重新打开深层链接。
 
-**验收**：路由守卫先验证后端会话，会员可问答但不能管理评测；没有 JWT 出现在 localStorage；POST 携带 X-CSRF-Token。
+**验收**：路由守卫先验证后端会话，会员可问答但不能管理评测；没有 JWT 出现在 localStorage；需要 CSRF 校验的写请求携带 X-CSRF-Token。登录、注册、发验证码等明确豁免的接口需对照 `src/lib/axios.ts` 理解。
 
 **教师提示**：先解释“是谁、能做什么、请求是否来自可信页面”三个独立问题。前端隐藏按钮只是体验，真正权限由后端 @PreAuthorize 决定。
 
