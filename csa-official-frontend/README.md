@@ -1,78 +1,59 @@
-# CSA Official Frontend
+# CSA Vue 3 前端
 
-计协官网前端，基于 Next.js App Router。页面分为公开官网和登录后的工作台两部分。
+当前分支 `codex/vue3-frontend` 使用 Vue 3 + Vite + TypeScript + Vue Router + Pinia。React 版保存在 `codex/agent-rag-evaluation`（`bf1415c`），不是在同一个应用里混装 React/Vue。
 
-## 技术栈
-
-- Next.js 16.3.3 + React 19.2.4
-- TypeScript
-- Tailwind CSS
-- shadcn/ui 风格组件
-- Zustand 登录态
-- axios 1.18.1 前后端通信
-- `src/proxy.ts` 入口保护和安全响应头
-- isomorphic-dompurify 富文本展示清洗
-
-## 页面入口
-
-| 路径 | 说明 |
-| --- | --- |
-| `/` | 官网首页 |
-| `/about` | 协会介绍 |
-| `/competitions` | 公开竞赛 |
-| `/contributors` | 贡献者墙 |
-| `/resources` | 资源入口 |
-| `/login` | 登录 |
-| `/register` | 注册 |
-| `/dashboard` | 工作台概览 |
-| `/dashboard/profile` | 个人资料 |
-| `/dashboard/resources` | 资源库 |
-| `/dashboard/competitions` | 竞赛管理 |
-| `/dashboard/resume` | 我的简历 |
-| `/dashboard/departments` | 部门人事 |
-| `/dashboard/vote` | 提案中心 |
-| `/dashboard/settings` | 公开设置 |
-
-`/dashboard/**` 会先经过 `src/proxy.ts`。没有 `CSA_AUTH_TOKEN` Cookie 时会跳转到 `/login?redirect=...`，同时 proxy 会设置 CSP nonce、CSP Header，生产环境还会加 HSTS。
-
-## 本地开发
-
-```powershell
-cd <project-root>\csa-official-frontend
-npm install
-npm run dev
-```
-
-本地联调后端时，设置 `.env.local`：
-
-```properties
-NEXT_PUBLIC_API_URL=http://localhost:8080
-```
-
-## 构建验证
+## 启动与验证
 
 ```powershell
 npm ci
-npm run build
-npm run test
+Copy-Item .env.example .env.local
+npm run dev
+```
+
+Node >=22.12，推荐 Node 22 最新 LTS 补丁。默认地址 `http://127.0.0.1:3000`，API 同源，由 Vite 代理到 `http://127.0.0.1:8080`。`API_PROXY_TARGET` 只影响本地开发/预览；`VITE_API_URL` 构建期写入客户端，不得放密钥。镜像中 API 由 Nginx/Caddy 转发。
+
+```powershell
+npm run typecheck
 npm run lint
-npm audit --audit-level=high
+npm test
+npm run build
+npm run start
 npm run test:e2e
 ```
 
-2026-08-26 的 CI 修复 checkpoint 在干净 `npm ci` 安装后通过 Vitest（6 files、12 tests）、lint（0 errors、1 既有 warning）、Next.js 16.3.3 build（25/25）和完整/production `npm audit`。该变更只更新依赖锁定与测试类型写法；需要回退时还原对应 Git checkpoint 后重新执行 `npm ci`，不涉及数据库迁移或环境变量变更。
+`start` 是 Vite 构建预览；生产使用 Docker/Nginx。Playwright 首次需 `npx playwright install chromium`。浏览器测试默认自己启动 Vite。真实后端测试仅在提供隔离环境 `E2E_USERNAME`、`E2E_PASSWORD` 时执行；其它 fixtures 不依赖外部模型或数据库。
 
-## 前后端契约
+如果本机 npm 旧代理不可达，先核对自己的代理配置。本轮安装使用仅当前命令的 `--proxy=null --https-proxy=null` 直连，没有更改用户或全局 npm 配置。
 
-- API 基础地址来自 `NEXT_PUBLIC_API_URL`。
-- `src/lib/axios.ts` 统一处理 `withCredentials`、CSRF Token 自动获取/注入、401 跳转和错误包装。
-- 浏览器前端不保存、不读取、不拼接 Bearer Token；认证 JWT 由后端写入 `CSA_AUTH_TOKEN` HttpOnly Cookie。
-- 登录接口响应体只返回 `csrfToken`、`username`、`roleLevel`，`src/store/useAuthStore.ts` 只保存页面渲染需要的用户信息。
-- 业务接口集中在 `src/services/*.ts`。
-- 菜单权限配置在 `src/config/menu.ts`，真实权限仍以后端为准。
+## 页面与权限
 
-## Agent 实验室（2026-10-31）
+| 路径 | 最低角色 |
+| --- | --- |
+| /、/about、/contributors、/privacy、/competitions | 公开 |
+| /resources | 页面公开，资源内容要求会员 1 |
+| /login、/register、/forgot-password、/reset-password | 公开 |
+| /dashboard、/dashboard/profile、/dashboard/settings | 已登录 0 |
+| /dashboard/resources、/dashboard/ai | 会员 1 |
+| /dashboard/resume | 核心成员 2 |
+| /dashboard/resume-reviews、/dashboard/competitions、/dashboard/vote | 部长 3 |
+| /dashboard/departments、/dashboard/audit、/dashboard/contributions、/dashboard/member-export、/dashboard/carousels | 会长 4 |
 
-新增 `/dashboard/ai`，会员可进行知识库问答并查看引用与执行轨迹；部长及以上可维护文本资料、运行标注数据集评测并导出 JSON 报告。页面使用真实 API，离线摘录与在线模型模式按后端状态明确区分。没有标注的评测维度显示 `—`。
+AI 知识写入和评测另外要求部长 3；公开介绍写入要求会长 4。直接输入受限 URL 同样经过 `sessionGuard`，菜单隐藏不代替后端权限。
 
-完整用法、请求契约、权限与测试入口见 [Agent 实验室前端](../docs/ai-frontend.md)。本次验证见 [修改记录](../docs/change-records/2026-10-31-ai-frontend.md)。
+## 会话与安全
+
+- `src/store/useAuthStore.ts` 使用内存 Pinia 状态；不读旧 Zustand 缓存做授权。
+- 受保护导航先调用 `/api/sys/user/info`；401 跳登录，角色不足进入403页面，网络故障显示重试页面。
+- axios 保留 `withCredentials`、CSRF token 内存缓存、统一错误封装和401处理。
+- 公开介绍与比赛 HTML 经 DOMPurify 允许列表清洗，答案和文档文本使用 Vue 插值。
+- 生产静态资源不含内联执行脚本；Nginx 设置 CSP、禁止嵌入和其它安全响应头。
+
+服务 URL、参数和接口返回类型保留在 `src/services/`，业务后端无需迁移。完整模块说明见 [公开与认证](../docs/vue-public-auth.md)、[业务](../docs/vue-business.md)、[管理和AI](../docs/vue-admin-ai.md)。
+
+## 与 React 的区别
+
+使用 Vue SFC、ref/computed/watch/onMounted 和 Pinia；页面由 Vue Router 懒加载。采用原生控件与响应式 CSS，视觉重新组织，业务操作继续调用原接口。无 SSR/Next proxy，认证守卫在浏览器执行，数据保护仍由 Spring Security 执行。Nginx `try_files` 保证刷新深层链接可用。
+
+教学先按 [Vue 学习指南](../docs/study-and-demo-guide.md)跑通一个请求，再选择 [Agent 四节核心课](../docs/agent-learning-plan.md)。无需同时掌握两套前端。
+
+若 npm10 修改依赖时报内部 edgesOut 错误，可使用 npm11 生成锁文件；正常使用已提交锁文件执行 npm ci。本轮完整依赖审计无high/critical、保留12项开发工具moderate；生产依赖审计为0。详见集成记录。

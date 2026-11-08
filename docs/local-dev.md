@@ -5,7 +5,7 @@
 项目分为两个服务：
 
 ```text
-前端：<project-root>\csa-official-frontend   Next.js，默认端口 3000
+前端：<project-root>\csa-official-frontend   Vue 3 / Vite，默认端口 3000
 后端：<project-root>\csa-official-backend    Spring Boot，默认端口 8080
 ```
 
@@ -16,7 +16,7 @@
 | 工具 | 建议版本 | 检查命令 | 说明 |
 | --- | --- | --- | --- |
 | JDK | 17+ | `java -version` | 后端编译运行。当前机器用 Java 21 也能跑 |
-| Node.js | 20+ | `node -v` | 前端开发和构建 |
+| Node.js | 22.12+ | `node -v` | 前端开发和构建 |
 | npm | 随 Node 安装 | `npm -v` | 前端依赖管理 |
 | MySQL | 8.x 或兼容云库 | 用数据库工具连接 | 后端业务数据 |
 | Redis | 可选 | `redis-cli ping` | 本地可以不用，改用内存缓存 |
@@ -237,56 +237,29 @@ BUILD SUCCESS
 - 文件上传校验。
 - 投票阈值逻辑。
 
-## 6. 前端配置
+## 6. Vue 前端配置和启动
 
-进入前端目录：
-
-```powershell
-cd <project-root>\csa-official-frontend
-```
-
-本地联调时 `.env.local` 应该写：
-
-```properties
-NEXT_PUBLIC_API_URL=http://localhost:8080
-```
-
-如果这个变量指向线上后端，例如：
-
-```properties
-NEXT_PUBLIC_API_URL=https://csa-backend-mi58.onrender.com
-```
-
-那你本地页面请求的就是线上后端，不会打到本地 Java 服务。
-
-## 7. 启动前端
-
-安装依赖：
+当前 Vue 工作目录 D:/CSA-Project-vue；React 保留在 D:/CSA-Project-agent。两个目录分别 npm ci，不共用 node_modules。
 
 ```powershell
-npm install
-```
-
-启动开发服务：
-
-```powershell
+cd D:/CSA-Project-vue/csa-official-frontend
+npm ci
+Copy-Item .env.example .env.local
 npm run dev
 ```
 
-默认访问：
+浏览器访问 http://127.0.0.1:3000。本地 .env.local 使用 VITE_API_URL=/ 与 API_PROXY_TARGET=http://127.0.0.1:8080；Vite 将 /api、/files 代理到隔离后端。不要复制生产.env或用线上后端做自动验收。
 
-```text
-http://localhost:3000
-```
-
-构建验证：
+## 7. 前端验证
 
 ```powershell
+npm run lint
+npm test
 npm run build
+npm run start
 ```
 
-当前已验证：Next.js 生产构建通过。
-
+build 包含 vue-tsc，生成 dist；start 为本地预览。浏览器测试运行 npm run test:e2e（首次安装 Chromium）。本轮真实结果见 Vue 集成记录，历史 Next 构建结果不适用于该分支。
 ## 8. 推荐启动顺序
 
 本地联调建议：
@@ -295,7 +268,7 @@ npm run build
 2. 如果用 Redis，启动 Redis；如果不用，`.env` 设置 `CSA_CACHE_TYPE=memory`。
 3. 启动后端 `.\mvnw.cmd spring-boot:run`。
 4. 打开 `http://localhost:8080/actuator/health` 确认后端可访问；如果要看 Knife4j，先设置 `SWAGGER_ENABLED=true`。
-5. 设置前端 `.env.local` 指向 `http://localhost:8080`。
+5. 设置前端 API_PROXY_TARGET 指向隔离后端 http://127.0.0.1:8080。
 6. 启动前端 `npm run dev`。
 7. 打开 `http://localhost:3000`。
 8. 注册、登录、进入 `/dashboard`。
@@ -425,7 +398,7 @@ JWT_SECRET=一串至少32字符的随机字符串
 
 可能原因：
 
-1. `NEXT_PUBLIC_API_URL` 指向错了。
+1. `VITE_API_URL` 或开发代理 `API_PROXY_TARGET` 配置错误。
 2. 后端 CORS 没允许当前前端地址。
 3. Cookie 没写入。
 4. Cookie SameSite/Secure 配错。
@@ -532,4 +505,4 @@ npm run dev -- -p 3001
 
 ## Agent 实验台（2026-10-31）
 
-在最新开发基线启动后访问 `/dashboard/ai`。默认离线，不需要模型密钥；先以 Level 3 录入文本，再用 Level 1 问答。首次启动需顺序执行新增 V7/V8，测试使用隔离 H2，不读取旧工作目录 `.env`。真实模型和可选 embedding 配置见 [后端说明](ai-backend.md)，演示步骤见 [Agent 实验台](agent-lab.md)。本次 `D:/CSA-Project-agent` 因 npm registry 拒绝连接而复用依赖 junction，前端需 `npm run dev -- --webpack`；网络恢复并成功 `npm ci` 后可用默认启动方式，详情见实验台说明。
+React 历史分支曾使用依赖 junction 和 Webpack 参数；本 Vue 工作区独立 npm ci 后直接 npm run dev。

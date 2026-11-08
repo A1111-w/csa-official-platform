@@ -1,4 +1,4 @@
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+const apiBaseUrl = import.meta.env.VITE_API_URL || "/"
 
 export function formatDateTime(value?: string | null) {
   if (!value) {

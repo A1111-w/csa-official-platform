@@ -1,6 +1,6 @@
 # CSA Agent 实验台
 
-本轮基于远程 `codex/development`（`b3a7377`，2026-09-20）开发；该分支包含 2026-08-28 `codex/resume-review-workflow` 的新版前端。原 `D:/CSA-Project` 的未提交改动保留，本轮独立工作目录为 `D:/CSA-Project-agent`，分支 `codex/agent-rag-evaluation`。尚未推送或部署。
+Agent 后端最初基于 codex/development 的 b3a7377；React 完整快照已保留为 codex/agent-rag-evaluation（bf1415c）并推送GitHub。当前Vue迁移目录为 D:/CSA-Project-vue，分支 codex/vue3-frontend。原 main 未提交改动保持原样，未部署生产。
 
 ## 能展示什么
 
@@ -27,13 +27,13 @@
 
 ## 运行模式和配置
 
-本机验证时 npm registry 连接失败，因此当前 worktree 的 `node_modules` 通过 junction 复用已核对版本的本机依赖。这里启动前端请使用 `npm run dev -- --webpack`，或在生产构建后使用 `npm run start`；默认 Turbopack 会拒绝跨项目根目录的依赖链接。后续在网络可用时正常完成 `npm ci`，即可恢复通常的启动方式。这是当前工作目录的依赖安装限制，项目没有修改框架配置或锁文件来规避它。
+Vue 分支使用独立 npm ci，npm run dev 启动 Vite；React 分支的 Webpack/junction 限制仅为历史记录，不用于本分支。
 
 默认 `AI_ENABLED=false`：BM25 检索和规则路由，回答只是明确标注的资料摘录。它适合无模型凭据的本地演示，不是语义生成，也不是自主模型规划。
 
 真实模式配置见后端 `.env.example` 和 [后端说明](ai-backend.md)。只有启用并配置模型服务、模型名和服务端凭据后才会调用外部服务。可选 embedding 模型开启混合检索；离线期间录入的文档没有向量，需在启用 embedding 后重新导入。更换 embedding 模型也应重建对应文档。服务异常不会伪装成离线模型成功。
 
-本轮使用已有 Java 17 / Spring Boot 和 Next.js 架构，没有为展示额外拆微服务。向量保存在 MySQL JSON 文本字段中，对小型语料逐一计算相似度；这不是 Milvus/pgvector 级别的 ANN 向量索引。当前演示索引最多 2000 个分块，资源和竞赛工具只筛选最近 100 条记录。
+本轮使用已有 Java 17 / Spring Boot 和 Vue 3 架构，没有为展示额外拆微服务。向量保存在 MySQL JSON 文本字段中，对小型语料逐一计算相似度；这不是 Milvus/pgvector 级别的 ANN 向量索引。当前演示索引最多 2000 个分块，资源和竞赛工具只筛选最近 100 条记录。
 
 ## 当前边界
 
@@ -48,3 +48,5 @@
 架构参考 [Spring AI 模块化 RAG](https://docs.spring.io/spring-ai/reference/api/retrieval-augmented-generation.html) 的检索与上下文增强拆分；评测参考 [Ragas Agent metrics](https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/agents/) 和 [Langfuse evaluation](https://langfuse.com/docs/evaluation/overview)。本轮是与现有 Spring Boot 项目融合的独立实现，未安装这些框架或连接其云平台。
 
 规格见 `specs/002-agent-rag-evaluation/`；本轮实际测试结果见 `docs/change-records/2026-10-31-agent-integration.md`。历史文档中的未来路线和旧测试数字不代替这份记录。
+
+Vue 使用 D:/CSA-Project-vue，入口 src/views/admin/AgentView.vue；启动和分支对照见 [Vue 迁移](vue-migration.md)。未标注评测维度显示 N/A。

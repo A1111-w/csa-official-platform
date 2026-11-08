@@ -59,7 +59,8 @@
 
 ## Implementation Boundaries
 
-- Preserve the current Spring Boot/Java and Next.js/TypeScript architecture.
+- This branch uses Spring Boot/Java and Vue 3/TypeScript, as explicitly requested
+  by the user on 2026-11-08. React/Next.js remains on `codex/agent-rag-evaluation`.
   Read `pom.xml` and `package.json` for actual versions; avoid incidental upgrades.
 - Keep browser authentication in HttpOnly cookies, backend authorization, CSRF,
   account/session-version checks, and file ownership checks intact.

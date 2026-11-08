@@ -110,27 +110,17 @@ services:
       start_period: 60s
 
   # ---------------------------------------------------------------------------
-  # 前端 —— Next.js 16（Node 20），端口 3000
-  # NEXT_PUBLIC_API_URL 会在 next build 阶段被内联进浏览器包（构建期，而非运行期），
-  # 因此必须作为 build arg 传入。它指向浏览器可达的地址 http://localhost:8080，
-  # 而不是容器网络里的 http://backend:8080（浏览器在宿主机上，解析不到服务名）。
-  # ---------------------------------------------------------------------------
+  # 前端：Vue 3 / Vite 静态构建，Nginx 3000，同源代理 /api 和 /files。
   frontend:
     build:
       context: ./csa-official-frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+        VITE_API_URL: ${VITE_API_URL:-/}
     container_name: csa-frontend
     restart: unless-stopped
     depends_on:
       - backend
-    environment:
-      NODE_ENV: production
-      # 同名运行期变量供中间件 / 服务端组件读取（proxy.ts 用它拼 CSP connect-src）
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
-      PORT: 3000
-      HOSTNAME: 0.0.0.0
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     healthcheck:

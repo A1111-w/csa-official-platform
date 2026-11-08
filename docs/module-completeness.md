@@ -65,3 +65,7 @@
 3. 多学校能力继续按 ADR 演进，不在当前规模提前拆微服务。
 
 完整部署阻断项和 Docker 验证边界见 `docs/production-readiness/phase-1-verification.md`、`phase-2-verification.md`。
+
+## Vue 分支迁移（2026-11-08）
+
+全部公开、认证、业务、管理和Agent入口已迁移Vue3，保留API、角色门槛和既有业务操作。路径在src/views，路由由src/router集中定义；详见[迁移对照](vue-migration.md)。本轮验证完成度以[集成记录](change-records/2026-11-08-vue-integration.md)为准，不引用历史React构建作为Vue证据。

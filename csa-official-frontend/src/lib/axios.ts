@@ -7,9 +7,10 @@ import axios, {
 
 import { getSafeRedirect } from "@/lib/navigation"
 import { useAuthStore } from "@/store/useAuthStore"
+import { pinia } from "@/store/pinia"
 import { ApiError, type ApiEnvelope } from "@/types/api"
 
-const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+const baseURL = import.meta.env.VITE_API_URL || "/"
 const CSRF_ENDPOINT = "/api/auth/csrf"
 const CSRF_HEADER_NAME = "X-CSRF-Token"
 const CSRF_EXEMPT_PATHS = new Set([
@@ -156,7 +157,7 @@ function handleUnauthorized() {
   }
 
   clearCsrfToken()
-  useAuthStore.getState().logout()
+  useAuthStore(pinia).logout()
   const redirect = getSafeRedirect(`${pathname}${window.location.search}`, "/dashboard")
   window.location.href = `/login?redirect=${encodeURIComponent(redirect)}`
 }

@@ -1,18 +1,13 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTs from "eslint-config-next/typescript";
+import js from '@eslint/js'
+import ts from 'typescript-eslint'
+import vue from 'eslint-plugin-vue'
 
-const eslintConfig = defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  // Override default ignores of eslint-config-next.
-  globalIgnores([
-    // Default ignores of eslint-config-next:
-    ".next/**",
-    "out/**",
-    "build/**",
-    "next-env.d.ts",
-  ]),
-]);
-
-export default eslintConfig;
+export default ts.config(
+  { ignores: ['dist/**', 'node_modules/**', 'test-results/**', 'playwright-report/**', 'coverage/**'] },
+  js.configs.recommended,
+  ...ts.configs.recommended,
+  ...vue.configs['flat/essential'],
+  // vue-tsc checks unresolved names, including DOM types, in TypeScript SFC scripts.
+  { files: ['**/*.vue'], languageOptions: { parserOptions: { parser: ts.parser } }, rules: { 'no-undef': 'off' } },
+  { rules: { 'vue/multi-word-component-names': 'off' } },
+)

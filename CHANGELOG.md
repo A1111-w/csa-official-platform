@@ -13,6 +13,28 @@
 
 ## [Unreleased]
 
+### 20261108-vue-integration | Vue 3 迁移与 React 双分支
+
+- 日期：2026-11-08；执行：Codex主agent；需求：前端Vue3、保留React版本、上传GitHub；规格 specs/003-vue3-frontend。
+- 变更：Vue Router/Pinia/Vite/TypeScript重写全部24个原路由，沿用Java API与Cookie/CSRF，加入会话故障恢复，迁移全部业务和Agent；静态Nginx、Compose和CI适配，更新教学与使用文档。
+- 验证：71项单元/组件、9项浏览器fixtures、类型/lint/build、52项漂移检查通过；3项真实后端浏览器流程未配置账号而跳过，Docker daemon不可用，未部署生产。最终依赖及推送事实见 [集成记录](docs/change-records/2026-11-08-vue-integration.md)。
+- 保留React于 codex/agent-rag-evaluation（bf1415c），Vue位于 codex/vue3-frontend；无后端或数据库迁移修改。前端改为SPA，SSR差异及回退见 [迁移说明](docs/vue-migration.md)。章程1.0.1仅同步用户授权的框架事实。
+
+### 20261108-vue-public-auth | 公开和认证页面
+
+- 日期：2026-11-08；执行：Codex vue_public_spec；公开首页/介绍/贡献者/隐私和四种认证流程、政策版本校验、站内重定向、主题适配；11项组件测试通过。
+- [说明](docs/vue-public-auth.md)、[记录](docs/change-records/2026-11-08-vue-public-auth.md)；无后端契约变更，真实邮件链路仍需环境验收；回退React分支。
+
+### 20261108-vue-business | 业务工作台
+
+- 日期：2026-11-08；执行：Codex vue_business；六个业务工作台Vue迁移，资源归属/竞赛全文编辑/未知状态/审核与投票边界保留，12项组件测试通过。
+- [说明](docs/vue-business.md)、[记录](docs/change-records/2026-11-08-vue-business.md)；成员列表保留原单次上限，回退React分支。
+
+### 20261108-vue-admin-ai | 管理与 Agent
+
+- 日期：2026-11-08；执行：Codex vue_admin_ai；七个管理页面、AI三工作区、账户安全和导出，9项组件测试通过，Agent浏览器场景已集成。
+- [说明](docs/vue-admin-ai.md)、[记录](docs/change-records/2026-11-08-vue-admin-ai.md)；规则评测不代表语义质量验收，回退React分支。
+
 ### 20261031-agent-integration | Agent 实验台与规则评测
 
 - 日期：2026-10-31（Asia/Shanghai）；执行 agent：Codex 主 agent；需求：技术展示用 Agent/RAG/评测与新版前端。

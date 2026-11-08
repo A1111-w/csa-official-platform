@@ -11,7 +11,7 @@
 ```mermaid
 flowchart LR
   Browser["浏览器 / 用户"]
-  Next["Next.js 前端"]
+  Next["Vue 3 前端"]
   Proxy["src/proxy.ts<br/>Dashboard 跳转 / CSP nonce / HSTS"]
   Axios["Axios 封装<br/>withCredentials / CSRF / 401 / 错误处理"]
   Security["Spring Security<br/>JWT Filter / CSRF Filter / 权限"]
@@ -144,89 +144,24 @@ enums
 
 ## 3. 前端分层
 
-前端核心目录：
+本分支按用户要求使用 Vue 3；React 版保留在 codex/agent-rag-evaluation。
 
-```text
-src
-├─ app
-├─ components
-├─ config
-├─ hooks
-├─ lib
-├─ services
-├─ store
-├─ types
-└─ proxy.ts
-```
-
-### 3.1 app
-
-`src/app` 是 Next.js App Router 页面。
-
-```text
-/
-/about
-/competitions
-/contributors
-/resources
-/login
-/register
-/dashboard
-/dashboard/profile
-/dashboard/resources
-/dashboard/competitions
-/dashboard/resume
-/dashboard/departments
-/dashboard/vote
-/dashboard/settings
-```
-
-页面文件主要负责组合组件，不应该塞太多业务请求和复杂状态。
-
-### 3.2 components
-
-`components` 分三类：
-
-| 目录 | 说明 |
+| 层 | 文件与职责 |
 | --- | --- |
-| `components/ui` | Button、Input、Card、Dialog 等基础组件 |
-| `components/layout` | Navbar、Footer、DashboardSidebar、DashboardGuard |
-| `components/business` | 具体业务组件，如 ResourceLibrary、ProposalCenter |
+| 应用壳 | src/App.vue：公开导航、工作台侧栏、主题、通知 |
+| 路由 | src/router/index.ts：懒加载页面；guard.ts：服务器会话和角色守卫 |
+| 页面 | src/views/public、auth、business、admin：Vue SFC Composition API |
+| 服务 | src/services：保持既有参数、返回类型与后端 API 契约 |
+| 会话 | src/store/useAuthStore.ts：Pinia 内存 user/profile，会话请求去重、过期清理 |
+| HTTP | src/lib/axios.ts：Cookie、CSRF、统一错误和401处理 |
+| 安全 | src/lib/sanitize-html.ts：DOMPurify 允许列表；navigation.ts：站内重定向 |
+| 样式 | src/style.css + SFC scoped CSS |
 
-### 3.3 services
+页面导航先调用 /api/sys/user/info，不能用缓存角色放行。网络故障进入可重试的 /session-error；401跳登录；角色不足进入 /forbidden。用户身份不写入 localStorage，真正认证仍依赖后端 HttpOnly Cookie。
 
-`src/services` 是前后端契约层。
+Vite 生成 dist 静态文件，Nginx 提供 history fallback 和同源 /api、/files 代理。公开页面改为客户端请求数据，不具备 Next SSR；生产安全响应头在 Nginx/Caddy 配置，不再有 src/proxy.ts。
 
-好处：
-
-- 页面不直接写 URL。
-- API 参数和返回类型集中。
-- 后端路径变化时修改 service 即可。
-
-### 3.4 lib
-
-`src/lib` 放通用逻辑：
-
-| 文件 | 作用 |
-| --- | --- |
-| `axios.ts` | API 实例、CSRF、401 跳转、错误包装 |
-| `access.ts` | 角色标签、角色说明、权限判断 |
-| `format.ts` | 格式化展示 |
-| `navigation.ts` | 安全跳转 |
-| `sanitize-html.ts` | 基于 isomorphic-dompurify 的前端展示/预览 HTML 清洗 |
-| `utils.ts` | className 合并等工具 |
-
-### 3.5 store
-
-`useAuthStore.ts` 保存：
-
-- `user`
-- `setLogin`
-- `setUser`
-- `logout`
-
-注意：当前持久化只保存用户信息，不持久化 token。真正认证依赖 `CSA_AUTH_TOKEN` HttpOnly Cookie；登录接口响应体不返回 JWT token。
-
+完整路由表和版本差异见 [前端说明](../csa-official-frontend/README.md) 与 [Vue 迁移](vue-migration.md)。
 ## 4. 请求流转
 
 ### 4.1 公开接口流转
@@ -535,9 +470,9 @@ modules/activity
 前端建议：
 
 ```text
-src/app/activities/page.tsx
-src/app/dashboard/activities/page.tsx
-src/components/business/activities/ActivityBoard.tsx
+src/views/public/ActivitiesView.vue
+src/router/index.ts
+src/views/business/ActivitiesView.vue
 src/services/activity.ts
 src/types/activity.ts
 ```

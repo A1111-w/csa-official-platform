@@ -369,7 +369,7 @@ Jsoup.clean(content, ABOUT_CONTENT_SAFELIST)
 
 ```text
 src/lib/sanitize-html.ts
-→ isomorphic-dompurify
+→ DOMPurify
 ```
 
 也就是说，当前是后端 Jsoup + 前端 DOMPurify 的双层清洗。
@@ -434,3 +434,7 @@ src/lib/sanitize-html.ts
 ## Agent 实验台（2026-10-31）
 
 AI API 继承既有会话、CSRF 和后端权限。知识检索 SQL 在评分前过滤 `min_role_level`；管理者不能创建高于自身等级的文档。工具名单和参数由服务端校验，仅提供知识/资源/公开竞赛只读操作，不接受模型指定任意 URL、SQL 或写操作。模型端点来自运维配置，默认不跟随 HTTP 重定向。运行归属 owner_id 且读取时重新核验知识引用 ACL；评测报告仅创建者且 Level 3 可见。来源文档和工具内容按不可信数据处理，但提示词不能提供绝对的 prompt injection 防御或事实正确性保证。外部调用会发送问题和获授权的证据，配置前应选择允许接收这些内容的服务。见 [实现边界](agent-lab.md)。
+
+## Vue 分支的浏览器边界（2026-11-08）
+
+Vue Router 在受保护导航前通过服务器会话恢复角色，不读取旧 Zustand 持久化身份。Pinia 只在内存中保存渲染信息；接口仍受 Spring Security、CSRF 和账号/会话版本保护。网络故障不会当作成功会话放行。生产 SPA 由 Nginx 托管，CSP script-src self、frame-ancestors none 等由 nginx.conf 提供，HTTPS/HSTS 仍由 Caddy 提供。静态页面壳可公开获取，敏感数据仅由授权接口返回；没有 Next proxy 中间件。

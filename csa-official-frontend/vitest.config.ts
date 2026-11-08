@@ -1,15 +1,8 @@
-import { fileURLToPath } from "node:url"
-
-import { defineConfig } from "vitest/config"
-
+import { fileURLToPath } from 'node:url'
+import { defineConfig } from 'vitest/config'
+import vue from '@vitejs/plugin-vue'
 export default defineConfig({
-  resolve: {
-    alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-    },
-  },
-  test: {
-    environment: "node",
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
-  },
+  plugins: [vue()],
+  resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
+  test: { environment: 'node', include: ['src/**/*.test.ts'], maxWorkers: 2 },
 })

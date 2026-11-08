@@ -1,140 +1,73 @@
-import { expect, test, type APIRequestContext } from "@playwright/test"
+import { expect, test, type APIRequestContext, type Page } from '@playwright/test'
 
 const username = process.env.E2E_USERNAME
 const password = process.env.E2E_PASSWORD
 const hasCredentials = Boolean(username && password)
-const apiBaseURL = process.env.E2E_API_BASE_URL || process.env.E2E_BASE_URL || "http://127.0.0.1:8080"
-
+const apiBaseURL = process.env.E2E_API_BASE_URL || process.env.E2E_BASE_URL || 'http://127.0.0.1:8080'
 type ApiEnvelope<T> = { data?: T; code?: number; message?: string }
-
 async function login(context: APIRequestContext) {
-  const csrfResponse = await context.get("/api/auth/csrf")
+  const csrfResponse = await context.get('/api/auth/csrf')
   expect(csrfResponse.ok()).toBeTruthy()
-  const csrfPayload = (await csrfResponse.json()) as ApiEnvelope<{ csrfToken: string }>
-  const csrfToken = csrfPayload.data?.csrfToken
-  expect(csrfToken).toBeTruthy()
-
-  const loginResponse = await context.post("/api/auth/login", {
-    data: { username, password },
-  })
-  expect(loginResponse.status()).toBe(200)
-  const loginPayload = (await loginResponse.json()) as ApiEnvelope<{ csrfToken: string }>
-
-  const resolvedToken = loginPayload.data?.csrfToken || csrfToken
-  if (!resolvedToken) {
-    throw new Error("Login response did not include a CSRF token")
-  }
-  return resolvedToken
+  const csrf = (await csrfResponse.json()) as ApiEnvelope<{ csrfToken: string }>
+  const response = await context.post('/api/auth/login', { data: { username, password } })
+  expect(response.status()).toBe(200)
+  const payload = (await response.json()) as ApiEnvelope<{ csrfToken: string }>
+  const token = payload.data?.csrfToken || csrf.data?.csrfToken
+  if (!token) throw new Error('Missing CSRF token')
+  return token
 }
-
-test("public privacy page is reachable", async ({ page }) => {
-  await page.goto("/privacy")
-  await expect(page.getByRole("heading", { name: "隐私说明" })).toBeVisible()
+async function mockSession(page: Page, roleLevel: number | null) {
+  await page.route('**/api/sys/user/info', route => route.fulfill({
+    status: roleLevel === null ? 401 : 200, contentType: 'application/json',
+    body: JSON.stringify(roleLevel === null ? { code: 401, message: '请登录' } : { code: 200, data: { id: 1, username: 'fixture-user', roleLevel, realName: '演示成员' } }),
+  }))
+}
+test('public privacy page renders the server policy and stays accessible without a session', async ({ page }) => {
+  await mockSession(page, null)
+  await page.route('**/api/public/privacy', route => route.fulfill({ json: { code: 200, data: {
+    policyVersion: 'fixture-2026', collectedFields: ['用户名'], purposes: { account: '提供账号服务' },
+    retention: { account: '按保留策略处理' }, userRights: ['导出个人数据'], contactEmail: 'privacy@example.invalid',
+  } } }))
+  await page.goto('/privacy')
+  await expect(page.getByRole('heading', { name: '隐私说明' })).toBeVisible()
+  await expect(page.getByText('当前版本：fixture-2026')).toBeVisible()
 })
-
-test("dashboard redirects unauthenticated visitors", async ({ page }) => {
-  await page.goto("/dashboard")
-  await expect(page).toHaveURL(/\/login\?redirect=%2Fdashboard/)
+test('dashboard rejects a stale privileged localStorage role and preserves the deep link', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('csa-auth-storage', JSON.stringify({ state: { user: { username: 'stale-root', roleLevel: 99 } } })))
+  await mockSession(page, null)
+  await page.goto('/dashboard/ai?tab=knowledge')
+  await expect(page).toHaveURL(/\/login\?redirect=/)
+  expect(new URL(page.url()).searchParams.get('redirect')).toBe('/dashboard/ai?tab=knowledge')
+  await expect(page.getByRole('button', { name: '发送问题' })).toHaveCount(0)
 })
-
-test("level 4 can open and edit the mocked carousel management workspace", async ({
-  context,
-  page,
-}) => {
-  await context.addCookies([
-    {
-      name: "CSA_AUTH_TOKEN",
-      value: "playwright-carousel-session",
-      url: "http://127.0.0.1:3000",
-      httpOnly: true,
-      sameSite: "Lax",
-    },
-  ])
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      "csa-auth-storage",
-      JSON.stringify({
-        state: { user: { username: "president", roleLevel: 4 } },
-        version: 3,
-      })
-    )
-  })
-
-  const corsHeaders = {
-    "access-control-allow-origin": "http://127.0.0.1:3000",
-    "access-control-allow-credentials": "true",
-  }
-  await page.route("**/api/sys/user/info", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      headers: corsHeaders,
-      body: JSON.stringify({
-        code: 200,
-        message: "Success",
-        data: {
-          id: 1,
-          username: "president",
-          realName: "测试会长",
-          avatar: null,
-          email: null,
-          phone: null,
-          contact: null,
-          positionType: 1,
-          roleLevel: 4,
-          balance: 0,
-          college: null,
-          className: null,
-          studentId: null,
-        },
-      }),
-    })
-  )
-  await page.route("**/api/sys/carousel/list", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      headers: corsHeaders,
-      body: JSON.stringify({
-        code: 200,
-        message: "Success",
-        data: [
-          {
-            id: 7,
-            title: "招新开放日",
-            imgUrl: "https://assets.example.test/carousel.png",
-            targetUrl: "/register",
-            sortOrder: 2,
-            status: 1,
-            createTime: "2026-08-27T09:00:00",
-            updateTime: "2026-08-27T09:30:00",
-          },
-        ],
-      }),
-    })
-  )
-  await page.route("https://assets.example.test/carousel.png", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "image/png",
-      body: Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
-        "base64"
-      ),
-    })
-  )
-
-  await page.goto("/dashboard/carousels")
-
-  await expect(page.getByRole("heading", { name: "首页轮播管理" })).toBeVisible()
-  await expect(page.getByRole("heading", { name: "招新开放日" })).toBeVisible()
-  await expect(page.getByText("已启用")).toBeVisible()
-
-  await page.getByRole("button", { name: "编辑" }).click()
-  await expect(page.getByLabel("标题")).toHaveValue("招新开放日")
-  await expect(page.getByRole("textbox", { name: "跳转地址", exact: true })).toHaveValue(
-    "/register"
-  )
+test('member cannot navigate directly to an admin page', async ({ page }) => {
+  await mockSession(page, 1)
+  await page.goto('/dashboard/audit')
+  await expect(page).toHaveURL(/\/forbidden$/)
+  await expect(page.getByRole('heading', { name: '你暂时没有访问权限' })).toBeVisible()
+})
+test('session outage offers a retry instead of showing protected content', async ({ page }) => {
+  await page.route('**/api/sys/user/info', route => route.fulfill({ status: 503, json: { code: 503, message: 'fixture outage' } }))
+  await page.goto('/dashboard')
+  await expect(page).toHaveURL(/\/session-error\?redirect=/)
+  await expect(page.getByRole('heading', { name: '暂时无法验证会话' })).toBeVisible()
+  await mockSession(page, 1)
+  await page.getByRole('link', { name: '重新验证' }).click()
+  await expect(page.getByRole('heading', { name: '控制台概览' })).toBeVisible()
+})
+test('president can load a carousel for editing with its original values', async ({ page }) => {
+  await mockSession(page, 4)
+  await page.route('**/api/sys/carousel/list', route => route.fulfill({ json: { code: 200, data: [{
+    id: 7, title: '招新开放日', imgUrl: '/fixture.png', targetUrl: '/register', sortOrder: 2, status: 1,
+    createTime: '2026-11-08T09:00:00', updateTime: '2026-11-08T09:30:00',
+  }] } }))
+  await page.route('**/fixture.png', route => route.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="#116477"/></svg>' }))
+  await page.goto('/dashboard/carousels')
+  await expect(page.getByRole('heading', { name: '首页轮播管理' })).toBeVisible()
+  await page.getByRole('button', { name: '编辑', exact: true }).click()
+  await expect(page.getByLabel('标题', { exact: true })).toHaveValue('招新开放日')
+  await expect(page.getByLabel('跳转地址（选填）')).toHaveValue('/register')
+  await expect(page.getByLabel('排序值')).toHaveValue('2')
 })
 
 test.describe("authenticated security boundary", () => {
@@ -142,8 +75,8 @@ test.describe("authenticated security boundary", () => {
 
   test("login reaches dashboard", async ({ page }) => {
     await page.goto("/login?redirect=%2Fdashboard")
-    await page.getByPlaceholder("输入你的用户名").fill(username!)
-    await page.getByPlaceholder("输入密码").fill(password!)
+    await page.getByRole("textbox", { name: "用户名", exact: true }).fill(username!)
+    await page.locator('input[name="password"]').fill(password!)
 
     const loginResponsePromise = page.waitForResponse(
       (response) =>

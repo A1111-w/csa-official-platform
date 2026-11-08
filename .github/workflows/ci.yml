@@ -2,7 +2,7 @@ name: CSA CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "codex/vue3-frontend", "codex/agent-rag-evaluation"]
   pull_request:
 
 permissions:
@@ -57,7 +57,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: csa-official-frontend/package-lock.json
       - name: Install dependencies
@@ -129,7 +129,7 @@ jobs:
       - name: Build backend image
         run: docker build --tag csa-backend:ci ./csa-official-backend
       - name: Build frontend image
-        run: docker build --build-arg NEXT_PUBLIC_API_URL=/ --tag csa-frontend:ci ./csa-official-frontend
+        run: docker build --build-arg VITE_API_URL=/ --tag csa-frontend:ci ./csa-official-frontend
       - name: Scan backend image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -178,7 +178,7 @@ jobs:
           cache: maven
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: csa-official-frontend/package-lock.json
       - name: Generate ephemeral E2E values
@@ -234,7 +234,7 @@ jobs:
       - name: Run critical browser workflows
         working-directory: csa-official-frontend
         env:
-          NEXT_PUBLIC_API_URL: http://127.0.0.1:8080
+          VITE_API_URL: /
           E2E_API_BASE_URL: http://127.0.0.1:8080
           E2E_USERNAME: member
         run: npm run test:e2e

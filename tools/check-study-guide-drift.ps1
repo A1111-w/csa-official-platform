@@ -60,10 +60,10 @@ if ($failures.Count -eq 0) {
         "EasyExcel"            = $pom.SelectSingleNode("//m:dependency[m:artifactId='easyexcel']/m:version", $ns).InnerText
         "JGit"                 = $pom.SelectSingleNode("//m:dependency[m:artifactId='org.eclipse.jgit']/m:version", $ns).InnerText
         "Knife4j"              = $pom.SelectSingleNode("//m:dependency[m:artifactId='knife4j-openapi3-jakarta-spring-boot-starter']/m:version", $ns).InnerText
-        "Next.js"              = Normalize-NpmVersion $package.dependencies.next
-        "React"                = Normalize-NpmVersion $package.dependencies.react
+        "Vue"                  = Normalize-NpmVersion $package.dependencies.vue
+        "Vue Router"           = Normalize-NpmVersion $package.dependencies.'vue-router'
         "axios"                = Normalize-NpmVersion $package.dependencies.axios
-        "isomorphic-dompurify" = Normalize-NpmVersion $package.dependencies.'isomorphic-dompurify'
+        "dompurify"            = Normalize-NpmVersion $package.dependencies.dompurify
     }
 
     foreach ($entry in $versions.GetEnumerator()) {
@@ -75,7 +75,7 @@ $resourceController = Read-Utf8 (Join-Path $ProjectRoot "csa-official-backend/sr
 $resourceService = Read-Utf8 (Join-Path $ProjectRoot "csa-official-backend/src/main/java/com/csa/official/modules/sys/service/ResourceService.java")
 $pageUtils = Read-Utf8 (Join-Path $ProjectRoot "csa-official-backend/src/main/java/com/csa/official/common/util/PageUtils.java")
 $axios = Read-Utf8 (Join-Path $ProjectRoot "csa-official-frontend/src/lib/axios.ts")
-$resourceLibrary = Read-Utf8 (Join-Path $ProjectRoot "csa-official-frontend/src/components/business/resources/ResourceLibrary.tsx")
+$resourceLibrary = Read-Utf8 (Join-Path $ProjectRoot "csa-official-frontend/src/views/business/ResourcesView.vue")
 $globalHandler = Read-Utf8 (Join-Path $ProjectRoot "csa-official-backend/src/main/java/com/csa/official/common/exception/GlobalExceptionHandler.java")
 $securityConfig = Read-Utf8 (Join-Path $ProjectRoot "csa-official-backend/src/main/java/com/csa/official/config/SecurityConfig.java")
 $jwtFilter = Read-Utf8 (Join-Path $ProjectRoot "csa-official-backend/src/main/java/com/csa/official/config/JwtAuthenticationFilter.java")
@@ -96,9 +96,9 @@ Require-Contains $resourceService "map(ResourceVO::from)" "Entity-to-VO conversi
 Require-Contains $pageUtils "DEFAULT_PAGE_SIZE = 10" "Default page size"
 Require-Contains $pageUtils "MAX_PAGE_SIZE = 100" "Maximum page size"
 Require-Contains $resourceLibrary "const pageSize = 8" "Frontend page size"
-Require-Contains $resourceLibrary "setItems(response.records)" "React records state"
-Require-Contains $resourceLibrary "setPages(Math.max(response.pages || 1, 1))" "React page state"
-Require-Contains $resourceLibrary "setTotal(response.total || 0)" "React total state"
+Require-Contains $resourceLibrary "items.value = response.records" "Vue records state"
+Require-Contains $resourceLibrary "pages.value = Math.max(response.pages || 1, 1)" "Vue page state"
+Require-Contains $resourceLibrary "total.value = response.total || 0" "Vue total state"
 Require-Contains $axios "const payload = response.data as unknown" "Axios transport envelope extraction"
 Require-Contains $axios "return payload.data" "Axios business payload extraction"
 

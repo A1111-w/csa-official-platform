@@ -12,13 +12,13 @@
 4. 阅读 [当前状态](project-status.md)和 [CHANGELOG.md](../CHANGELOG.md)。
 5. 明确本功能要更新哪些文档；有 Spec Kit 需求时读取对应 spec、plan、tasks。
 
-当前开发位置是 `C:\Users\Administrator\Documents\ChatGPT\计算机协会`。
+Vue 分支当前开发位置是 `D:/CSA-Project-vue`，Git common dir 为本项目 `D:/CSA-Project/.git`。
 旧 CSA 目录和 `.migration-backup/` 只作回退证据，不是第二个开发入口。
 不修改兄弟项目、全局 Git 配置、旧 worktree，也不擅自配置远程或推送。
 
 ## 2. 代码与需求
 
-- 遵循既有 Java 17 / Spring Boot、Next.js / TypeScript 分层，不顺手升级依赖或改写架构。
+- 遵循 Java 17 / Spring Boot、Vue 3 / TypeScript 分层；2026-11-08 用户授权迁移前端框架，React 版保留于 `codex/agent-rag-evaluation`，其它依赖不顺手升级。
 - 后端业务规则优先放 Service；Controller 负责协议、校验和权限入口，Mapper 负责持久化。
 - 前端请求放 `src/services/`，共用 `src/lib/axios.ts`；菜单可见性不能替代后端授权。
 - 新功能、缺陷修复、配置、重构、数据库和文档修正都属于需要记录的修改。

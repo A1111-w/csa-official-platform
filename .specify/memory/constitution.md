@@ -8,8 +8,8 @@ Documentation of implemented behavior MUST agree with source, configuration,
 and observed verification. Agents MUST distinguish implemented functionality,
 planned work, historical evidence, and unverified claims. Specifications define
 accepted requirements; agents MUST NOT weaken them to disguise code defects.
-This project contains a Spring Boot backend and Next.js frontend, not merely
-Spec Kit scaffolding.
+This branch contains a Spring Boot backend and Vue 3 frontend. The user-requested
+2026-11-08 migration retains React/Next.js on `codex/agent-rag-evaluation`.
 
 ### II. Documentation and Records Are Part of Every Feature
 
@@ -89,4 +89,4 @@ new or materially expanded obligations, and a patch version for clarifications.
 Review compliance for every delivered feature. Missing documentation or a
 missing change record is a delivery failure, not optional follow-up work.
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-16 | **Last Amended**: 2026-09-16
+**Version**: 1.0.1 | **Ratified**: 2026-09-16 | **Last Amended**: 2026-11-08
