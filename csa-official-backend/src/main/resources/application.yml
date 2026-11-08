@@ -99,6 +99,14 @@ mybatis-plus:
       logic-delete-field: deleted
 
 csa:
+  ai:
+    enabled: ${AI_ENABLED:false}
+    base-url: ${AI_BASE_URL:https://api.openai.com/v1}
+    api-key: ${AI_API_KEY:}
+    model: ${AI_MODEL:}
+    embedding-model: ${AI_EMBEDDING_MODEL:}
+    max-iterations: ${AI_MAX_ITERATIONS:4}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:25}
   public-base-url: ${PUBLIC_BASE_URL:}
   seed:
     enabled: ${DEMO_SEED_ENABLED:false}

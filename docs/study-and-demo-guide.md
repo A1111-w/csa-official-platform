@@ -179,6 +179,14 @@ CSA Official 是我做的一个计算机协会官网和内部管理平台。前�
 
 ## 5. 学习路线
 
+### 授课与自学节奏校准（2026-10-31）
+
+下面的 Day 1–14 是主题编号和历史学习记录，不要求一天学完一节，也不应把历史验收当作当前学习者已掌握。首次学习按“讲师演示一个例子 → 一起做一次 → 学习者独立改一个条件”推进；先能观察和解释结果，再要求定位源码，不以背全类名作为起步门槛。
+
+Day 5 可拆成“Cookie 请求为何需要 CSRF”和“跨域/页面内容防护”；Day 7 拆成“资源列表”和“上传/受控下载”；Day 14 拆成“本地启动”和“隔离环境运维演练”。每次只选一条链路，其余内容留作查阅。遇到环境故障单独排查，不占用概念讲解后又要求赶完原进度。
+
+RAG/Agent 首版已实现，教学从 [Agent 分层学习安排](agent-learning-plan.md) 开始：先离线结果，再授权、检索、评测，最后选修真实模型与向量融合。每课有前置、步骤、成功信号、卡点和讲师提示。旧路线中的 PDF、专用向量库、通知草稿等仍属后续设想，不能作为当前课堂操作要求。
+
 ### 当前学习进度基线（2026-08-26）
 
 | 阶段 | 状态 | 已证明的能力 | 仍需补证据 |
@@ -3747,3 +3755,7 @@ cd <project-root>\csa-official-backend
 7. 用生产配置缺失秘密的故障演练确认 Compose fail-fast；再用临时假值验证配置可展开，绝不把假值写入仓库或日志。
 
 完整操作、迁移、回滚和验收表见 [`production-readiness/learning-guide.md`](production-readiness/learning-guide.md)；Phase 2 账号、审计、隐私、上传、邮件和幂等演练见 [`production-readiness/phase-2-learning-guide.md`](production-readiness/phase-2-learning-guide.md)，实际结果见 [`production-readiness/phase-2-verification.md`](production-readiness/phase-2-verification.md)。
+
+## 2026-10-31 更新：Agent 技术演示
+
+RAG/Agent 首版已从路线变成可运行代码：`modules/ai` 和 `/dashboard/ai`。授课使用 [Agent 分层学习安排](agent-learning-plan.md)，先让学习者找到一条回答的原文，再逐步解释权限、分块、关键词检索和评测；模型工具调用与向量融合放到选修。不要把离线摘录称为自主 Agent，不把关键词覆盖率称为忠实度，也不要把 MySQL JSON 向量的穷举计算说成 ANN 索引。功能演示见 [Agent 实验台](agent-lab.md)，指标解释见 [评测说明](ai-evaluation.md)。本指南旧有未来路线不等同本轮已实现范围，历史测试数字也不代替本次运行结果。

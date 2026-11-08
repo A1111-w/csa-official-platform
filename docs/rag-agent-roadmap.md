@@ -1,8 +1,10 @@
 # RAG / Agent 扩展路线
 
-这份文档是后续把 CSA Official 从“协会官网 + 管理后台”升级成“协会智能管理平台”的详细路线。它对应八周教学计划里的第 3 周到第 6 周内容。
+这份文档保留把 CSA Official 扩展成“协会智能管理平台”的长期设计，用于选题和架构讨论。本仓库没有可核对的固定八周课表，不再用“第 3 周到第 6 周”作为完成期限。
 
-当前项目还没有真正实现 RAG 和 Agent，本文件是设计方案和实施清单。
+2026-10-31：已实现首版 Agent 实验台，实际范围见 [使用说明](agent-lab.md)、[后端实现](ai-backend.md)与[评测说明](ai-evaluation.md)。下文仍是更广泛的长期设计，不代表 PDF/DOCX 解析、专用向量数据库、异步索引和所有工具均已交付。
+
+教学从 [Agent 分层学习安排](agent-learning-plan.md) 开始，先跑现成的离线文本检索、权限和规则评测，再选修 live 与 embedding；无需先搭独立 demo 或重建下文 `kb_*` 表。每次只教一个可以观察结果的问题，按掌握情况推进。第 3 节流程图已校准权限顺序：当前实现把角色条件放进候选 SQL，在排序和 Top-K 之前过滤，不能教成“先全库 Top-K 再隐藏无权结果”。第 14 节是未来工程拆分，不是零基础每周必交清单；通知草稿、部门可见性等尚不能要求学生在当前页面完成。
 
 ## 1. 最终目标
 
@@ -90,7 +92,7 @@ flowchart TD
 
   Upload --> Parse --> Clean --> Chunk --> Embed --> Store
   Chunk --> Meta
-  Ask --> Retrieve --> Filter --> Prompt --> LLM --> Answer --> Log
+  Ask --> Filter --> Retrieve --> Prompt --> LLM --> Answer --> Log
 ```
 
 ## 4. 建议新增模块

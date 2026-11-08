@@ -289,3 +289,7 @@ JWT_SECRET=$(openssl rand -hex 32) docker compose up --build   # hex 32 字节 =
 一个关键差异：`local-dev.md` 里 `.env.example` 默认 `CSA_CACHE_TYPE=memory`（方便学习，不装 Redis），而本编排既然已经拉起了 Redis 容器，默认就用 `redis`，更贴近生产。想省事随时可切回 `memory`（第 6 节）。
 
 另外，手动开发用的是 `npm run dev` 热更新，改代码即时生效；Docker 编排是生产构建，改了前端代码需要重新 `docker compose up --build`。因此日常写代码建议用 `local-dev.md` 的流程，而验证整体部署、给别人演示、或需要一条命令拉起全套时用本文的 Docker 流程。
+
+## AI 实验台配置（2026-10-31）
+
+默认离线配置不新增外部服务。启用真实模型时由后端进程接收 `.env.example` 的 AI 环境变量；Docker Compose 的 backend `environment` 需显式注入这些变量，不能假设宿主 `.env` 会自动传入容器。凭据只在服务端设置。Flyway 新增 V7/V8；运行/评测 JSON 纳入现有数据库备份。同步批量评测最长包含 5 次 Agent 执行，代理需允许相应请求耗时；这是演示功能，未提供分布式队列和全局配额。配置和未验证项见 [后端说明](ai-backend.md)与[本轮记录](change-records/2026-10-31-agent-integration.md)。

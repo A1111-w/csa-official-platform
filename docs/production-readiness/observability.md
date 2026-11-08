@@ -29,3 +29,7 @@ Prometheus 必须与 Compose 的内部网络连通，或通过受控的管理网
 `deploy/monitoring/prometheus-alerts.yml` 给出可复制的规则：backend 不可抓取、5xx 比例、P95 延迟、Hikari 连接池逼近上限和 readiness 失败。阈值是起点，应根据 400 名学生的真实基线调整。
 
 告警处理顺序：先看 readiness 和最近发布，再按 `X-Request-ID` 查 JSON 日志，确认数据库/Redis/邮件/上传依赖，必要时切换流量到维护页并执行恢复 runbook。告警通知中不得包含请求体、Authorization、Cookie 或邮件验证码。
+
+## AI 运行指标（2026-10-31）
+
+AgentService 通过 Micrometer 记录 `csa.ai.runs`（mode/outcome 标签）和 `csa.ai.run.duration`（mode 标签）；Prometheus 名称按现有 Micrometer 命名转换规则导出。运行结果保存工具/模型步骤耗时与提供商 usage token；离线 token 为 0，不伪造调用成本。没有接入 Langfuse 或 OpenTelemetry 外部采集器，原监控部署仍需独立验收。见 [Agent 实验台](../agent-lab.md)。

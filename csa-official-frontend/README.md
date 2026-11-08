@@ -70,3 +70,9 @@ npm run test:e2e
 - 登录接口响应体只返回 `csrfToken`、`username`、`roleLevel`，`src/store/useAuthStore.ts` 只保存页面渲染需要的用户信息。
 - 业务接口集中在 `src/services/*.ts`。
 - 菜单权限配置在 `src/config/menu.ts`，真实权限仍以后端为准。
+
+## Agent 实验室（2026-10-31）
+
+新增 `/dashboard/ai`，会员可进行知识库问答并查看引用与执行轨迹；部长及以上可维护文本资料、运行标注数据集评测并导出 JSON 报告。页面使用真实 API，离线摘录与在线模型模式按后端状态明确区分。没有标注的评测维度显示 `—`。
+
+完整用法、请求契约、权限与测试入口见 [Agent 实验室前端](../docs/ai-frontend.md)。本次验证见 [修改记录](../docs/change-records/2026-10-31-ai-frontend.md)。

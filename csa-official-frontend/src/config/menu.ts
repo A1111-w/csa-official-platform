@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react"
 import {
   Award,
+  Bot,
   ClipboardCheck,
   FileText,
   FileSpreadsheet,
@@ -39,6 +40,12 @@ export const dashboardMenu: MenuItem[] = [
     title: "资源库",
     href: "/dashboard/resources",
     icon: HardDrive,
+    minLevel: 1,
+  },
+  {
+    title: "Agent 实验室",
+    href: "/dashboard/ai",
+    icon: Bot,
     minLevel: 1,
   },
   {

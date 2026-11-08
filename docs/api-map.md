@@ -1349,3 +1349,7 @@ GET /api/test/password
 7. GlobalExceptionHandler：最终返回什么错误结构。
 
 这个顺序比直接盯着前端页面更快。
+
+## Agent 实验台（2026-10-31）
+
+新增 `/api/ai`：Level 1 可 GET `/status`、GET `/documents`、POST `/runs`、GET `/runs/{id}`；Level 3 可 POST `/documents`、DELETE `/documents/{id}`、POST `/evaluations`、GET `/evaluations/{id}`。运行和评测读取限定创建者；知识候选按当前等级过滤，写入文档访问等级不能高于操作者。请求/响应与上限见 [API 合同](../specs/002-agent-rag-evaluation/contracts/api.md)，评测公式见 [评测说明](ai-evaluation.md)。所有端点继续使用现有 Cookie、CSRF、统一 R 和错误码机制。

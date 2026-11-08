@@ -529,3 +529,7 @@ npm run dev -- -p 3001
 
 - `SameSite=None` 时必须 `Secure=true`。
 - prod/production profile 下认证 Cookie 必须 `Secure=true`。
+
+## Agent 实验台（2026-10-31）
+
+在最新开发基线启动后访问 `/dashboard/ai`。默认离线，不需要模型密钥；先以 Level 3 录入文本，再用 Level 1 问答。首次启动需顺序执行新增 V7/V8，测试使用隔离 H2，不读取旧工作目录 `.env`。真实模型和可选 embedding 配置见 [后端说明](ai-backend.md)，演示步骤见 [Agent 实验台](agent-lab.md)。本次 `D:/CSA-Project-agent` 因 npm registry 拒绝连接而复用依赖 junction，前端需 `npm run dev -- --webpack`；网络恢复并成功 `npm ci` 后可用默认启动方式，详情见实验台说明。

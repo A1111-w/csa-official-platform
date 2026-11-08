@@ -1,15 +1,15 @@
 # 当前项目状态
 
-核对日期：2026-09-20（Asia/Shanghai）
+核对日期：2026-10-31（Asia/Shanghai）；旧迁移与 CI 数字保留为历史记录。
 
 ## 项目身份
 
 - 项目：CSA Official 计算机协会官网与协会管理平台。
-- 当前路径：`C:\Users\Administrator\Documents\ChatGPT\计算机协会`。
+- 当前开发路径：`D:\CSA-Project-agent`（本轮隔离 Git worktree）。
 - Git 根目录：当前路径。
-- Git 元数据：当前路径下独立的 `.git`。
+- Git 元数据：`.git` 链接至 `D:\CSA-Project\.git\worktrees\CSA-Project-agent`，common dir 为本项目 `D:\CSA-Project\.git`；不涉及其他项目仓库。
 - GitHub 远程：`origin` 指向 `https://github.com/A1111-w/csa-official-platform.git`；2026-09-20 已核对远程保留迁移前提交 `fb1a2f9`。
-- 当前分支：`codex/development`。
+- 当前分支：`codex/agent-rag-evaluation`；基线为 `origin/codex/development` 的 `b3a7377`（2026-09-20）。其前端源码包含 `codex/resume-review-workflow`（2026-08-28）的完整版本。
 - 迁入基线：`fb1a2f9`（轮播管理工作流完成后的 CSA 历史）；后续提交以 Git log 为准。
 - 主体代码：`csa-official-backend/`（Spring Boot 3.5.14 / Java 17）和
   `csa-official-frontend/`（Next.js 16.3.3 / React 19.2.4）。
@@ -29,16 +29,16 @@
 - 首页轮播管理、文件上传与受控访问、简历 Git 同步、邮件投递补偿。
 - MySQL + Flyway V1-V6、Redis/内存缓存、Prometheus 指标、健康探针和 Docker Compose。
 - 公开竞赛缓存已补齐版本化 JSON Cache-Aside、空值缓存、TTL 抖动、热点回源锁、失效 generation 和 ready 后可失败预热；简历审核和提案投票补齐数据库并发边界。
-- RAG/Agent、多学校 SaaS 和支付仍是规划或 ADR，不是已实现产品能力。
+- 2026-10-31 增加 RAG/Agent 实验台，范围与本轮验证见 [Agent 实验台](agent-lab.md)；多学校 SaaS 和支付仍是规划或 ADR。
 
-## 当前未提交工作
+## 历史迁入时未提交工作
 
 迁入时已有的代码和测试修改属于用户/历史工作，不由本次文档治理记录代为拆分或
 重写。当前工作区仍有登录时间投影、Redis 连接校验、登录页面动效、个人资料
 会话复用、监控告警以及相应测试和运行记录等改动。后续 agent 必须先查看
 `git status --short --branch`，不能把这些已有修改误归入自己的功能。
 
-## 当前验证证据
+## 历史验证证据（2026-09；本轮见 Agent 集成记录）
 
 本次迁移后直接执行：
 

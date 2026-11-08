@@ -24,7 +24,7 @@ CSA Official 是一个面向计算机协会的官网与内部管理平台。它�
 | 安全 | 已有 Spring Security、JWT、HttpOnly Cookie、CSRF、CORS、稳定 HTTP status / `errorCode` / `traceId` |
 | 权限 | 已有 `roleLevel` 等级体系，前端菜单隐藏 + 后端 `@PreAuthorize` |
 | 数据访问 | 使用 MyBatis-Plus + MySQL |
-| 数据库迁移 | 生产使用 Flyway V1-V6；`db/schema.sql` 只是当前结构快照，`db/seed.sql` 仅供 dev/test 演示，`SchemaConsistencyTest` 防止实体与 migration 漂移 |
+| 数据库迁移 | 迁移链为 Flyway V1-V8（V7/V8 新增 AI 数据表）；`db/schema.sql` 只是当前结构快照，`db/seed.sql` 仅供 dev/test 演示，`SchemaConsistencyTest` 防止实体与 migration 漂移 |
 | 缓存/限流 | 支持 Redis，也支持本地内存缓存降级；公开竞赛读链路使用版本化 Cache-Aside、空值缓存、TTL 抖动、热点互斥锁和启动预热 |
 | 文件 | 支持上传、类型限制、大小限制、受控访问 |
 | 简历审核 | 已完成“成员提交 → 部长队列 → 详情 → 通过/驳回 → 状态回写”前后端闭环；接口和竞态规则见 `docs/api-map.md` |
@@ -32,7 +32,7 @@ CSA Official 是一个面向计算机协会的官网与内部管理平台。它�
 | 一键启动 | 已提供 `docker-compose.yml`，一条命令拉起 MySQL、Redis、后端、前端 |
 | 文档 | 已补充本 README、启动文档、接口地图、架构说明、数据库说明、部署手册、学习路线 |
 | 测试 | 后端全量测试、前端测试、lint 和生产构建均纳入验收，实际结果见生产就绪验证记录 |
-| AI 扩展 | 已规划 RAG / Agent 接入路线，尚未真正落库实现 |
+| AI 实验台 | `/dashboard/ai`：持久化知识库、BM25/可选语义混合检索、受限工具 Agent、引用/轨迹及批量规则评测；[使用说明](docs/agent-lab.md) |
 
 ## 技术栈
 
@@ -603,6 +603,7 @@ cd <project-root>\csa-official-backend
 - [安全设计说明](docs/security-design.md)
 - [RAG / Agent 扩展路线](docs/rag-agent-roadmap.md)
 - [项目讲解、演示和学习路线](docs/study-and-demo-guide.md)
+- [Agent 实验台：循序学习与授课安排](docs/agent-learning-plan.md)
 - [模块完成度审计](docs/module-completeness.md)
 - [功能闭环、测试与 Git 回退](docs/feature-completion-learning-guide.md)
 - [轮播管理调用链与回退学习文档](docs/carousel-management-learning-guide.md)
@@ -622,7 +623,7 @@ cd <project-root>\csa-official-backend
 3. 本地开发友好：Redis 可以降级到内存缓存，`.env.example` 明确列出配置。
 4. 前后端契约清楚：统一返回、Axios 拦截器、接口地图、类型定义。
 5. 工程化有验证：后端测试、前端构建、启动文档和排错手册。
-6. AI 扩展路线明确：资源库可以自然演进为 RAG 知识库，竞赛和资源查询可以封装成 Agent 工具。
+6. AI 实验台：可以演示权限感知 RAG、BM25/向量 RRF 融合、模型工具调用预算、证据引用与可重复评测；离线和真实模型模式明确区分。
 
 ## 当前生产就绪状态与后续优先级
 

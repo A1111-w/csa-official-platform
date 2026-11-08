@@ -13,6 +13,31 @@
 
 ## [Unreleased]
 
+### 20261031-agent-integration | Agent 实验台与规则评测
+
+- 日期：2026-10-31（Asia/Shanghai）；执行 agent：Codex 主 agent；需求：技术展示用 Agent/RAG/评测与新版前端。
+- 变更：基于 `b3a7377` 创建隔离工作分支，新增 EvaluationModels/Metrics/Service/Controller、V8、数据集快照、Recall/MRR/工具召回/关键词覆盖与失败隔离，集成后端和前端；同步 README、API、架构、安全、数据库、启动、部署、教学和完成度文档。
+- 规格：`specs/002-agent-rag-evaluation/`；配置默认离线，V7/V8 为向前新增表，保留现有鉴权。详细状态、真实验证结果、风险和回退见 [集成记录](docs/change-records/2026-10-31-agent-integration.md)。没有推送、部署或真实模型质量验收。
+- 验收状态：后端全量回归及最终 AI 30 项定向测试、前端 28 项测试、lint、Webpack 生产构建与文档漂移均通过；浏览器验收因自动审批拒绝启动本地服务而未执行，保留为未完成项。
+
+### 20261031-ai-backend | 权限感知 RAG 与受限 Agent
+
+- 日期：2026-10-31；执行 agent：Codex backend；关联同上 US1/US2。
+- 变更：V7 知识与运行表、重叠分块、BM25/可选 embedding+RRF、三个只读工具、离线/在线模式、执行预算/并发/HTTP 边界、Micrometer 与 owner/ACL 校验。
+- 文档与验证：[后端说明](docs/ai-backend.md)、[独立记录](docs/change-records/2026-10-31-ai-backend.md)；最终集成结果以主记录为准。小型穷举索引，不含 ANN、PDF/OCR 或真实外部模型验收。回退应用时保留已应用迁移和附加表。
+
+### 20261031-ai-frontend | Agent 实验台界面
+
+- 日期：2026-10-31；执行 agent：Codex frontend；关联 US1/US2/US3。
+- 变更：新增 `/dashboard/ai` 与菜单、真实 API 服务、角色可见性、文本导入、问答引用/轨迹、标注数据集和报告导出；保留共享 Cookie/CSRF 请求链，不修改依赖版本。
+- 文档与验证：[前端说明](docs/ai-frontend.md)、[独立记录](docs/change-records/2026-10-31-ai-frontend.md)；真实环境及依赖安装限制见记录。回退这些新增入口和模块，不覆盖旧工作目录修改。
+
+### 20261031-agent-design | 规格、开源参考与独立验证
+
+- 日期：2026-10-31；执行 agent：Codex research；关联 `specs/002-agent-rag-evaluation/`。
+- 变更：Spec Kit spec/plan/tasks、API contract/data model/quickstart/research/checklist，独立审查、Spring 事务回滚测试以及 V8 MySQL/Flyway 集成断言。依据用户补充的教学友好性要求，新增 [4 节核心课 + 2 节选修课](docs/agent-learning-plan.md)，校准 Day 节奏与无依据的八周期限，每课补齐前置、操作、成功信号、卡点和讲师提示。文档明确 Spring AI/Ragas/Langfuse 仅为设计参考。
+- 验证与回退：[独立记录](docs/change-records/2026-10-31-agent-design.md)，主 agent 汇总当前测试结果；无架构依赖升级。回退对应新增规格和测试文件，保持应用迁移历史。
+
 ### 20260920-github-delivery | GitHub 提交整理
 
 - 日期：2026-09-20（Asia/Shanghai）；执行 agent：Codex；关联任务：用户要求登录 GitHub 并提交更新。

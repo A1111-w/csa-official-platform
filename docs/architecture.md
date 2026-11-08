@@ -566,3 +566,7 @@ src/types/activity.ts
 5. 在健康 staging 环境补跑当前镜像、Playwright、备份恢复和 Trivy 验证。
 6. 接入 RAG 后，把知识库模块单独放 `modules/kb`。
 6. 接入 Agent 后，把工具调用和审计单独放 `modules/agent`。
+
+## Agent 实验台（2026-10-31）
+
+`modules/ai` 在现有单体内新增 KnowledgeService、ModelGateway、AgentService 和 EvaluationService。入库经分块和可选 embedding 写入 MySQL；检索先做角色 ACL，再计算 BM25/向量相似度和 RRF。Agent 使用有限轮次模型循环与三个只读工具，默认离线模式明确返回摘录。评测复用相同 AgentService 并保存原始标注与逐条 runId。无新框架依赖、独立微服务或外部评测平台。见 [后端结构](ai-backend.md)及[演示指南](agent-lab.md)。

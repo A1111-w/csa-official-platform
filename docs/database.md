@@ -201,3 +201,7 @@ mysql -u <admin-user> -p -e 'CREATE DATABASE csa_db CHARACTER SET utf8mb4 COLLAT
 | `guest` | 陈路人 | 0 | 路人 |
 
 密码哈希由项目实际使用的 Spring Security `BCryptPasswordEncoder` 生成。验收时从进程环境读取临时密码，不要把它复制到日志、文档、测试或截图中。详见 `db/seed.sql` 文件头和 `DevSeedDataInitializer`。
+
+## AI 数据表（2026-10-31）
+
+V7 新增 `ai_document`（标题、来源、最低等级、分块数、创建者）、`ai_chunk`（内容、文档 ID、序号、可选向量 JSON 与 embedding 模型）、`ai_run`（创建者及运行结果 JSON）；V8 新增 `ai_evaluation`（创建者及带数据集的报告 JSON）。知识入库/删除使用事务；owner/role 索引支持隔离查询。不改写 V1–V6。数据包含用户内容，现阶段无自动保留期清理。应用升级执行向前迁移，`db/schema.sql` 仍只是快照。见 [数据模型](../specs/002-agent-rag-evaluation/data-model.md)。

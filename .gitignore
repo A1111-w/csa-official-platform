@@ -6,6 +6,7 @@
 
 # Runtime and disaster-recovery artifacts.
 backups/
+logs/
 restore-work/
 *.log
 

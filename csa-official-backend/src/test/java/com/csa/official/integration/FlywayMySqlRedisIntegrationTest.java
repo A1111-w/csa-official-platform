@@ -90,7 +90,67 @@ class FlywayMySqlRedisIntegrationTest {
             try (ResultSet history = statement.executeQuery(
                     "SELECT version FROM flyway_schema_history WHERE success = 1 ORDER BY installed_rank DESC LIMIT 1")) {
                 assertThat(history.next()).isTrue();
-                assertThat(history.getString(1)).isEqualTo("6");
+                assertThat(history.getString(1)).isEqualTo("8");
+            }
+            try (ResultSet aiTables = statement.executeQuery("""
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = DATABASE()
+                      AND table_name IN ('ai_document', 'ai_chunk', 'ai_run', 'ai_evaluation')
+                    """)) {
+                assertThat(aiTables.next()).isTrue();
+                assertThat(aiTables.getInt(1)).isEqualTo(4);
+            }
+            try (ResultSet aiIndexes = statement.executeQuery("""
+                    SELECT COUNT(DISTINCT index_name)
+                    FROM information_schema.statistics
+                    WHERE table_schema = DATABASE()
+                      AND index_name IN ('idx_ai_document_role', 'idx_ai_chunk_document',
+                                         'idx_ai_run_owner', 'idx_ai_evaluation_owner')
+                    """)) {
+                assertThat(aiIndexes.next()).isTrue();
+                assertThat(aiIndexes.getInt(1)).isEqualTo(4);
+            }
+            try (PreparedStatement document = connection.prepareStatement("""
+                    INSERT INTO ai_document (id, title, source, min_role_level, chunk_count, owner_id)
+                    VALUES ('integration-document', 'Knowledge fixture', 'integration', 3, 1, 60001)
+                    """)) {
+                assertThat(document.executeUpdate()).isEqualTo(1);
+            }
+            try (PreparedStatement chunk = connection.prepareStatement("""
+                    INSERT INTO ai_chunk (id, document_id, chunk_index, content, embedding_json, embedding_model)
+                    VALUES ('integration-document:0', 'integration-document', 0, 'RAG evidence', '[1.0,0.0]', 'fixture')
+                    """)) {
+                assertThat(chunk.executeUpdate()).isEqualTo(1);
+            }
+            try (PreparedStatement run = connection.prepareStatement("""
+                    INSERT INTO ai_run (id, owner_id, result_json)
+                    VALUES ('integration-run', 60001, '{"mode":"offline"}')
+                    """)) {
+                assertThat(run.executeUpdate()).isEqualTo(1);
+            }
+            try (PreparedStatement report = connection.prepareStatement("""
+                    INSERT INTO ai_evaluation (id, owner_id, report_json)
+                    VALUES ('integration-evaluation', 60001, '{"evaluatorVersion":"rules-v1","dataset":[]}')
+                    """)) {
+                assertThat(report.executeUpdate()).isEqualTo(1);
+            }
+            try (ResultSet evidence = statement.executeQuery("""
+                    SELECT c.content, c.embedding_model, d.min_role_level
+                    FROM ai_chunk c JOIN ai_document d ON d.id = c.document_id
+                    WHERE d.id = 'integration-document'
+                    """)) {
+                assertThat(evidence.next()).isTrue();
+                assertThat(evidence.getString("content")).isEqualTo("RAG evidence");
+                assertThat(evidence.getString("embedding_model")).isEqualTo("fixture");
+                assertThat(evidence.getInt("min_role_level")).isEqualTo(3);
+            }
+            try (ResultSet report = statement.executeQuery("""
+                    SELECT report_json FROM ai_evaluation
+                    WHERE id = 'integration-evaluation' AND owner_id = 60001
+                    """)) {
+                assertThat(report.next()).isTrue();
+                assertThat(report.getString(1)).contains("rules-v1", "dataset");
             }
             try (ResultSet reviewIndex = statement.executeQuery("""
                     SELECT COUNT(*)

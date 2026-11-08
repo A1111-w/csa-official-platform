@@ -89,3 +89,7 @@ cd <project-root>\csa-official-backend
 ```
 
 2026-07-30 的 Testcontainers 验证使用 MySQL 8.0.36 和 Redis 7.2：空库迁到 V1、写入旧数据、升级 V2、校验规范化和 Redis round trip，1/1 通过。当前源码已扩展到 V6；集成测试现额外校验 `biz_resume.version`、`idx_resume_user_version`、CAS 条件更新、投票唯一约束和 Redis `SETNX`。这些断言仍需在健康 Docker 或 staging 实际执行；生产发布还必须先处理上面的重复数据查询。
+
+## AI 实验台迁移（2026-10-31）
+
+本轮新增 V7 `ai_document` / `ai_chunk` / `ai_run` 和 V8 `ai_evaluation`，从 V6 按顺序向前升级至 V8。只新增表，不修改已有业务表。旧版应用回退时可保留这些附加表，不要删除已应用的 migration 或执行自动 DROP。H2 隔离验证覆盖新表读写；真实 MySQL/Testcontainers 与 staging 验收结果以本轮 [集成记录](../change-records/2026-10-31-agent-integration.md)为准。旧段落的 V6 属于历史基线。
