@@ -15,6 +15,8 @@
 
 前端为 Vue3.5.45 / Vue Router4.6.4 / Pinia3.0.4 / Vite8.3.6 / TypeScript，后端为 Spring Boot3.5.14 / Java17。保留公开官网、认证、安全、全部工作台和Agent实验室业务契约。Flyway V1–V8，不新增数据库迁移。
 
+2026-11-18 的首页改版基于 Vue 3 分支开发，可在 `codex/vue3-homepage-redesign` 查看。变更范围和当次前端验证见 [首页改版记录](change-records/2026-11-18-vue3-homepage.md)。
+
 迁移内容和API角色清单见 [前端说明](../csa-official-frontend/README.md)、[Vue迁移](vue-migration.md)。默认离线Agent提供真实检索和规则评测，在线模型需单独配置和验收。
 
 ## 验证事实

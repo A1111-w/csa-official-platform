@@ -13,6 +13,13 @@
 
 ## [Unreleased]
 
+### 20261118-vue3-homepage | Vue 3 官网星环首页
+
+- 2026-11-18（Asia/Shanghai），Codex 主任务协调星环、星图和浏览器验收。关联 [首页改版规格](specs/004-vue3-homepage/spec.md)。
+- 正式 Vue 首页加入星环行星、连续昼夜、点击星波和 CSA 粒子字样。功能星图连接现有路由，保留协会动态、介绍、排行榜和成员数据。没有依赖、API 或数据库迁移。
+- ESLint、构建、71 项 Vitest、12 项 Chromium 回归及 52 项文档一致性检查通过。3 项真实认证用例因未配置隔离测试账号而跳过。交付独立 Vue 3 改版分支。
+- [公开页说明](docs/vue-public-auth.md) · [星环首屏](docs/vue-home-hero.md) · [核验与回退记录](docs/change-records/2026-11-18-vue3-homepage.md)。
+
 ### 20261108-vue-integration | Vue 3 迁移与 React 双分支
 
 - 日期：2026-11-08；执行：Codex主agent；需求：前端Vue3、保留React版本、上传GitHub；规格 specs/003-vue3-frontend。

@@ -11,9 +11,12 @@
 
 React 基线提交为 `bf1415c`，包含 Agent/RAG/规则评测完整源码。Vue 从这个提交继续开发；原 `D:/CSA-Project` 用户改动保持原样。两分支共享后端接口和 Flyway V1–V8，不需要为前端切换清库或修改业务数据。
 
+本次首页改版在 `codex/vue3-homepage-redesign`，由 Vue 3 基线独立检出。
+
 ## 功能
 
 - 公开首页、协会介绍、贡献者、隐私说明、竞赛活动、会员资源入口。
+- 「星环地平线」首页支持拖动行星、点击星波、预览时间和暂停动效。「数据星图」通往竞赛、资源、简历、Agent 实验室和贡献者。
 - 登录、注册、邮箱验证码、找回密码、重置密码、账号安全与个人资料。
 - 资源发布与下载、竞赛和协作者管理、简历编辑及审核、提案投票、部门任命。
 - 审计查询、贡献记录、成员 Excel 导出、首页轮播与公开内容维护。
@@ -42,7 +45,7 @@ Vue 版采用客户端 SPA，公开页不再由 Next.js 服务端渲染。静态
 要求 Node.js >=22.12、npm、JDK 17+，后端数据库使用隔离开发环境。
 
 ```powershell
-cd D:/CSA-Project-vue/csa-official-frontend
+cd csa-official-frontend
 npm ci
 Copy-Item .env.example .env.local
 npm run dev
@@ -74,12 +77,13 @@ csa-official-frontend/
   src/App.vue            导航和工作台布局
 csa-official-backend/     现有 Java 服务
 specs/003-vue3-frontend/  迁移规格与验收任务
+specs/004-vue3-homepage/  首页改版规格与验收任务
 docs/                    运维、接口、教学和变更记录
 ```
 
 ## 阅读入口
 
-- [Vue 前端说明](csa-official-frontend/README.md) · [迁移与对照](docs/vue-migration.md)
+- [Vue 前端说明](csa-official-frontend/README.md) · [公开首页与认证](docs/vue-public-auth.md) · [迁移与对照](docs/vue-migration.md)
 - [学习与演示指南](docs/study-and-demo-guide.md) · [Agent 教学计划](docs/agent-learning-plan.md)
 - [Agent 实验台](docs/agent-lab.md) · [评测指标定义](docs/ai-evaluation.md)
 - [接口地图](docs/api-map.md) · [架构](docs/architecture.md) · [安全](docs/security-design.md)

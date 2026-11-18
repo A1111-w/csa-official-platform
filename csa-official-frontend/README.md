@@ -1,6 +1,6 @@
 # CSA Vue 3 前端
 
-当前分支 `codex/vue3-frontend` 使用 Vue 3 + Vite + TypeScript + Vue Router + Pinia。React 版保存在 `codex/agent-rag-evaluation`（`bf1415c`），不是在同一个应用里混装 React/Vue。
+Vue 基线 `codex/vue3-frontend` 和首页改版 `codex/vue3-homepage-redesign` 使用 Vue 3 + Vite + TypeScript + Vue Router + Pinia。React 版保存在 `codex/agent-rag-evaluation`（`bf1415c`）。
 
 ## 启动与验证
 
@@ -24,6 +24,16 @@ npm run test:e2e
 `start` 是 Vite 构建预览；生产使用 Docker/Nginx。Playwright 首次需 `npx playwright install chromium`。浏览器测试默认自己启动 Vite。真实后端测试仅在提供隔离环境 `E2E_USERNAME`、`E2E_PASSWORD` 时执行；其它 fixtures 不依赖外部模型或数据库。
 
 如果本机 npm 旧代理不可达，先核对自己的代理配置。本轮安装使用仅当前命令的 `--proxy=null --https-proxy=null` 直连，没有更改用户或全局 npm 配置。
+
+## 首页改版
+
+`/` 的星环首屏随北京时间更新。可以手动预览一天中的任意分钟，或恢复「跟随北京时间」。拖动星空或聚焦后按方向键可改变视角，点按星空可触发星波。首屏提供暂停和重置按钮。
+
+数据星图使用现有 Vue Router 入口，活动、介绍、排名和成员来自公开 API。项目提供同源 WebP 和 Canvas 动效，系统减少动态效果设置会停止自动播放。见 [公开页说明](../docs/vue-public-auth.md)。
+
+```powershell
+npm run test:e2e -- e2e/vue-home-design.spec.ts
+```
 
 ## 页面与权限
 

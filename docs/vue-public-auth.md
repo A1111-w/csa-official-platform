@@ -1,18 +1,27 @@
 # Vue 公开页与认证流程
 
-日期：2026-11-08。此文档描述 `codex/vue3-frontend`；保留的 React 实现在 `codex/agent-rag-evaluation` 的 `bf1415c`。
+此文档记录基于 `codex/vue3-frontend` 的公开页和 2026-11-18 首页改版。保留的 React 实现在 `codex/agent-rag-evaluation` 的 `bf1415c`。
 
 ## 页面与行为
 
 | 页面 | Vue 文件 | 保持的行为 |
 | --- | --- | --- |
-| `/` | `src/views/public/HomeView.vue` | 介绍、成员、轮播、排行榜四接口独立读取；部分失败保留可用内容并可重试；6 秒轮播、前后切换、暂停；成员统计、工作区入口 |
+| `/` | `src/views/public/HomeView.vue` | 星环首屏、功能星图、工作台或登录入口。介绍、成员、轮播、排行榜四项独立读取，部分失败保留可用内容并可重试 |
 | `/about` | `src/views/public/AboutView.vue` | 富文本介绍经 `sanitizeHtml` 净化，显示公开核心成员 |
 | `/contributors` | `src/views/public/ContributorsView.vue` | 公开成员、头像、头衔、部门、角色与部门数量 |
 | `/privacy` | `src/views/public/PrivacyView.vue` | 服务器政策版本、收集字段、目的、期限、权利和联系方式 |
 | 4 个认证 URL | `src/views/auth/AuthView.vue` | 登录、注册、忘记密码、重置密码，随路由切换清理密码与错误 |
 
 资源和竞赛公开页由业务迁移模块负责，导航和全局页脚由应用布局负责。公开内容请求失败不替换成假数据；所有页面含加载、空数据及失败反馈。首页卡片、认证表单和成员头像占位使用共享主题变量，随全站浅色/深色切换。
+
+## 首页互动与数据
+
+- 星谷背景来自同源 `public/brand/csa-horizon-landscape.webp`。北京时钟和手动时间预览驱动同一套连续光照，夜间星光增强。拖动星空或聚焦后按方向键可改变视角，暂停和重置由首屏按钮控制。
+- 点击或轻触星空可触发彩色星波。系统减少动态效果时，自动播放和点击粒子停用，导航、时间预览和直接调整视角仍可使用。
+- 「聚成 CSA」让粒子汇成协会字样。暂停或减少动态效果时可以直接切换静态字样。更多操作见 [星环首屏](vue-home-hero.md)。
+- 功能星图通往 `/competitions`、`/resources`、`/dashboard/resume`、`/dashboard/ai` 和 `/contributors`。受限入口由既有会话守卫及后端权限判断。
+- 活动轮播在满足自动播放条件时每 6 秒切换，可用前后按钮和暂停控制。指针或焦点进入轮播、页面隐藏或系统减少动态效果时暂停自动切换。标题、图片和详情地址沿用公开接口，详情链接限制为站内路径或 HTTP(S)。
+- 贡献排名、成员统计、介绍和空状态使用现有接口结果。星空场景独立运行，可以在公开接口部分失败时继续显示。
 
 ## 认证约束
 
@@ -34,4 +43,4 @@
 
 在前端目录运行 `npm test -- src/views/auth/AuthView.test.ts src/views/public/PublicViews.test.ts`。测试使用隔离服务 mock，不连接真实账户或数据库；具体执行结果见 [变更记录](change-records/2026-11-08-vue-public-auth.md)。
 
-Vue 视觉使用原生控件和响应式 CSS，未复刻 React 装饰动画。公开页面由 SPA 在客户端加载，SSR/SEO 行为与 Next 版本不同；部署须支持深层路由回退，参见主迁移文档。
+首页改版可以通过 `npm run test:e2e -- e2e/vue-home-design.spec.ts` 验证。公开页面由 SPA 在客户端加载，静态宿主须支持深层路由回退，参见主迁移文档。
