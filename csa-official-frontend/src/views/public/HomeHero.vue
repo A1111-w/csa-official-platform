@@ -369,30 +369,32 @@ onUnmounted(() => {
 }
 
 .hero-landscape {
-  background: url('/brand/csa-observatory-sky.webp') center 56% / cover no-repeat, #0b152b;
+  --horizon-position: center 63%;
+  background: #0b152b url('/brand/csa-ring-horizon-midnight.webp') var(--horizon-position) / cover no-repeat;
   transform: translate(var(--art-x, 0), var(--art-y, 0)) scale(1.035);
-  filter: brightness(calc(1.04 + var(--daylight) * .17 + var(--twilight) * .12)) saturate(calc(1.02 + var(--twilight) * .13));
-  transition: filter .3s ease-out;
 }
 .hero-landscape::before, .hero-landscape::after {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
-  mix-blend-mode: screen;
 }
 .hero-landscape::before {
-  background: radial-gradient(ellipse at var(--sun-x) 79%, color-mix(in srgb, var(--sky-color) 62%, #fff), var(--sky-color) 16%, transparent 67%);
-  opacity: calc(.045 + var(--daylight) * .29 + var(--twilight) * .54);
+  background:
+    linear-gradient(166deg, transparent 30%, color-mix(in srgb, var(--sky-color) 14%, transparent) 76%, transparent),
+    url('/brand/csa-ring-horizon-dawn.webp') var(--horizon-position) / cover no-repeat;
+  opacity: max(var(--daylight), calc(var(--twilight) * .92));
+  transition: opacity .65s ease-out;
 }
 .hero-landscape::after {
-  background: linear-gradient(165deg, transparent 15%, var(--sky-color) 82%, transparent 100%);
-  opacity: calc(.035 + var(--daylight) * .24 + var(--twilight) * .16);
+  background: radial-gradient(ellipse at var(--sun-x) 78%, var(--sky-color), transparent 66%);
+  mix-blend-mode: screen;
+  opacity: calc(var(--daylight) * .13 + var(--twilight) * .09);
 }
 .hero-mask {
   background:
-    linear-gradient(180deg, #080e1c51, transparent 17%, transparent 70%, #080e1cf7),
-    linear-gradient(90deg, #080e1c6e, #080e1c19 43%, transparent 62%);
+    linear-gradient(180deg, #080e1c26, transparent 17%, transparent 78%, #080e1cd6),
+    linear-gradient(90deg, #080e1c65, #080e1c22 41%, transparent 61%);
 }
 .hero-frame {
   position: relative;
@@ -553,7 +555,7 @@ onUnmounted(() => {
 }
 @media (max-width: 720px) {
   .hero-sky { align-items: end; min-height: clamp(35rem, 77svh, 42rem); }
-  .hero-landscape { background-position: 61% 50%; }
+  .hero-landscape { --horizon-position: 80% center; }
   .hero-mask {
     background: linear-gradient(180deg, #080e1c38, transparent 18%, transparent 42%, #080e1cc7 76%, #080e1c 100%);
   }
@@ -574,6 +576,6 @@ onUnmounted(() => {
   .sky-clock time { font-size: .8rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hero-landscape, .hero-actions .button, .hero-buttons button { transition: none; }
+  .hero-landscape::before, .hero-actions .button, .hero-buttons button { transition: none; }
 }
 </style>

@@ -21,6 +21,8 @@
 
 同日完成公开、账号、工作台和异常页面的全站改造与 162 组布局检查。[全站改版记录](change-records/2026-11-19-sitewide.md)
 
+Vue 分支随后接入九幅同源 ImageGen 背景，用于首页昼夜过渡、公开栏目与工作台等页面。[背景图改版记录](change-records/2026-11-19-sky-art.md)
+
 迁移内容和API角色清单见 [前端说明](../csa-official-frontend/README.md)、[Vue迁移](vue-migration.md)。默认离线Agent提供真实检索和规则评测，在线模型需单独配置和验收。
 
 ## 验证事实

@@ -13,6 +13,10 @@
 
 ## [Unreleased]
 
+### 20261119-sky-art | 九幅星空背景
+
+- 2026-11-19（Asia/Shanghai），Codex 按「星环地平线」方向用 ImageGen 生成九幅 WebP 背景。首页按北京时间混合晨夜场景，公开栏目、账号、工作台和状态页按内容选择图像。[用途、验证和回退](docs/change-records/2026-11-19-sky-art.md)
+
 ### 20261119-vue-sitewide | Vue 3 全站版式与逐页检查
 
 - 2026-11-19（Asia/Shanghai），Codex 与公开页、账号及工作台协作者完成 27 个前端页面改造。默认深色，浅色偏好可保存；改版涉及全宽栏目标题、图文和成员名录、账号表单、角色导航、工作台表格与异常恢复入口。[全站规格](specs/005-vue-sitewide-design/spec.md)

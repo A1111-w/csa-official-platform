@@ -1,7 +1,9 @@
-/* Each workspace picks a different accent and position on the orbital chart. */
+/* Match each workspace function to its scene and orbital motif. */
 .workspace-shell {
   --signal: #8ae8ce;
   --orbit: -16deg;
+  --scene: url('/brand/csa-compute-bridge.webp');
+  --scene-position: 68% 49%;
   --signal-ink: color-mix(in srgb, var(--signal) 70%, var(--text));
   --line: color-mix(in srgb, var(--signal) 15%, var(--border));
   --entry: color-mix(in srgb, var(--bg) 40%, var(--surface));
@@ -29,6 +31,27 @@
 .workspace-shell[data-workspace-page='member-export'] { --signal: #a7d9c8; --orbit: 16deg; }
 .workspace-shell[data-workspace-page='carousels'] { --signal: #e4b1db; --orbit: 22deg; }
 .workspace-shell[data-workspace-page='settings'] { --signal: #a6c8d4; --orbit: -12deg; }
+.workspace-shell:is([data-workspace-page='profile'], [data-workspace-page='resume']) {
+  --scene: url('/brand/csa-project-lab.webp'); --scene-position: 50% 49%;
+}
+.workspace-shell:is([data-workspace-page='resources'], [data-workspace-page='resume-reviews'], [data-workspace-page='member-export']) {
+  --scene: url('/brand/csa-optical-archive.webp'); --scene-position: 70% 52%;
+}
+.workspace-shell[data-workspace-page='competitions'] {
+  --scene: url('/brand/csa-comet-circuit.webp'); --scene-position: 70% 50%;
+}
+.workspace-shell:is([data-workspace-page='vote'], [data-workspace-page='contributions']) {
+  --scene: url('/brand/csa-mirror-constellation.webp'); --scene-position: 72% 49%;
+}
+.workspace-shell[data-workspace-page='departments'] {
+  --scene: url('/brand/csa-signal-array.webp'); --scene-position: 70% 55%;
+}
+.workspace-shell:is([data-workspace-page='audit'], [data-workspace-page='settings']) {
+  --scene: url('/brand/csa-magnetic-veil.webp'); --scene-position: 72% 50%;
+}
+.workspace-shell[data-workspace-page='carousels'] {
+  --scene: url('/brand/csa-orbital-port.webp'); --scene-position: 60% 48%;
+}
 .workspace-shell .sidebar {
   top: var(--site-header-height, 68px);
   height: calc(100svh - var(--site-header-height, 68px));
@@ -68,6 +91,8 @@
   position: relative;
   isolation: isolate;
   overflow: hidden;
+  min-height: clamp(10rem, 15vw, 13rem);
+  align-content: center;
   padding: clamp(1rem, 2.25vw, 2.4rem) 0 clamp(1.3rem, 2.5vw, 2.5rem);
   margin: 0;
   border: 0;
@@ -76,20 +101,15 @@
   background: transparent;
   box-shadow: none;
 }
-.workspace-shell main .page > header:not(.overview-header)::before {
+.workspace-shell main .page > header::before {
   position: absolute;
   z-index: -2;
-  inset: 0 0 0 37%;
+  inset: 0 0 0 25%;
   content: '';
   pointer-events: none;
-  background: url('/brand/csa-observatory-sky.webp') right calc(42% + var(--orbit-position,0%)) / 165% auto no-repeat;
-  filter: hue-rotate(var(--orbit)) saturate(.87);
-  opacity: .74;
-  mask-image: linear-gradient(90deg, transparent 0, #0009 37%, #000 100%);
+  background: var(--scene) var(--scene-position) / cover no-repeat;
+  mask-image: linear-gradient(90deg, transparent, #0002 21%, #000d 54%, #000 73%);
 }
-.workspace-shell:is([data-workspace-page='profile'],[data-workspace-page='contributions'],[data-workspace-page='competitions']) { --orbit-position: 22%; }
-.workspace-shell:is([data-workspace-page='resources'],[data-workspace-page='member-export'],[data-workspace-page='resume-reviews']) { --orbit-position: -22%; }
-:root[data-theme='light'] .workspace-shell main .page > header:not(.overview-header)::before { opacity: .23; }
 .workspace-shell main .page > header > :not(button) { position: relative; }
 .workspace-shell main .page > header::after {
   position: absolute;
@@ -176,15 +196,6 @@
 .workspace-shell .empty { border-style: dashed; background: var(--entry); }
 .workspace-shell .panel > p + button { margin-top: .7rem; }
 .workspace-shell .sidebar nav a:focus-visible, .workspace-shell main :focus-visible { outline-offset: 3px; }
-.workspace-shell .overview-header::before {
-  position: absolute;
-  z-index: -2;
-  content: '';
-  inset: 0;
-  background: linear-gradient(90deg, var(--bg) 2%, color-mix(in srgb, var(--bg) 78%, transparent) 45%, transparent 83%),
-    url('/brand/csa-observatory-sky.webp') 71% 50% / cover;
-  mask-image: linear-gradient(0deg, transparent, #000 15%, #000 85%, transparent);
-}
 .workspace-shell .overview-facts {
   display: flex; flex-wrap: wrap; gap: .8rem 2.2rem;
   margin: 1.5rem 0 0;
@@ -272,6 +283,14 @@
 .workspace-shell .rich-text { overflow-wrap: anywhere; }
 .workspace-shell .rich-text img { max-width: 100%; }
 
+@media (min-width: 761px) {
+  .workspace-shell main .page > header > p,
+  .workspace-shell main .page > header.toolbar > div,
+  .workspace-shell .lab-header > .toolbar > div,
+  .workspace-shell .lab-header .metrics {
+    max-width: 52%;
+  }
+}
 @media (min-width: 1120px) {
   .workspace-shell:is([data-workspace-page='resources'],[data-workspace-page='competitions']) .workspace-flow > form.panel {
     display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start;
@@ -298,13 +317,15 @@
   .workspace-shell .workspace-nav-select select { width: min(68%,20rem); margin: 0; }
   .workspace-shell .sidebar:has(.workspace-nav-select) nav { display: none; }
   .workspace-shell main > .page { padding: .6rem 1rem 2.4rem; }
-  .workspace-shell main .page > header { padding: 1rem 0 1.25rem; }
-  .workspace-shell main .page > header:not(.overview-header)::before {
-    inset-inline-start: 26%;
-    opacity: .33;
-    mask-image: linear-gradient(90deg,transparent 0, #0005 40%,#000 100%);
+  .workspace-shell main .page > header {
+    --scene-height: clamp(4.75rem, 19vw, 7.5rem);
+    min-height: auto; padding: calc(var(--scene-height) + .8rem) 0 1.25rem;
   }
-  .workspace-shell main .page > header::after { opacity: .3; width: 33%; right: -2rem; }
+  .workspace-shell main .page > header::before {
+    inset: 0 0 auto; height: var(--scene-height);
+    mask-image: linear-gradient(#000 73%, transparent);
+  }
+  .workspace-shell main .page > header::after { opacity: .3; width: 33%; height: var(--scene-height); top: calc(var(--scene-height) / 2); }
   .workspace-shell .agent-lab .metrics { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .workspace-shell .agent-lab .metrics > div { padding: .55rem .4rem; }
   .workspace-shell .agent-lab .metrics strong { font-size: .95rem; }

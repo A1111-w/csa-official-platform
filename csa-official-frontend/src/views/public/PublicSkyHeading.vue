@@ -190,7 +190,9 @@ onUnmounted(() => {
 <style scoped>
 .public-sky-heading {
   --glow: #72d0c0;
-  --position: 52%;
+  --scene: url('/brand/csa-signal-array.webp');
+  --position: 50% 53%;
+  --mobile-position: 79% 44%;
   position: relative;
   overflow: hidden;
   isolation: isolate;
@@ -205,27 +207,45 @@ onUnmounted(() => {
   z-index: -1;
 }
 .public-sky-heading::before {
-  background: url('/brand/csa-observatory-sky.webp') center var(--position) / cover;
-  opacity: .7;
-  filter: hue-rotate(var(--hue, 0deg));
+  background: var(--scene) var(--position) / cover no-repeat;
 }
 .public-sky-heading::after {
   background:
-    linear-gradient(90deg, #070e1bef, #08102099 32%, transparent 60%, #0b112077),
-    linear-gradient(0deg, #0a1020c9, transparent 50%),
-    radial-gradient(ellipse at 75% 65%, color-mix(in srgb, var(--glow) 17%, transparent), transparent 55%);
+    linear-gradient(90deg, #060d18df, #070f1cb0 30%, #08102027 58%, transparent 79%),
+    linear-gradient(0deg, #08111d75, transparent 32%);
 }
-.public-sky-heading[data-motif='network'] { --glow: #eeb3ff; --position: 33%; --hue: 10deg; }
-.public-sky-heading[data-motif='meteors'] { --glow: #ffd0a5; --position: 82%; --hue: 8deg; }
-.public-sky-heading[data-motif='layers'] { --glow: #b7caff; --position: 24%; --hue: -24deg; }
-.public-sky-heading[data-motif='shield'] { --glow: #aeebcc; --position: 74%; --hue: -52deg; }
+.public-sky-heading[data-motif='network'] {
+  --scene: url('/brand/csa-mirror-constellation.webp');
+  --glow: #eeb3ff;
+  --position: 55% 52%;
+  --mobile-position: 72% 45%;
+}
+.public-sky-heading[data-motif='meteors'] {
+  --scene: url('/brand/csa-comet-circuit.webp');
+  --glow: #ffd0a5;
+  --position: 50% 42%;
+  --mobile-position: 74% 38%;
+}
+.public-sky-heading[data-motif='layers'] {
+  --scene: url('/brand/csa-optical-archive.webp');
+  --glow: #b7caff;
+  --position: 50% 48%;
+  --mobile-position: 77% 45%;
+}
+.public-sky-heading[data-motif='shield'] {
+  --scene: url('/brand/csa-magnetic-veil.webp');
+  --glow: #aeebcc;
+  --position: 55% 49%;
+  --mobile-position: 74% 44%;
+}
 .heading-inner {
   width: min(var(--atlas-width, 1480px), calc(100% - 2 * var(--atlas-gutter, clamp(1rem,5vw,5rem))));
   margin: auto;
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: clamp(1rem, 4vw, 4rem);
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: clamp(.5rem, 1vw, 1rem);
   min-height: clamp(14.5rem, 23vw, 22rem);
   padding-block: clamp(1.7rem, 4vw, 3rem);
 }
@@ -235,10 +255,9 @@ onUnmounted(() => {
 .heading-copy :slotted(p) { margin-top: 1rem; font-size: .85rem; color: var(--glow); }
 .heading-art {
   position: relative;
-  justify-self: end;
-  width: min(100%, 28rem);
+  order: -1;
+  width: clamp(6rem, 9vw, 9rem);
   aspect-ratio: 2;
-  background: radial-gradient(ellipse, #0a1528cf 0, #08132980 31%, transparent 68%);
 }
 .heading-art::before {
   content: '';
@@ -251,12 +270,15 @@ onUnmounted(() => {
 }
 .heading-art canvas { position: relative; width: 100%; height: 100%; display: block; }
 @media (max-width: 620px) {
-  .heading-inner { display: flex; min-height: 14rem; align-items: end; padding-block: 5.7rem 1.8rem; }
+  .heading-inner { min-height: 15rem; justify-content: end; padding-block: 3rem 1.6rem; }
   .heading-copy { max-width: 100%; }
   .heading-copy h1 { font-size: clamp(2rem, 7.6vw, 2.85rem); }
   .heading-copy p { margin-top: .45rem; font-size: .89rem; }
-  .heading-art { position: absolute; top: -.6rem; right: 0; width: 12.5rem; opacity: .9; }
-  .public-sky-heading::after { background: linear-gradient(0deg, #081020ed, #0810208f 50%, #08102033); }
+  .public-sky-heading::before { background-position: var(--mobile-position); }
+  .public-sky-heading::after {
+    background: linear-gradient(0deg, #081020f5 2%, #0810209e 43%, transparent 80%),
+      linear-gradient(90deg, #0810207a, transparent 67%);
+  }
 }
 </style>
 

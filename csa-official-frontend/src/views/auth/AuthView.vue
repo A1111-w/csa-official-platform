@@ -171,24 +171,36 @@ onUnmounted(() => { alive = false; generation++; clearInterval(countdownTimer) }
 
 <style scoped>
 .auth-layout {
-  --photo-x: 69%; --starlight: #b3e3dc; --tilt: -22deg;
+  --photo: url('/brand/csa-orbital-port.webp');
+  --photo-position: 60% 50%; --starlight: #ffdcad; --tilt: -22deg;
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(21rem, .9fr);
   align-items: start; width: min(100%, 1460px); max-width: 1460px; margin-inline: auto;
   gap: clamp(2rem, 6vw, 6rem); padding: clamp(1.5rem, 4vw, 4rem) clamp(1rem, 5vw, 5rem);
 }
-.auth-layout[data-auth-mode="register"] { --photo-x: 55%; --starlight: #f4c799; --tilt: 21deg; }
-.auth-layout[data-auth-mode="forgot"] { --photo-x: 79%; --starlight: #a4d0ff; --tilt: -49deg; }
-.auth-layout[data-auth-mode="reset"] { --photo-x: 61%; --starlight: #e2b9ed; --tilt: 49deg; }
+.auth-layout[data-auth-mode="register"] {
+  --photo: url('/brand/csa-project-lab.webp');
+  --photo-position: 54% 51%; --starlight: #f4c799; --tilt: 21deg;
+}
+.auth-layout[data-auth-mode="forgot"] {
+  --photo: url('/brand/csa-signal-array.webp');
+  --photo-position: 73% 53%; --starlight: #a4d0ff; --tilt: -49deg;
+}
+.auth-layout[data-auth-mode="reset"] {
+  --photo: url('/brand/csa-magnetic-veil.webp');
+  --photo-position: 73% 47%; --starlight: #e2b9ed; --tilt: 49deg;
+}
 .auth-intro {
   position: sticky; top: 5.5rem; isolation: isolate; overflow: hidden;
   display: flex; flex-flow: column; justify-content: space-between;
   min-height: clamp(30rem, 65svh, 45rem); padding: clamp(1.3rem, 3vw, 3rem);
   color: #fbf8ef; border-radius: 4px;
-  background: linear-gradient(0deg, #070d1cf2 0%, transparent 46%, #08102475), url('/brand/csa-observatory-sky.webp') var(--photo-x) center / cover no-repeat, #0c1528;
+  background: linear-gradient(0deg, #070d1cf0, transparent 39%),
+    radial-gradient(ellipse at top left, #070d1cbf, transparent 44%),
+    var(--photo) var(--photo-position) / cover no-repeat, #0c1528;
 }
 .auth-back { align-self: start; display: inline-flex; align-items: center; min-height: 44px; gap: .6em; color: #fff9ed; font-size: .9rem; }
-.orbit { position: absolute; z-index: -1; inset: 17% -13% 6%; overflow: hidden; pointer-events: none; }
+.orbit { position: absolute; z-index: -1; inset: 17% -13% 6%; overflow: hidden; pointer-events: none; opacity: .66; }
 .orbit i { position: absolute; inset: 21% 15%; border: 1px solid color-mix(in srgb, var(--starlight) 58%, transparent); border-radius: 50%; transform: rotate(var(--tilt)); }
 .orbit i:nth-child(2) { inset: 12% 23%; transform: rotate(calc(var(--tilt) + 40deg)); opacity: .65; }
 .orbit i:nth-child(3) { inset: 33% 4%; opacity: .68; }
@@ -226,7 +238,7 @@ onUnmounted(() => { alive = false; generation++; clearInterval(countdownTimer) }
 .auth-card > .error { margin-block: .8rem; }
 @media (max-width: 720px) {
   .auth-layout { grid-template-columns: minmax(0, 1fr); gap: 1rem; max-width: 39rem; padding-block: 1rem 2rem; }
-  .auth-intro { position: relative; top: auto; min-height: 9rem; padding: .65rem 1.25rem 1rem; }
+  .auth-intro { position: relative; top: auto; min-height: clamp(10rem, 37vw, 12rem); padding: .65rem 1.25rem 1rem; }
   .identity { gap: 0; }
   .identity span { font-size: .82rem; }
   .identity strong { font-size: 1.5rem; }
