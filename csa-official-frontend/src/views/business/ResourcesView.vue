@@ -83,10 +83,17 @@ async function download(item: ResourceItem) {
 </script>
 
 <template>
-  <section class="page stack">
+  <section :class="dashboard ? 'page stack' : 'atlas-route'">
     <header v-if="dashboard"><p class="eyebrow">RESOURCES</p><h1>资源库</h1><p class="muted">课程资料、比赛题解与项目模板，让每一次积累都能被找到。</p></header>
     <PublicSkyHeading v-else motif="layers" title="资源库" description="查找课程资料、比赛题解、项目模板和工具。" />
-    <div v-if="!canView" class="panel empty"><h2>资源库需要会员身份</h2><p>登录会员账号后即可浏览与下载资料。</p><RouterLink v-if="!auth.user" class="button" to="/login?redirect=%2Fresources">登录后查看</RouterLink><p v-else>当前账号尚未达到会员等级，请联系协会负责人。</p></div>
+    <div :class="dashboard ? 'workspace-flow' : 'page atlas-body stack'">
+    <section v-if="!canView" class="resource-access">
+      <div>
+        <h2>资源库需要会员身份</h2>
+        <p>{{ auth.user ? '当前账号尚未达到会员等级，请联系协会负责人。' : '登录会员账号后即可浏览与下载资料。' }}</p>
+      </div>
+      <RouterLink v-if="!auth.user" class="button" to="/login?redirect=%2Fresources">登录后查看 <span aria-hidden="true">↗</span></RouterLink>
+    </section>
     <template v-else>
       <form v-if="canManage" class="panel stack" @submit.prevent="save">
         <h2>{{ draft.id ? '编辑资源' : '发布资源' }}</h2>
@@ -97,14 +104,46 @@ async function download(item: ResourceItem) {
         <p v-if="uploading" role="status">正在上传文件…</p>
         <div class="actions"><button :disabled="saving || uploading">{{ saving ? '保存中…' : draft.id ? '保存修改' : '发布资源' }}</button><button type="button" class="secondary" :disabled="saving || uploading" @click="draft = empty()">{{ draft.id ? '取消编辑' : '清空表单' }}</button></div>
       </form>
-      <div class="toolbar"><label>分类 <select v-model="category" :disabled="loading" @change="loadResources(1)"><option value="">全部分类</option><option v-for="value in categories" :key="value" :value="value">{{ value }}</option></select></label><span class="muted">共 {{ total }} 份资源</span><button class="secondary" :disabled="loading" @click="loadResources()">刷新</button></div>
+      <div class="toolbar resource-filter"><label>分类 <select v-model="category" :disabled="loading" @change="loadResources(1)"><option value="">全部分类</option><option v-for="value in categories" :key="value" :value="value">{{ value }}</option></select></label><span class="count muted">共 {{ total }} 份资源</span><button class="secondary" :disabled="loading" @click="loadResources()">刷新</button></div>
       <p v-if="error" class="error" role="alert">{{ error }} <button class="secondary" @click="loadResources()">重试</button></p>
       <p v-if="loading" role="status">正在加载资源…</p>
       <div v-else-if="!items.length && !error" class="panel empty">当前分类暂无资源。</div>
-      <div v-else class="grid resource-grid"><article v-for="item in items" :key="item.id" class="panel stack"><span class="badge">{{ item.category || '未分类' }}</span><h2>{{ item.title }}</h2><p>{{ item.summary || '暂无简介' }}</p><p class="muted">{{ formatDateTime(item.createTime) }} · 下载 {{ item.downloadCount || 0 }} 次</p><div class="actions"><button @click="download(item)">打开资源</button><template v-if="canManageItem(item)"><button class="secondary" :disabled="saving || uploading" @click="draft = { id: item.id, title: item.title, summary: item.summary || '', fileUrl: item.fileUrl, category: item.category || '' }">编辑</button><button class="danger" :disabled="mutating !== null || saving || uploading" @click="remove(item)">删除</button></template></div></article></div>
-      <nav class="toolbar" aria-label="资源分页"><button class="secondary" :disabled="page <= 1 || loading" @click="loadResources(page - 1)">上一页</button><span>第 {{ page }} / {{ pages }} 页</span><button class="secondary" :disabled="page >= pages || loading" @click="loadResources(page + 1)">下一页</button></nav>
+      <div v-else class="resource-grid">
+        <article v-for="item in items" :key="item.id" class="resource-item">
+          <div class="resource-copy">
+            <span class="badge">{{ item.category || '未分类' }}</span>
+            <h2>{{ item.title }}</h2><p>{{ item.summary || '暂无简介' }}</p>
+          </div>
+          <div class="resource-meta">
+            <span>{{ formatDateTime(item.createTime) }} · 下载 {{ item.downloadCount || 0 }} 次</span>
+            <div class="actions">
+              <button @click="download(item)">打开资源</button>
+              <template v-if="canManageItem(item)">
+                <button class="secondary" :disabled="saving || uploading" @click="draft = { id: item.id, title: item.title, summary: item.summary || '', fileUrl: item.fileUrl, category: item.category || '' }">编辑</button>
+                <button class="danger" :disabled="mutating !== null || saving || uploading" @click="remove(item)">删除</button>
+              </template>
+            </div>
+          </div>
+        </article>
+      </div>
+      <nav v-if="pages > 1" class="toolbar collection-pagination" aria-label="资源分页"><button class="secondary" :disabled="page <= 1 || loading" @click="loadResources(page - 1)">上一页</button><span>第 {{ page }} / {{ pages }} 页</span><button class="secondary" :disabled="page >= pages || loading" @click="loadResources(page + 1)">下一页</button></nav>
     </template>
+    </div>
   </section>
 </template>
 
-<style scoped>.resource-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))}</style>
+<style scoped>
+.workspace-flow { display: contents; }
+.resource-access { border-block: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.4rem; padding: clamp(1.5rem, 3.5vw, 3.5rem) 0; }
+.resource-access h2 { font-size: clamp(1.35rem, 2.2vw, 2rem); }
+.resource-filter { border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin: 0; gap: .85rem; }
+.resource-filter label { display: flex; align-items: center; gap: .6rem; }
+.resource-filter .count { margin-inline-start: auto; font-size: .9rem; }
+.resource-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr)); gap: 1rem clamp(1.5rem, 3.5vw, 3rem); }
+.resource-item { display: flex; min-width: 0; flex-direction: column; justify-content: space-between; gap: 1.6rem; padding: 1rem .1rem 1.5rem; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.resource-copy h2 { font-size: clamp(1.15rem, 1.6vw, 1.6rem); margin-top: .65rem; }
+.resource-copy p { font-size: .95rem; margin-top: .36rem; }
+.resource-meta > span { color: var(--muted); font-size: .83rem; }
+.resource-meta .actions { margin-top: .75rem; }
+@media (max-width: 480px) { .resource-filter .count { margin-inline-start: 0; } }
+</style>

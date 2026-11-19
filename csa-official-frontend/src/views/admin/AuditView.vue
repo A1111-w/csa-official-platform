@@ -46,7 +46,7 @@ onMounted(() => load())
         <div class="actions"><button :disabled="loading">查询</button><button type="button" class="secondary" :disabled="loading" @click="reset">重置</button></div>
       </form>
       <p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="loading" role="status">正在加载日志…</p>
-      <div v-else class="panel table-wrap"><table><thead><tr><th>时间</th><th>操作人</th><th>操作</th><th>对象</th><th>结果</th><th>详情</th></tr></thead><tbody>
+      <div v-else class="panel table-wrap" role="region" aria-label="审计日志表" tabindex="0"><table><thead><tr><th>时间</th><th>操作人</th><th>操作</th><th>对象</th><th>结果</th><th>详情</th></tr></thead><tbody>
         <tr v-for="item in items" :key="item.id"><td>{{ formatDateTime(item.createTime) }}</td><td>{{ item.actorUsername || '—' }}<small>ID {{ item.actorUserId ?? '—' }}</small></td><td>{{ item.action }}</td><td>{{ item.targetType || '—' }} / {{ item.targetId || '—' }}</td><td><span class="badge">{{ item.result }}</span></td><td><details><summary>查看详情 #{{ item.id }}</summary><dl><dt>请求 ID</dt><dd>{{ item.requestId || '—' }}</dd><dt>IP 地址</dt><dd>{{ item.ipAddress || '—' }}</dd><dt>User-Agent</dt><dd>{{ item.userAgent || '—' }}</dd></dl><pre>{{ details(item.detailsJson) }}</pre></details></td></tr>
         <tr v-if="!items.length"><td colspan="6" class="empty">没有符合条件的日志。</td></tr>
       </tbody></table></div>

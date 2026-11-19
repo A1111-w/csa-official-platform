@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/store/useAuthStore'
 import { competitionService, type CompetitionItem, type CompetitionDetailItem } from '@/services/competition'
@@ -19,6 +19,8 @@ const page = ref(1), pages = ref(1), loading = ref(false), saving = ref(false), 
 const empty = () => ({ id: undefined as number | undefined, title: '', content: '', coverImg: '', startTime: '', endTime: '', status: 1 })
 const draft = ref(empty()), grantTarget = ref<CompetitionItem | null>(null), editorId = ref<number | null>(null), keyword = ref('')
 const detail = ref<CompetitionDetailItem | null>(null), detailBusy = ref(false)
+const detailHeading = ref<HTMLElement | null>(null)
+let detailsTrigger: HTMLElement | null = null
 const filteredMembers = computed(() => members.value.filter(m => (m.roleLevel ?? 0) >= 1 && [m.realName, m.username, m.email, m.departmentName].some(v => v?.toLowerCase().includes(keyword.value.trim().toLowerCase()))))
 const statuses = [{ value: 0, label: '未发布' }, { value: 1, label: '进行中' }, { value: 2, label: '已结束' }]
 const statusLabel = (value: CompetitionItem['status']) => statuses.find(s => s.value === Number(value))?.label || String(value ?? '待更新')
@@ -47,6 +49,7 @@ watch(dashboard, () => { draft.value = empty(); grantTarget.value = null; detail
 watch(canManage, async allowed => { if (allowed) { try { members.value = await userService.list({ minRoleLevel: 1, size: 120 }) } catch (e) { notify.error(e instanceof Error ? e.message : '成员加载失败') } } }, { immediate: true })
 async function openDetail(item: CompetitionItem, edit = false) {
   if (detailBusy.value) return
+  if (!edit) detailsTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null
   const fromDashboard = dashboard.value
   detailBusy.value = true
   try {
@@ -59,7 +62,11 @@ async function openDetail(item: CompetitionItem, edit = false) {
       draft.value = { id: result.id, title: result.title, content: result.content || '', coverImg: result.coverImg || '', startTime: dateInput(result.startTime), endTime: dateInput(result.endTime), status: Number(result.status) }
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
-    else detail.value = result
+    else {
+      detail.value = result
+      await nextTick()
+      detailHeading.value?.focus()
+    }
   } catch (e) { notify.error(e instanceof Error ? e.message : '详情加载失败') }
   finally { detailBusy.value = false }
 }
@@ -90,19 +97,66 @@ async function grant() {
 </script>
 
 <template>
-  <section class="page stack">
+  <section :class="dashboard ? 'page stack' : 'atlas-route'">
     <header v-if="dashboard"><p class="eyebrow">COMPETITIONS</p><h1>比赛管理</h1><p class="muted">发现比赛、参与训练，在真实项目中共同成长。</p></header>
     <PublicSkyHeading v-else motif="meteors" title="比赛与活动" description="发现比赛、参与训练，在真实项目中共同成长。" />
+    <div :class="dashboard ? 'workspace-flow' : 'page atlas-body stack'">
     <form v-if="canManage" class="panel stack" @submit.prevent="save"><h2>{{ draft.id ? '编辑比赛' : '发布比赛' }}</h2><div class="form-grid"><label class="field">比赛标题<input v-model="draft.title" :disabled="saving || uploading || detailBusy" required /></label><label class="field">状态<select v-model.number="draft.status" :disabled="saving || uploading || detailBusy"><option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option></select></label></div><label class="field">比赛详情<textarea v-model="draft.content" :disabled="saving || uploading || detailBusy" rows="7" required /></label><div class="form-grid"><label class="field">开始时间<input v-model="draft.startTime" :disabled="saving || uploading || detailBusy" type="datetime-local" /></label><label class="field">结束时间<input v-model="draft.endTime" :disabled="saving || uploading || detailBusy" type="datetime-local" /></label></div><label class="field">封面地址<input v-model="draft.coverImg" :disabled="saving || uploading || detailBusy" /></label><label class="field">上传封面<input type="file" accept="image/*" :disabled="uploading || saving" @change="upload" /></label><img v-if="resolveAssetUrl(draft.coverImg)" :src="resolveAssetUrl(draft.coverImg)" class="cover" alt="比赛封面预览" /><div class="actions"><button :disabled="saving || uploading">{{ saving ? '保存中…' : draft.id ? '保存修改' : '发布比赛' }}</button><button type="button" class="secondary" :disabled="saving || uploading" @click="draft = empty()">取消 / 清空</button></div></form>
     <form v-if="canManage && grantTarget" class="panel stack" @submit.prevent="grant"><h2>协作者授权：{{ grantTarget.title }}</h2><label class="field">搜索成员<input v-model="keyword" placeholder="姓名、账号、邮箱或部门" /></label><label class="field">选择协作者<select v-model.number="editorId" required><option :value="null" disabled>请选择</option><option v-for="m in filteredMembers" :key="m.id" :value="m.id">{{ m.realName || m.username }} · @{{ m.username }} · {{ m.departmentName || '未分配部门' }}</option></select></label><p v-if="!filteredMembers.length" class="muted">没有匹配的成员。</p><div class="actions"><button :disabled="granting || !editorId">确认授权</button><button type="button" class="secondary" :disabled="granting" @click="grantTarget = null">取消</button></div></form>
     <p v-if="error" class="error" role="alert">{{ error }} <button class="secondary" @click="load()">重试</button></p>
     <div v-if="needsLogin" class="panel"><p>当前服务要求登录后查看比赛。</p><RouterLink class="button" to="/login?redirect=%2Fcompetitions">登录后查看</RouterLink></div>
     <p v-else-if="loading" role="status">正在加载比赛…</p>
     <div v-else-if="!items.length && !error" class="panel empty">暂无比赛与活动。</div>
-    <div v-else class="grid competition-grid"><article v-for="item in items" :key="item.id" class="panel stack"><img v-if="resolveAssetUrl(item.coverImg)" :src="resolveAssetUrl(item.coverImg)" :alt="item.title" class="cover" loading="lazy" /><span class="badge">{{ statusLabel(item.status) }}</span><h2>{{ item.title }}</h2><p>{{ item.summary || '暂无活动简介' }}</p><p class="muted">{{ formatDateTime(item.startTime) }} 至 {{ formatDateTime(item.endTime) }}</p><div class="actions"><button class="secondary" :disabled="detailBusy" @click="openDetail(item)">查看详情</button><button v-if="canManage && item.canEdit" :disabled="detailBusy || saving || uploading" @click="openDetail(item, true)">编辑</button><button v-if="canManage && item.canGrant" class="secondary" :disabled="granting" @click="grantTarget = item; editorId = null">授权协作</button></div></article></div>
-    <nav v-if="!needsLogin" class="toolbar" aria-label="比赛分页"><button class="secondary" :disabled="page <= 1 || loading" @click="load(page - 1)">上一页</button><span>第 {{ page }} / {{ pages }} 页</span><button class="secondary" :disabled="page >= pages || loading" @click="load(page + 1)">下一页</button></nav>
-    <section v-if="detail" class="panel stack" aria-label="比赛详情"><div class="toolbar"><h2>{{ detail.title }}</h2><button class="secondary" @click="detail = null">关闭详情</button></div><div class="prose" v-html="sanitizeHtml(detail.content)" /></section>
+    <div v-else class="competition-grid">
+      <article v-for="item in items" :key="item.id" class="event" :class="{ 'with-cover': resolveAssetUrl(item.coverImg) }">
+        <img v-if="resolveAssetUrl(item.coverImg)" :src="resolveAssetUrl(item.coverImg)" :alt="item.title" class="cover" loading="lazy" />
+        <div class="event-copy">
+          <span class="event-status" :data-status="item.status">{{ statusLabel(item.status) }}</span>
+          <h2>{{ item.title }}</h2><p>{{ item.summary || '暂无活动简介' }}</p>
+          <dl class="event-dates">
+            <div><dt>开始</dt><dd>{{ formatDateTime(item.startTime) }}</dd></div>
+            <div><dt>结束</dt><dd>{{ formatDateTime(item.endTime) }}</dd></div>
+          </dl>
+          <div class="actions">
+            <button class="secondary" :disabled="detailBusy" @click="openDetail(item)">查看详情</button>
+            <button v-if="canManage && item.canEdit" :disabled="detailBusy || saving || uploading" @click="openDetail(item, true)">编辑</button>
+            <button v-if="canManage && item.canGrant" class="secondary" :disabled="granting" @click="grantTarget = item; editorId = null">授权协作</button>
+          </div>
+        </div>
+      </article>
+    </div>
+    <nav v-if="!needsLogin && pages > 1" class="toolbar collection-pagination" aria-label="比赛分页"><button class="secondary" :disabled="page <= 1 || loading" @click="load(page - 1)">上一页</button><span>第 {{ page }} / {{ pages }} 页</span><button class="secondary" :disabled="page >= pages || loading" @click="load(page + 1)">下一页</button></nav>
+    <section v-if="detail" class="event-detail" aria-label="比赛详情">
+      <div class="section-rule"><h2 ref="detailHeading" tabindex="-1">{{ detail.title }}</h2><button class="secondary" @click="detail = null; detailsTrigger?.focus()">关闭详情</button></div>
+      <div class="prose" v-html="sanitizeHtml(detail.content)" />
+    </section>
+    </div>
   </section>
 </template>
 
-<style scoped>.competition-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}.cover{width:100%;max-height:260px;object-fit:cover;border-radius:12px}</style>
+<style scoped>
+.workspace-flow { display: contents; }
+.competition-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 25rem), 1fr)); gap: clamp(1rem, 3vw, 2.5rem); }
+.event { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; border-block: 1px solid var(--border); }
+.event-copy { display: grid; gap: .6rem; align-content: center; justify-items: start; padding: 1.1rem .2rem; }
+.cover { width: 100%; aspect-ratio: 2 / 1; object-fit: cover; display: block; }
+.event-status { display: inline-flex; align-items: center; gap: .45rem; font-size: .8rem; color: var(--muted); }
+.event-status::before { content: ''; width: .42rem; height: .42rem; background: currentColor; border-radius: 50%; }
+.event-status[data-status='1'] { color: var(--accent); }
+.event h2 { font-size: clamp(1.2rem, 2.4vw, 2rem); }
+.event h2 + p { margin: 0; }
+.event-dates { display: flex; flex-wrap: wrap; gap: .75rem clamp(1rem, 3vw, 3rem); margin: .5rem 0 0; }
+.event-dates div { display: grid; gap: .2rem; }
+.event-dates dt { font-size: .78rem; color: var(--muted); }
+.event-dates dd { margin: 0; font-size: .92rem; font-variant-numeric: tabular-nums; }
+.event .actions { margin-top: .6rem; }
+.event-detail { border-block: 1px solid var(--border); padding: 1.25rem 0; }
+.event-detail .section-rule { display: flex; align-items: baseline; flex-wrap: wrap; gap: 1rem; }
+.event-detail h2 { scroll-margin-top: 7rem; }
+.prose { max-width: 65ch; margin: 1rem 0; overflow-wrap: anywhere; }
+@media (min-width: 800px) {
+  .event.with-cover:only-child { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); align-items: stretch; }
+  .event.with-cover:only-child .cover { height: 100%; min-height: 16rem; max-height: 24rem; }
+  .event.with-cover:only-child .event-copy { padding: clamp(1.5rem, 3.25vw, 3.8rem); }
+}
+</style>

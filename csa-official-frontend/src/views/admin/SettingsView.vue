@@ -80,7 +80,7 @@ onMounted(loadAbout)
 <template>
   <section class="page stack">
     <header><h1>账户与公开设置</h1><p class="muted">管理账号安全、个人数据与协会公开介绍。</p></header>
-    <div class="grid">
+    <div class="grid security-controls">
       <form class="panel stack" @submit.prevent="changePassword">
         <h2>修改密码</h2><p class="muted">修改密码会立即吊销旧会话。</p>
         <label class="field">当前密码<input v-model="passwords.current" type="password" autocomplete="current-password" required :disabled="!!pending" /></label>

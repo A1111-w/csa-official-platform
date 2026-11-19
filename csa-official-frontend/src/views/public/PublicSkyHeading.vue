@@ -174,42 +174,120 @@ onUnmounted(() => {
 
 <template>
   <header class="public-sky-heading" :data-motif="motif">
-    <div class="heading-copy">
-      <h1>{{ title }}</h1>
-      <p>{{ description }}</p>
-      <slot />
+    <div class="heading-inner">
+      <div class="heading-copy">
+        <h1>{{ title }}</h1>
+        <p>{{ description }}</p>
+        <slot />
+      </div>
+      <div class="heading-art" aria-hidden="true">
+        <canvas ref="art" width="600" height="300"></canvas>
+      </div>
     </div>
-    <canvas ref="art" width="600" height="300" aria-hidden="true"></canvas>
   </header>
 </template>
 
 <style scoped>
 .public-sky-heading {
-  --glow: #367c80;
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(13rem, .75fr);
-  align-items: center;
-  gap: 1rem;
+  --glow: #72d0c0;
+  --position: 52%;
   position: relative;
   overflow: hidden;
-  min-height: 10rem;
-  padding: clamp(1.25rem, 3vw, 2.35rem);
   isolation: isolate;
-  background: radial-gradient(ellipse at 82% 95%, color-mix(in srgb, var(--glow) 64%, transparent), transparent 59%), #101724;
-  border-bottom: 1px solid color-mix(in srgb, var(--glow) 75%, #fff);
+  background: #0b1120;
+  color-scheme: dark;
 }
-.public-sky-heading[data-motif='network'] { --glow: #63476f; }
-.public-sky-heading[data-motif='meteors'] { --glow: #8c4b3c; }
-.public-sky-heading[data-motif='layers'] { --glow: #4c5584; }
-.public-sky-heading[data-motif='shield'] { --glow: #3c654f; }
-.heading-copy { position: relative; z-index: 1; }
-.heading-copy h1 { color: #f6f8f8; }
-.heading-copy p, .heading-copy :slotted(p) { color: #d3dee5; font-size: .95rem; }
-.public-sky-heading canvas { display: block; width: min(100%, 20rem); justify-self: end; height: auto; pointer-events: none; }
+.public-sky-heading::before, .public-sky-heading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+.public-sky-heading::before {
+  background: url('/brand/csa-observatory-sky.webp') center var(--position) / cover;
+  opacity: .7;
+  filter: hue-rotate(var(--hue, 0deg));
+}
+.public-sky-heading::after {
+  background:
+    linear-gradient(90deg, #070e1bef, #08102099 32%, transparent 60%, #0b112077),
+    linear-gradient(0deg, #0a1020c9, transparent 50%),
+    radial-gradient(ellipse at 75% 65%, color-mix(in srgb, var(--glow) 17%, transparent), transparent 55%);
+}
+.public-sky-heading[data-motif='network'] { --glow: #eeb3ff; --position: 33%; --hue: 10deg; }
+.public-sky-heading[data-motif='meteors'] { --glow: #ffd0a5; --position: 82%; --hue: 8deg; }
+.public-sky-heading[data-motif='layers'] { --glow: #b7caff; --position: 24%; --hue: -24deg; }
+.public-sky-heading[data-motif='shield'] { --glow: #aeebcc; --position: 74%; --hue: -52deg; }
+.heading-inner {
+  width: min(var(--atlas-width, 1480px), calc(100% - 2 * var(--atlas-gutter, clamp(1rem,5vw,5rem))));
+  margin: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: clamp(1rem, 4vw, 4rem);
+  align-items: center;
+  min-height: clamp(14.5rem, 23vw, 22rem);
+  padding-block: clamp(1.7rem, 4vw, 3rem);
+}
+.heading-copy { position: relative; z-index: 1; max-width: 42rem; }
+.heading-copy h1 { color: #fbf7eb; font-size: clamp(2.45rem, 4.5vw, 5rem); letter-spacing: -.048em; line-height: 1.18; }
+.heading-copy p { margin-top: .85rem; max-width: 37em; color: #d9e2ee; font-size: clamp(.95rem, 1.25vw, 1.16rem); }
+.heading-copy :slotted(p) { margin-top: 1rem; font-size: .85rem; color: var(--glow); }
+.heading-art {
+  position: relative;
+  justify-self: end;
+  width: min(100%, 28rem);
+  aspect-ratio: 2;
+  background: radial-gradient(ellipse, #0a1528cf 0, #08132980 31%, transparent 68%);
+}
+.heading-art::before {
+  content: '';
+  position: absolute;
+  inset: 8% 8%;
+  border: 1px solid color-mix(in srgb, var(--glow) 24%, transparent);
+  border-radius: 50%;
+  transform: rotate(-10deg);
+  pointer-events: none;
+}
+.heading-art canvas { position: relative; width: 100%; height: 100%; display: block; }
 @media (max-width: 620px) {
-  .public-sky-heading { grid-template-columns: 1fr; min-height: 10.5rem; align-items: end; }
-  .public-sky-heading canvas { position: absolute; right: .2rem; top: -.8rem; width: 11.5rem; opacity: .76; }
-  .heading-copy { padding-top: 3rem; }
-  .heading-copy p, .heading-copy :slotted(p) { font-size: .86rem; }
+  .heading-inner { display: flex; min-height: 14rem; align-items: end; padding-block: 5.7rem 1.8rem; }
+  .heading-copy { max-width: 100%; }
+  .heading-copy h1 { font-size: clamp(2rem, 7.6vw, 2.85rem); }
+  .heading-copy p { margin-top: .45rem; font-size: .89rem; }
+  .heading-art { position: absolute; top: -.6rem; right: 0; width: 12.5rem; opacity: .9; }
+  .public-sky-heading::after { background: linear-gradient(0deg, #081020ed, #0810208f 50%, #08102033); }
+}
+</style>
+
+<style>
+.atlas-route > .atlas-body {
+  width: min(var(--atlas-width, 1480px), calc(100% - 2 * var(--atlas-gutter, clamp(1rem,5vw,5rem))));
+  max-width: none;
+  margin-inline: auto;
+  padding: clamp(2rem, 4vw, 4rem) 0 clamp(3rem, 7vw, 6rem);
+  min-width: 0;
+}
+.atlas-route .section-rule {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .5rem 1rem;
+  padding-bottom: .85rem;
+  border-bottom: 1px solid var(--border);
+}
+.atlas-route .section-rule h2 { font-size: clamp(1.35rem, 2vw, 1.85rem); }
+.atlas-route .section-rule a { font-size: .88rem; }
+.atlas-route .collection-pagination {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: .8rem;
+  color: var(--muted);
+  font-size: .88rem;
 }
 </style>

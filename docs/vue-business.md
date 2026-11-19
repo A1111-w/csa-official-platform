@@ -1,5 +1,7 @@
 # Vue 3 业务工作台
 
+在全站改版分支，侧栏和手机栏目选择器都从当前角色的菜单生成。工作台概览按个人学习、项目协作和协会管理组织入口。简历编辑与同步状态、提案与投票、竞赛发布与活动列表采用与任务对应的版式。小屏下表格在本地容器滚动。
+
 本分支将业务页面迁入 `csa-official-frontend/src/views/business/`。请求仍经 `src/services/` 和统一 axios 客户端发送，业务数据和权限由原 Spring Boot 接口管理。React 对照版本保留在 `codex/agent-rag-evaluation` 分支。
 
 | 页面 | 路径 | 迁移后的操作 |

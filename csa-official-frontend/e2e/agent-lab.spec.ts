@@ -35,7 +35,7 @@ async function prepare(context: BrowserContext, page: Page, level = 3) {
 test('member can inspect a grounded answer without management controls; writes carry CSRF', async ({ context, page }) => {
   const writes = await prepare(context, page, 1)
   await page.goto('/dashboard/ai')
-  await expect(page.getByRole('heading', { name: '让知识成为行动的起点' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Agent 实验室' })).toBeVisible()
   await page.getByLabel('今天想了解什么？').fill('Java 怎么学？')
   await page.getByRole('button', { name: '发送问题' }).click()
   await expect(page.getByText('先学习 Java，再学习 Spring Boot。', { exact: true })).toBeVisible()

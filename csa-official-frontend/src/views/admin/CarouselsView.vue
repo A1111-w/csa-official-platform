@@ -84,7 +84,11 @@ onMounted(load)
     <header class="toolbar"><div><h1>首页轮播管理</h1><p class="muted">维护图片、跳转地址、显示顺序和启用状态。保存后清理公开缓存。</p></div><button v-if="canManage" class="secondary" :disabled="loading || busy" @click="load">刷新列表</button></header>
     <p v-if="!canManage" class="panel">该页面仅向会长及以上开放。</p>
     <template v-else>
-      <div class="toolbar panel"><span>轮播总数 {{ items.length }}</span><span>当前启用 {{ enabledCount }}</span><span>{{ draft.id ? '编辑中' : '新建中' }}</span></div>
+      <dl class="carousel-summary">
+        <div><dt>轮播总数</dt><dd>{{ items.length }}</dd></div>
+        <div><dt>当前启用</dt><dd>{{ enabledCount }}</dd></div>
+        <div><dt>编辑状态</dt><dd>{{ draft.id ? '编辑中' : '新建中' }}</dd></div>
+      </dl>
       <div id="carousel-editor" class="grid">
         <form class="panel stack" @submit.prevent="save"><div class="toolbar"><h2>{{ draft.id ? '编辑轮播图' : '新增轮播图' }}</h2><button v-if="draft.id" type="button" class="secondary" :disabled="busy" @click="draft = emptyDraft()">取消编辑</button></div>
           <fieldset class="stack" :disabled="busy"><label class="field">标题<input v-model="draft.title" maxlength="128" required /></label>
@@ -99,7 +103,7 @@ onMounted(load)
         <section class="panel stack"><h2>图片预览</h2><img v-if="resolveAssetUrl(draft.imgUrl)" class="preview-image" :src="resolveAssetUrl(draft.imgUrl)" :alt="draft.title || '轮播图片预览'" /><div v-else class="empty">上传图片或填写图片地址后预览。</div><h3>{{ draft.title || '轮播标题' }}</h3><a v-if="safeTarget(draft.targetUrl)" :href="safeTarget(draft.targetUrl)" target="_blank" rel="noopener noreferrer">打开目标页面 ↗</a><p v-else class="muted">不设置跳转</p></section>
       </div>
       <p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="loading" role="status">正在加载轮播列表…</p>
-      <section v-else class="panel table-wrap"><h2>轮播列表</h2><table><thead><tr><th>图片 / 标题</th><th>跳转</th><th>排序</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead><tbody><tr v-for="item in items" :key="item.id"><td><img v-if="resolveAssetUrl(item.imgUrl)" class="thumbnail" :src="resolveAssetUrl(item.imgUrl)" :alt="item.title" />{{ item.title }}</td><td><a v-if="safeTarget(item.targetUrl)" :href="safeTarget(item.targetUrl)" target="_blank" rel="noopener noreferrer">{{ item.targetUrl }}</a><span v-else>不设置跳转</span></td><td>{{ item.sortOrder }}</td><td>{{ item.status === 1 ? '启用' : '停用' }}</td><td>{{ formatDateTime(item.updateTime || item.createTime) }}</td><td><div class="actions"><button class="secondary" :disabled="busy" @click="edit(item)">编辑</button><button class="secondary" :disabled="busy" @click="mutate(item, 'toggle')">{{ item.status === 1 ? '停用' : '启用' }}</button><button class="danger" :disabled="busy" @click="mutate(item, 'delete')">删除</button></div></td></tr><tr v-if="!items.length"><td colspan="6" class="empty">尚未添加轮播图。</td></tr></tbody></table></section>
+      <section v-else class="panel table-wrap" aria-label="轮播列表" tabindex="0"><h2>轮播列表</h2><table><thead><tr><th>图片 / 标题</th><th>跳转</th><th>排序</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead><tbody><tr v-for="item in items" :key="item.id"><td><img v-if="resolveAssetUrl(item.imgUrl)" class="thumbnail" :src="resolveAssetUrl(item.imgUrl)" :alt="item.title" />{{ item.title }}</td><td><a v-if="safeTarget(item.targetUrl)" :href="safeTarget(item.targetUrl)" target="_blank" rel="noopener noreferrer">{{ item.targetUrl }}</a><span v-else>不设置跳转</span></td><td>{{ item.sortOrder }}</td><td>{{ item.status === 1 ? '启用' : '停用' }}</td><td>{{ formatDateTime(item.updateTime || item.createTime) }}</td><td><div class="actions"><button class="secondary" :disabled="busy" @click="edit(item)">编辑</button><button class="secondary" :disabled="busy" @click="mutate(item, 'toggle')">{{ item.status === 1 ? '停用' : '启用' }}</button><button class="danger" :disabled="busy" @click="mutate(item, 'delete')">删除</button></div></td></tr><tr v-if="!items.length"><td colspan="6" class="empty">尚未添加轮播图。</td></tr></tbody></table></section>
     </template>
   </section>
 </template>

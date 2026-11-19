@@ -40,7 +40,7 @@ const destinations = [
   gap: clamp(.5rem, 3vw, 3rem);
   border-block-end: 1px solid #8496b02c;
   padding-block: clamp(.35rem, 1.5vw, 1.4rem);
-  color: #f1ede4;
+  color: var(--text);
 }
 .map-copy h2 {
   font-size: clamp(1.65rem, 2.5vw, 2.8rem);
@@ -50,7 +50,7 @@ const destinations = [
 }
 .map-copy p {
   margin-top: .7rem;
-  color: #b3bccd;
+  color: var(--muted);
   font-size: .9rem;
 }
 .constellation {
@@ -110,7 +110,7 @@ const destinations = [
   gap: .62rem;
   padding: 4px .25rem .35rem;
   border-radius: .25rem;
-  color: #dfe3eb;
+  color: var(--text);
   font-size: clamp(.78rem, .92vw, .95rem);
   font-weight: 500;
   line-height: 1.35;
@@ -148,6 +148,12 @@ const destinations = [
 .node-link:focus-visible { outline: 2px solid var(--starlight); outline-offset: 4px; }
 .map-node:has(.node-link:is(:hover, :focus-visible)) .trace { background: var(--starlight); }
 :root[data-theme=dark] .atlas-orbits { opacity: .8; }
+:root[data-theme=light] .node-competitions { --starlight: #96501f; }
+:root[data-theme=light] .node-resources { --starlight: #08776c; }
+:root[data-theme=light] .node-resume { --starlight: #386c97; }
+:root[data-theme=light] .node-agent { --starlight: #8a4997; }
+:root[data-theme=light] .node-contributors { --starlight: #856034; }
+:root[data-theme=light] .trace { background: #66808a77; }
 @media (min-width: 621px) and (max-width: 880px) {
   .star-map { grid-template-columns: 1fr; gap: 0; }
   .constellation { min-height: 12rem; }

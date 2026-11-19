@@ -1,0 +1,317 @@
+/* Each workspace picks a different accent and position on the orbital chart. */
+.workspace-shell {
+  --signal: #8ae8ce;
+  --orbit: -16deg;
+  --signal-ink: color-mix(in srgb, var(--signal) 70%, var(--text));
+  --line: color-mix(in srgb, var(--signal) 15%, var(--border));
+  --entry: color-mix(in srgb, var(--bg) 40%, var(--surface));
+  display: grid;
+  grid-template-columns: clamp(13rem, 17vw, 17rem) minmax(0, 1fr);
+  width: 100%;
+  min-width: 0;
+  max-width: 1960px;
+  min-height: calc(100svh - var(--site-header-height, 68px));
+  margin-inline: auto;
+  color: var(--text);
+  background: radial-gradient(ellipse at 85% 0%, color-mix(in srgb, var(--signal) 6%, transparent), transparent 32rem), var(--bg);
+}
+:root[data-theme='light'] .workspace-shell { --signal-ink: color-mix(in srgb, var(--signal) 25%, #182c41); }
+.workspace-shell[data-workspace-page='profile'] { --signal: #f0c5a8; --orbit: -28deg; }
+.workspace-shell[data-workspace-page='resources'] { --signal: #9bd4ff; --orbit: 8deg; }
+.workspace-shell[data-workspace-page='ai'] { --signal: #afa7ff; --orbit: -30deg; }
+.workspace-shell[data-workspace-page='resume'] { --signal: #aad9e5; --orbit: 9deg; }
+.workspace-shell[data-workspace-page='resume-reviews'] { --signal: #f3cd94; --orbit: -4deg; }
+.workspace-shell[data-workspace-page='competitions'] { --signal: #ffaf9a; --orbit: -25deg; }
+.workspace-shell[data-workspace-page='vote'] { --signal: #c2bfef; --orbit: 24deg; }
+.workspace-shell[data-workspace-page='departments'] { --signal: #b5deb1; --orbit: 0deg; }
+.workspace-shell[data-workspace-page='audit'] { --signal: #9dbbde; --orbit: -7deg; }
+.workspace-shell[data-workspace-page='contributions'] { --signal: #e9c890; --orbit: -20deg; }
+.workspace-shell[data-workspace-page='member-export'] { --signal: #a7d9c8; --orbit: 16deg; }
+.workspace-shell[data-workspace-page='carousels'] { --signal: #e4b1db; --orbit: 22deg; }
+.workspace-shell[data-workspace-page='settings'] { --signal: #a6c8d4; --orbit: -12deg; }
+.workspace-shell .sidebar {
+  top: var(--site-header-height, 68px);
+  height: calc(100svh - var(--site-header-height, 68px));
+  padding: 1.65rem clamp(.7rem, 1.5vw, 1.45rem);
+  background: color-mix(in srgb, var(--bg) 56%, var(--surface));
+  border-inline-end: 1px solid var(--border);
+  scrollbar-width: thin;
+}
+.workspace-shell .sidebar-heading {
+  padding: .2rem .75rem 1.2rem;
+  margin-bottom: .75rem;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.workspace-shell .sidebar-heading .eyebrow { color: var(--signal-ink); }
+.workspace-shell .sidebar nav { gap: .12rem; }
+.workspace-shell .sidebar nav a {
+  position: relative;
+  padding: .5rem .8rem;
+  font-size: .88rem;
+  border-radius: .32rem;
+}
+.workspace-shell .sidebar nav a.selected {
+  background: color-mix(in srgb, var(--signal) 11%, var(--entry));
+  color: var(--signal-ink);
+  box-shadow: inset 2px 0 var(--signal-ink);
+}
+.workspace-shell .workspace-nav-select { display: none; }
+.workspace-shell main { min-width: 0; }
+.workspace-shell main > .page {
+  width: 100%;
+  max-width: 1540px;
+  padding: clamp(1.35rem, 3.1vw, 3.5rem) clamp(1rem, 3.8vw, 4.4rem) 3.5rem;
+  gap: clamp(1.05rem, 1.8vw, 1.8rem);
+}
+.workspace-shell main .page > header {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(1rem, 2.25vw, 2.4rem) 0 clamp(1.3rem, 2.5vw, 2.5rem);
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.workspace-shell main .page > header:not(.overview-header)::before {
+  position: absolute;
+  z-index: -2;
+  inset: 0 0 0 37%;
+  content: '';
+  pointer-events: none;
+  background: url('/brand/csa-observatory-sky.webp') right calc(42% + var(--orbit-position,0%)) / 165% auto no-repeat;
+  filter: hue-rotate(var(--orbit)) saturate(.87);
+  opacity: .74;
+  mask-image: linear-gradient(90deg, transparent 0, #0009 37%, #000 100%);
+}
+.workspace-shell:is([data-workspace-page='profile'],[data-workspace-page='contributions'],[data-workspace-page='competitions']) { --orbit-position: 22%; }
+.workspace-shell:is([data-workspace-page='resources'],[data-workspace-page='member-export'],[data-workspace-page='resume-reviews']) { --orbit-position: -22%; }
+:root[data-theme='light'] .workspace-shell main .page > header:not(.overview-header)::before { opacity: .23; }
+.workspace-shell main .page > header > :not(button) { position: relative; }
+.workspace-shell main .page > header::after {
+  position: absolute;
+  z-index: -1;
+  content: '';
+  pointer-events: none;
+  width: clamp(9rem, 23vw, 23rem);
+  height: 10rem;
+  right: 0;
+  top: 50%;
+  opacity: .76;
+  background:
+    radial-gradient(circle at 15% 52%, var(--signal-ink) 0 1px, transparent 2.1px),
+    radial-gradient(circle at 38% 34%, var(--signal-ink) 0 1.6px, transparent 2.6px),
+    radial-gradient(circle at 64% 73%, var(--signal-ink) 0 2px, transparent 3px),
+    radial-gradient(circle at 91% 46%, var(--signal-ink) 0 1px, transparent 2px),
+    repeating-radial-gradient(ellipse 68% 48% at center, transparent 0 17%, color-mix(in srgb, var(--signal-ink) 24%, transparent) 17.5%, transparent 18%);
+  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 80%, transparent);
+  transform: translateY(-50%) rotate(var(--orbit));
+  animation: workspace-orbits 9s ease-in-out infinite alternate;
+}
+@keyframes workspace-orbits {
+  to { opacity: .45; transform: translateY(-53%) rotate(calc(var(--orbit) + 3deg)); }
+}
+.workspace-shell:is([data-workspace-page='resources'],[data-workspace-page='resume'],[data-workspace-page='member-export']) main .page > header::after {
+  background:
+    radial-gradient(circle at 42% 46%, var(--signal-ink) 0 2px, transparent 3px),
+    radial-gradient(circle at 69% 63%, var(--signal-ink) 0 1px, transparent 2px),
+    repeating-linear-gradient(151deg, transparent 0 1.15rem, color-mix(in srgb,var(--signal-ink) 28%,transparent) 1.18rem 1.22rem, transparent 1.25rem 1.7rem);
+  mask-image: radial-gradient(ellipse 64% 40%, #000 24%, transparent 82%);
+}
+.workspace-shell:is([data-workspace-page='ai'],[data-workspace-page='departments'],[data-workspace-page='audit']) main .page > header::after {
+  background:
+    radial-gradient(circle at 32% 40%,var(--signal-ink) 0 2px, transparent 3px),
+    radial-gradient(circle at 71% 69%,var(--signal-ink) 0 3px, transparent 4px),
+    radial-gradient(circle at 42% 69%,var(--signal-ink) 0 1.5px, transparent 2px),
+    repeating-linear-gradient(90deg, transparent 0 2.7rem,var(--line) 2.75rem 2.8rem),
+    repeating-linear-gradient(0deg, transparent 0 1.5rem,var(--line) 1.55rem 1.6rem);
+  mask-image: radial-gradient(ellipse 58% 38%,#000 28%,transparent 90%);
+}
+.workspace-shell:is([data-workspace-page='competitions'],[data-workspace-page='vote'],[data-workspace-page='contributions']) main .page > header::after {
+  background:
+    radial-gradient(circle at 22% 62%, var(--signal-ink) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 62% 42%, var(--signal-ink) 0 2.5px, transparent 3.5px),
+    linear-gradient(151deg,transparent 0 44%,var(--line) 44.4% 45%,transparent 45.5%) 20% 40% / 73% 72% no-repeat,
+    repeating-linear-gradient(157deg, transparent 0 2.2rem,var(--line) 2.24rem 2.28rem,transparent 2.34rem 4.1rem);
+  mask-image: radial-gradient(ellipse 67% 40%,#000 24%,transparent 86%);
+}
+.workspace-shell main .page > header h1 {
+  font-size: clamp(1.85rem, 3.1vw, 3.2rem);
+  line-height: 1.2;
+  font-weight: 620;
+  letter-spacing: -.035em;
+  overflow-wrap: anywhere;
+}
+.workspace-shell .page > header p { max-width: 60ch; }
+.workspace-shell .page > header .eyebrow { color: var(--signal-ink); font-size: .72rem; letter-spacing: .14em; }
+.workspace-shell main .page > header.toolbar { justify-content: space-between; }
+.workspace-shell .panel {
+  padding: clamp(1rem, 1.7vw, 1.65rem);
+  border: 1px solid var(--border);
+  border-radius: .6rem;
+  background: var(--surface);
+  box-shadow: none;
+}
+.workspace-shell .stack > :is(.badge, button) { align-self: start; }
+.workspace-shell .panel h2 { font-size: clamp(1.05rem, 1.45vw, 1.36rem); }
+.workspace-shell .toolbar { margin-bottom: 0; }
+.workspace-shell :is(.grid, .form-grid, .actions, .toolbar) > * { min-width: 0; }
+.workspace-shell .form-grid { align-items: start; }
+.workspace-shell .form-grid > .actions { align-self: end; }
+.workspace-shell .actions button, .workspace-shell .toolbar button { max-width: 100%; }
+.workspace-shell .table-wrap {
+  min-width: 0;
+  max-width: 100%;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) var(--bg);
+}
+.workspace-shell .table-wrap table { min-width: 37rem; }
+.workspace-shell .table-wrap th { color: var(--signal-ink); }
+.workspace-shell .field, .workspace-shell dd, .workspace-shell .panel { overflow-wrap: anywhere; }
+.workspace-shell dd { margin-inline-start: 0; }
+.workspace-shell nav[aria-label$='分页'] { justify-content: center; }
+.workspace-shell .empty { border-style: dashed; background: var(--entry); }
+.workspace-shell .panel > p + button { margin-top: .7rem; }
+.workspace-shell .sidebar nav a:focus-visible, .workspace-shell main :focus-visible { outline-offset: 3px; }
+.workspace-shell .overview-header::before {
+  position: absolute;
+  z-index: -2;
+  content: '';
+  inset: 0;
+  background: linear-gradient(90deg, var(--bg) 2%, color-mix(in srgb, var(--bg) 78%, transparent) 45%, transparent 83%),
+    url('/brand/csa-observatory-sky.webp') 71% 50% / cover;
+  mask-image: linear-gradient(0deg, transparent, #000 15%, #000 85%, transparent);
+}
+.workspace-shell .overview-facts {
+  display: flex; flex-wrap: wrap; gap: .8rem 2.2rem;
+  margin: 1.5rem 0 0;
+}
+.workspace-shell .overview-facts div { display: grid; gap: .15rem; }
+.workspace-shell .overview-facts dt { color: var(--muted); font-size: .76rem; }
+.workspace-shell .overview-facts dd { margin: 0; font-weight: 650; font-size: 1.14rem; }
+.workspace-shell .overview-group h2 { font-size: 1.15rem; margin-bottom: .6rem; }
+.workspace-shell .quick-links { gap: .6rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); }
+.workspace-shell .quick-link { display: block; padding: .9rem 1rem; }
+.workspace-shell .quick-link:hover { background: var(--entry); border-color: var(--signal-ink); }
+.workspace-shell .quick-link h3 { display: flex; justify-content: space-between; align-items: baseline; }
+.workspace-shell .quick-link h3 span { color: var(--signal-ink); font-weight: 450; font-size: .85rem; }
+.workspace-shell .quick-link p { margin-top: .32rem; }
+.workspace-shell .profile-facts {
+  margin: 0; display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 0 1.25rem;
+}
+.workspace-shell .profile-facts > .panel {
+  display: grid; gap: .3rem; padding: 1.1rem .1rem;
+  border: 0; border-radius: 0; border-bottom: 1px solid var(--border); background: transparent;
+}
+.workspace-shell .profile-facts dt { font-size: .79rem; }
+.workspace-shell .profile-facts dd { font-weight: 600; }
+.workspace-shell .profile-identity { display: flex; align-items: center; gap: 1rem; }
+.workspace-shell .profile-identity .badge { margin-top: .45rem; }
+.workspace-shell .profile-portrait {
+  display: grid; flex-shrink: 0; place-items: center; overflow: hidden;
+  width: clamp(3.4rem, 6vw, 5rem); aspect-ratio: 1; border-radius: 50%;
+  font-size: clamp(1.35rem,2.4vw,2rem); color: var(--signal-ink);
+  border: 1px solid var(--line); background: var(--soft);
+}
+.workspace-shell .profile-portrait img { width: 100%; height: 100%; object-fit: cover; }
+.workspace-shell .profile-header > p { margin-top: .9rem; }
+.workspace-shell .agent-lab .lab-header::after { top: 2.5rem; }
+.workspace-shell .agent-lab .metrics {
+  gap: 0; margin: 1.4rem 0 .7rem; max-width: 53rem;
+  border-block: 1px solid var(--border);
+}
+.workspace-shell .agent-lab .metrics > div {
+  padding: .65rem .85rem; background: var(--entry); border: 0; border-radius: 0;
+}
+.workspace-shell .agent-lab .metrics strong { margin-top: .15rem; }
+.workspace-shell .agent-lab .tabs {
+  border-bottom: 1px solid var(--border); gap: .3rem; max-width: 100%;
+}
+.workspace-shell .agent-lab .tabs button { border: 0; border-radius: 0; min-height: 44px; }
+.workspace-shell .agent-lab .tabs button[aria-selected='true'] { color: var(--signal-ink); background: var(--entry); box-shadow: inset 0 -2px var(--signal-ink); }
+.workspace-shell .export-columns .form-grid { grid-template-columns: repeat(auto-fit, minmax(min(10rem,100%),1fr)); gap: .5rem; }
+.workspace-shell .export-columns label {
+  display: flex; align-items: center; gap: .55rem; min-height: 2.8rem; padding: .25rem .65rem;
+  border: 1px solid var(--border); border-radius: .35rem; cursor: pointer;
+}
+.workspace-shell .export-columns label:has(:checked) { background: var(--soft); border-color: var(--signal-ink); }
+.workspace-shell .export-columns input { margin: 0; }
+.workspace-shell .carousel-summary {
+  display: flex; flex-wrap: wrap; gap: .65rem clamp(1rem,4vw,3rem); margin: 0;
+  padding: .35rem 0 1rem; border-bottom: 1px solid var(--border);
+}
+.workspace-shell .carousel-summary div { display: grid; gap: .2rem; }
+.workspace-shell .carousel-summary dt { font-size: .77rem; color: var(--muted); }
+.workspace-shell .carousel-summary dd { margin: 0; font-size: 1.25rem; font-weight: 650; }
+.workspace-shell #carousel-editor .empty { display: grid; place-content: center; min-height: 145px; aspect-ratio: 16/9; }
+.workspace-shell #carousel-editor { scroll-margin-top: calc(var(--site-header-height,68px) + 1rem); }
+.workspace-shell main .reviews-grid, .workspace-shell main .department-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%,17rem),1fr)); }
+.workspace-shell .department-grid .selected { outline-color: var(--signal-ink); }
+.workspace-shell .agent-lab #agent-question, .workspace-shell[data-workspace-page='resume'] textarea { line-height: 1.75; }
+.workspace-shell[data-workspace-page='audit'] .page > form { grid-template-columns: repeat(auto-fit, minmax(min(100%,12rem),1fr)); }
+.workspace-shell[data-workspace-page='audit'] th { font-size: .8rem; }
+.workspace-shell[data-workspace-page='audit'] td { font-variant-numeric: tabular-nums; }
+.workspace-shell[data-workspace-page='settings'] .panel:has(> .actions > .danger) { border-inline-start: 3px solid var(--danger); }
+.workspace-shell[data-workspace-page='vote'] .reason { white-space: pre-wrap; overflow-wrap: anywhere; }
+.workspace-shell .vote-board { display: grid; gap: 1.3rem; align-items: start; }
+.workspace-shell .vote-ledger { min-width: 0; }
+.workspace-shell .vote-ledger > .toolbar, .workspace-shell .award-composer .panel > .toolbar { justify-content: space-between; }
+.workspace-shell .vote-ledger > article { border-inline-start: 2px solid var(--signal-ink); }
+.workspace-shell .member-results { gap: .4rem; padding: .2rem; }
+.workspace-shell .member-results .member-option {
+  display: block; align-self: stretch; white-space: normal; min-height: 2.75rem; padding: .65rem .8rem;
+}
+.workspace-shell .award-composer .toolbar { align-items: flex-end; }
+.workspace-shell .award-composer .toolbar label { flex: 1 1 12rem; }
+.workspace-shell .security-controls > .stack > .panel { flex: 1; }
+.workspace-shell .rich-text { overflow-wrap: anywhere; }
+.workspace-shell .rich-text img { max-width: 100%; }
+
+@media (min-width: 1120px) {
+  .workspace-shell:is([data-workspace-page='resources'],[data-workspace-page='competitions']) .workspace-flow > form.panel {
+    display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start;
+  }
+  .workspace-shell .workspace-flow > form.panel > :is(h2,.form-grid,.actions,p,img,.field:has(textarea)) { grid-column: 1/-1; }
+  .workspace-shell .vote-board { grid-template-columns: minmax(16rem,.86fr) minmax(0,1.14fr); }
+  .workspace-shell .award-composer { grid-template-columns: minmax(16rem,.8fr) minmax(0,1.2fr); }
+  .workspace-shell[data-workspace-page='resume'] main > .page {
+    display: grid; grid-template-columns: minmax(0,1.65fr) minmax(17rem,.8fr); align-items: start;
+  }
+  .workspace-shell[data-workspace-page='resume'] .page > :not(form):not(section) { grid-column: 1/-1; }
+  .workspace-shell[data-workspace-page='member-export'] .page > form {
+    display: grid; grid-template-columns: minmax(15rem,.8fr) minmax(0,1.2fr); align-items: start;
+  }
+  .workspace-shell[data-workspace-page='member-export'] .page > form > :is(p,.actions) { grid-column: 1/-1; }
+}
+@media (max-width: 760px) {
+  .workspace-shell { display: block; }
+  .workspace-shell .sidebar { height: auto; padding: .5rem 1rem; border-right: 0; }
+  .workspace-shell .workspace-nav-select {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: .6rem; font-size: .81rem; color: var(--muted);
+  }
+  .workspace-shell .workspace-nav-select select { width: min(68%,20rem); margin: 0; }
+  .workspace-shell .sidebar:has(.workspace-nav-select) nav { display: none; }
+  .workspace-shell main > .page { padding: .6rem 1rem 2.4rem; }
+  .workspace-shell main .page > header { padding: 1rem 0 1.25rem; }
+  .workspace-shell main .page > header:not(.overview-header)::before {
+    inset-inline-start: 26%;
+    opacity: .33;
+    mask-image: linear-gradient(90deg,transparent 0, #0005 40%,#000 100%);
+  }
+  .workspace-shell main .page > header::after { opacity: .3; width: 33%; right: -2rem; }
+  .workspace-shell .agent-lab .metrics { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .workspace-shell .agent-lab .metrics > div { padding: .55rem .4rem; }
+  .workspace-shell .agent-lab .metrics strong { font-size: .95rem; }
+  .workspace-shell .quick-links { grid-template-columns: repeat(auto-fit,minmax(min(100%,14rem),1fr)); }
+  .workspace-shell .panel > .form-grid { grid-template-columns: repeat(auto-fit,minmax(min(100%,12rem),1fr)); }
+  .workspace-shell .panel.export-columns > .form-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-shell main .page > header::after { animation: none; }
+}

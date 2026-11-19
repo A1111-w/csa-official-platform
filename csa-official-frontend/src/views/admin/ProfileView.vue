@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { getRoleDescription, getRoleLabel } from '@/lib/access'
-import { formatBalance } from '@/lib/format'
+import { formatBalance, resolveAssetUrl } from '@/lib/format'
 import { userService } from '@/services/user'
 import { useAuthStore } from '@/store/useAuthStore'
 import type { UserInfo } from '@/types/user'
@@ -10,6 +10,9 @@ import { errorText } from './helpers'
 
 const auth = useAuthStore()
 const profile = ref<UserInfo | null>(null)
+const avatarFailed = ref(false)
+const displayName = computed(() => profile.value?.realName || auth.user?.username || '个人资料')
+const avatar = computed(() => resolveAssetUrl(profile.value?.avatar))
 const loading = ref(false)
 const error = ref('')
 const fields = computed(() => profile.value ? [
@@ -19,6 +22,7 @@ const fields = computed(() => profile.value ? [
 ] : [])
 async function load() {
   loading.value = true
+  avatarFailed.value = false
   error.value = ''
   try { profile.value = await userService.getInfo() }
   catch (e) { error.value = errorText(e) }
@@ -29,9 +33,14 @@ onMounted(load)
 
 <template>
   <section class="page stack">
-    <header class="panel">
-      <h1>{{ profile?.realName || auth.user?.username || '个人资料' }}</h1>
-      <span class="badge">{{ getRoleLabel(profile?.roleLevel ?? auth.user?.roleLevel) }}</span>
+    <header class="profile-header">
+      <div class="profile-identity">
+        <span class="profile-portrait" aria-hidden="true">
+          <img v-if="avatar && !avatarFailed" :src="avatar" alt="" @error="avatarFailed = true" />
+          <template v-else>{{ displayName.slice(0,1) }}</template>
+        </span>
+        <div><h1>{{ displayName }}</h1><span class="badge">{{ getRoleLabel(profile?.roleLevel ?? auth.user?.roleLevel) }}</span></div>
+      </div>
       <p class="muted">{{ getRoleDescription(profile?.roleLevel ?? auth.user?.roleLevel) }}</p>
       <div class="actions">
         <RouterLink class="button secondary" to="/resources">打开资源库</RouterLink>
@@ -42,7 +51,7 @@ onMounted(load)
     </header>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="loading" role="status">正在加载资料…</p>
-    <dl v-else class="grid">
+    <dl v-else-if="profile" class="profile-facts">
       <div v-for="[label, value] in fields" :key="String(label)" class="panel">
         <dt class="muted">{{ label }}</dt><dd>{{ value || '—' }}</dd>
       </div>

@@ -46,11 +46,11 @@ async function exportMembers() {
 
 <template>
   <section class="page stack">
-    <h1>成员名单导出</h1>
+    <header><h1>成员名单导出</h1></header>
     <p v-if="!canExport" class="panel">该页面仅向会长及以上开放。</p>
     <form v-else class="stack" @submit.prevent="exportMembers">
       <p class="muted">导出操作会写入管理审计日志。密码、Token 和验证码不在可选列中。</p>
-      <fieldset class="panel" :disabled="exporting"><legend>导出列（已选 {{ columns.length }} 列）</legend><div class="form-grid"><label v-for="[key, label] in availableColumns" :key="key"><input v-model="columns" type="checkbox" :value="key" /> {{ label }}</label></div></fieldset>
+      <fieldset class="panel export-columns" :disabled="exporting"><legend>导出列（已选 {{ columns.length }} 列）</legend><div class="form-grid"><label v-for="[key, label] in availableColumns" :key="key"><input v-model="columns" type="checkbox" :value="key" /> {{ label }}</label></div></fieldset>
       <fieldset class="panel" :disabled="exporting"><legend>筛选条件</legend><div class="form-grid">
         <label class="field">开始日期<input v-model="filters.startDate" type="date" /></label><label class="field">结束日期<input v-model="filters.endDate" type="date" /></label>
         <label class="field">角色等级<select v-model="filters.roleLevel"><option value="">全部成员</option><option v-for="level in [0, 1, 2, 3, 4, 5, 99]" :key="level" :value="String(level)">{{ getRoleLabel(level) }} (Level {{ level }})</option></select></label>

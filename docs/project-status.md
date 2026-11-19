@@ -19,6 +19,8 @@
 
 2026-11-19 在同一分支重排宽屏首页，更新导航、银河星环和折叠设置，并为五个公开栏目加入不同的星图动效。[宽屏重排记录](change-records/2026-11-19-vue-observatory.md)
 
+同日完成公开、账号、工作台和异常页面的全站改造与 162 组布局检查。[全站改版记录](change-records/2026-11-19-sitewide.md)
+
 迁移内容和API角色清单见 [前端说明](../csa-official-frontend/README.md)、[Vue迁移](vue-migration.md)。默认离线Agent提供真实检索和规则评测，在线模型需单独配置和验收。
 
 ## 验证事实

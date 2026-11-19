@@ -166,27 +166,14 @@ onUnmounted(() => {
 
 <style scoped>
 .home-view {
-  --bg: #080e1e;
-  --surface: #111a2b;
-  --text: #f3efe8;
-  --muted: #b0b9cd;
-  --accent: #b0e0da;
-  --soft: #172539;
-  --border: #324056;
-  --danger: #ffb3ac;
-  --shadow: none;
   background: var(--bg);
   color: var(--text);
-}
-:global(:root[data-theme='dark']) .home-view {
-  --bg: #060a14;
-  --surface: #0d1524;
 }
 .home-content {
   display: grid;
   align-items: start;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-  width: min(1480px, calc(100% - 2 * clamp(1rem, 5vw, 5rem)));
+  width: min(var(--atlas-width), calc(100% - 2 * var(--atlas-gutter)));
   max-width: none;
   gap: clamp(2.6rem, 4.3vw, 4.8rem) clamp(2.2rem, 5vw, 5rem);
   padding: .5rem 0 clamp(3.5rem, 7vw, 7.5rem);

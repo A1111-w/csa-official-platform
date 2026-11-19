@@ -42,11 +42,13 @@ async function vote(item: ProposalItem, agree: boolean) {
 <template>
   <section class="page stack"><header><p class="eyebrow">GOVERNANCE</p><h1>提案中心</h1><p class="muted">让代码发布、活动安排和规则调整留下清楚的决策记录。</p></header>
     <div v-if="!canUse" class="panel">提案中心仅向部长及以上角色开放。</div>
-    <template v-else>
+    <div v-else class="vote-board">
       <form class="panel stack" @submit.prevent="create"><h2>发起提案</h2><div class="form-grid"><label class="field">提案类型<select v-model="draft.type" :disabled="creating"><option v-for="type in types" :key="type.value" :value="type.value">{{ type.label }}</option></select></label><label class="field">提案标题<input v-model="draft.title" :disabled="creating" required maxlength="200" /></label></div><label class="field">背景与理由<textarea v-model="draft.reason" :disabled="creating" maxlength="2000" required rows="4" placeholder="说明背景、风险和预期结果" /></label><div class="actions"><button :disabled="creating">{{ creating ? '提交中…' : '发起提案' }}</button></div></form>
-      <div class="toolbar"><h2>提案记录</h2><button class="secondary" :disabled="loading" @click="load">刷新</button></div><p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="loading" role="status">正在加载提案…</p><div v-else-if="!sorted.length && !error" class="panel empty">暂无提案。</div>
+      <section class="vote-ledger stack" aria-labelledby="vote-ledger-title">
+      <div class="toolbar"><h2 id="vote-ledger-title">提案记录</h2><button class="secondary" :disabled="loading" @click="load">刷新</button></div><p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="loading" role="status">正在加载提案…</p><div v-else-if="!sorted.length && !error" class="panel empty">暂无提案。</div>
       <article v-for="item in sorted" :key="item.id" class="panel stack"><div class="toolbar"><span class="badge">{{ statusLabel(item.status) }}</span><span class="muted">{{ types.find(t => t.value === item.type)?.label || item.type }}</span></div><h2>{{ item.title }}</h2><p class="reason">{{ item.reason }}</p><p class="muted">创建于 {{ formatDateTime(item.createTime) }} · 截止 {{ formatDateTime(item.expireTime) }}</p><p v-if="parseVoteResult(item.finalResultJson)">赞成 {{ parseVoteResult(item.finalResultJson)?.agree }} 票 · 反对 {{ parseVoteResult(item.finalResultJson)?.reject }} 票</p><template v-if="open(item) && !voted.has(item.id)"><label class="field">投票说明（可选）<textarea v-model="comments[item.id]" rows="2" :disabled="voting !== null" /></label><div class="actions"><button :disabled="voting !== null" @click="vote(item, true)">赞成</button><button class="secondary" :disabled="voting !== null" @click="vote(item, false)">反对</button></div></template><p v-else-if="voted.has(item.id)" class="success">你的投票已提交。</p><p v-else class="muted">本提案已结束或截止。</p></article>
-    </template>
+      </section>
+    </div>
   </section>
 </template>
 <style scoped>.reason{white-space:pre-wrap}</style>

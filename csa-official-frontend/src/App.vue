@@ -13,9 +13,8 @@ const auth = useAuthStore()
 const menuOpen = ref(false)
 const menuToggle = ref<HTMLButtonElement | null>(null)
 const busy = ref(false)
-const dark = ref(false)
+const dark = ref(document.documentElement.dataset.theme !== 'light')
 const workspace = computed(() => route.path.startsWith('/dashboard'))
-const isHome = computed(() => route.path === '/')
 const menu = computed(() => dashboardMenu.filter(item => (auth.user?.roleLevel ?? -1) >= item.minLevel))
 watch(() => route.path, () => { menuOpen.value = false })
 function dismissMenu() {
@@ -25,14 +24,15 @@ function dismissMenu() {
   }
 }
 onMounted(() => {
-  dark.value = localStorage.getItem('csa-theme') === 'dark'
-  document.documentElement.dataset.theme = dark.value ? 'dark' : 'light'
   if (!auth.initialized) void auth.refreshSession().catch(() => {})
 })
 function toggleTheme() {
   dark.value = !dark.value
-  localStorage.setItem('csa-theme', dark.value ? 'dark' : 'light')
-  document.documentElement.dataset.theme = dark.value ? 'dark' : 'light'
+  const theme = dark.value ? 'dark' : 'light'
+  document.documentElement.dataset.theme = theme
+  try {
+    localStorage.setItem('csa-theme', theme)
+  } catch { /* The current tab can still switch themes when storage is unavailable. */ }
 }
 async function logout() {
   busy.value = true
@@ -49,7 +49,7 @@ async function logout() {
 
 <template>
   <a class="skip-link" href="#main">跳到主要内容</a>
-  <header class="site-header" :class="{ 'home-header': isHome }" @keydown.esc="dismissMenu">
+  <header class="site-header atlas-header" @keydown.esc="dismissMenu">
     <RouterLink class="brand" to="/" aria-label="CSA 计算机协会首页">
       <span class="orbital-mark" aria-hidden="true"></span>
       <span class="brand-name">CSA<span class="brand-sub">计算机协会</span></span>
@@ -66,15 +66,19 @@ async function logout() {
       <RouterLink v-else class="button" to="/login">登录 / 加入</RouterLink>
     </div>
   </header>
-  <div :class="workspace ? 'workspace-shell' : 'public-shell'">
+  <div :class="workspace ? 'workspace-shell' : 'public-shell'" :data-workspace-page="workspace ? (route.path.split('/')[2] || 'overview') : undefined">
     <aside v-if="workspace" class="sidebar" aria-label="工作台导航">
-      <div class="sidebar-heading"><span class="eyebrow">WORKSPACE</span><strong>{{ auth.user?.username }}</strong><span class="muted">{{ getRoleLabel(auth.user?.roleLevel) }}</span></div>
-      <nav><RouterLink v-for="(item, index) in menu" :key="item.href" :to="item.href" :class="{ selected: route.path === item.href }"><span class="menu-number">{{ String(index + 1).padStart(2, '0') }}</span>{{ item.title }}</RouterLink></nav>
-      <div class="sidebar-note">一起学习 · 创造 · 分享</div>
+      <div class="sidebar-heading"><span class="eyebrow">工作台</span><strong>{{ auth.user?.username }}</strong><span class="muted">{{ getRoleLabel(auth.user?.roleLevel) }}</span></div>
+      <nav aria-label="工作台栏目"><RouterLink v-for="item in menu" :key="item.href" :to="item.href" :class="{ selected: route.path === item.href }">{{ item.title }}</RouterLink></nav>
+      <label class="workspace-nav-select">工作台导航
+        <select :value="route.path" @change="router.push(($event.target as HTMLSelectElement).value)">
+          <option v-for="item in menu" :key="item.href" :value="item.href">{{ item.title }}</option>
+        </select>
+      </label>
     </aside>
     <main id="main" tabindex="-1"><RouterView :key="route.path" /></main>
   </div>
-  <footer v-if="!workspace" class="site-footer" :class="{ 'home-footer': isHome }"><span><strong>CSA</strong> · 计算机协会</span><div><RouterLink to="/about">关于协会</RouterLink><RouterLink to="/privacy">隐私政策</RouterLink></div></footer>
+  <footer v-if="!workspace" class="site-footer atlas-footer"><span><strong>CSA</strong> · 计算机协会</span><div><RouterLink to="/about">关于协会</RouterLink><RouterLink to="/privacy">隐私政策</RouterLink></div></footer>
   <div class="notices" aria-live="polite" aria-atomic="false"><div v-for="notice in notifications" :key="notice.id" :class="['notice', notice.kind]" :role="notice.kind === 'error' ? 'alert' : 'status'"><span>{{ notice.message }}</span><button class="secondary" aria-label="关闭通知" @click="dismissNotice(notice.id)">×</button></div></div>
 </template>
 
@@ -115,91 +119,89 @@ async function logout() {
   rotate: -30deg;
 }
 :root[data-theme=dark] .theme-glyph { rotate: 150deg; }
-.home-header, .home-footer {
-  --nav-edge: max(clamp(1rem, 5vw, 5rem), calc((100% - 1480px) / 2));
+.atlas-header, .atlas-footer {
+  --nav-edge: max(var(--atlas-gutter), calc((100% - var(--atlas-width)) / 2));
   padding-inline: var(--nav-edge);
-  background: #080e1e;
-  color: #ece8df;
-  border-color: #8496b02c;
+  background: var(--nav-bg);
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--border) 64%, transparent);
 }
-.home-header { height: 68px; }
-.home-header .brand { gap: .6rem; color: #f2eee6; }
-.home-header .orbital-mark { color: #d9c8a9; }
-.home-header .brand-name {
+.atlas-header { height: var(--site-header-height); }
+.atlas-header .brand { gap: .6rem; color: var(--text); }
+.atlas-header .orbital-mark { color: var(--metal); }
+.atlas-header .brand-name {
   display: flex;
   align-items: center;
   gap: .85rem;
   font-size: 1.45rem;
 }
-.home-header .brand-sub {
-  border-left: 1px solid #d6dadd36;
+.atlas-header .brand-sub {
+  border-left: 1px solid var(--border);
   margin: 0;
   padding: .06rem 0 .06rem .85rem;
-  color: #d5d7dc;
+  color: var(--muted);
   font-size: .75rem;
   font-weight: 500;
   letter-spacing: .12em;
   white-space: nowrap;
 }
-.home-header nav { gap: clamp(1rem, 2.45vw, 2.55rem); }
-.home-header nav a {
+.atlas-header nav { gap: clamp(1rem, 2.45vw, 2.55rem); }
+.atlas-header nav a {
   position: relative;
   padding: .85rem 0;
-  color: #b8bfcd;
+  color: var(--muted);
   font-size: .87rem;
   font-weight: 500;
 }
-.home-header nav a:is(:hover, :focus-visible, .router-link-exact-active) { color: #f7efdf; text-decoration: none; }
-.home-header nav a.router-link-exact-active::after {
+.atlas-header nav a:is(:hover, :focus-visible, .router-link-exact-active) { color: var(--text); text-decoration: none; }
+.atlas-header nav a.router-link-exact-active::after {
   position: absolute;
   bottom: .25rem;
   left: calc(50% - .6rem);
   width: 1.2rem;
   height: 2px;
   border-radius: 2px;
-  background: #d9c8a9;
+  background: var(--metal);
   content: '';
 }
-.home-header .header-actions { gap: .7rem; }
-.home-header .header-actions .button, .home-header .header-actions button, .home-header .mobile-nav-toggle {
+.atlas-header .header-actions { gap: .7rem; }
+.atlas-header .header-actions .button, .atlas-header .header-actions button, .atlas-header .mobile-nav-toggle {
   min-height: 38px;
   padding: .45rem 1rem;
-  border: 1px solid #a4adbb54;
+  border: 1px solid var(--border);
   border-radius: 99px;
   background: transparent;
-  color: #e6e5e2;
+  color: var(--text);
   font-size: .8rem;
   font-weight: 550;
 }
-.home-header .header-actions .icon-button {
+.atlas-header .header-actions .icon-button {
   width: 38px;
   border-color: transparent;
   padding: .4rem;
-  color: #c3c9d4;
+  color: var(--muted);
 }
-.home-header .header-actions :is(button, a):hover, .home-header .mobile-nav-toggle:hover {
-  border-color: #e1d6c29c;
-  background: #d7d4e013;
+.atlas-header .header-actions :is(button, a):hover, .atlas-header .mobile-nav-toggle:hover {
+  border-color: var(--metal);
+  background: var(--soft);
   filter: none;
 }
-.home-footer { padding-block: 2rem; color: #bec3ce; }
-.home-footer a { color: #e9dfcc; }
-:root[data-theme=dark] :is(.home-header, .home-footer) { background: #050a15; }
-:root[data-theme=dark] .home-header .orbital-mark { color: #b8d8eb; }
+.atlas-footer { padding-block: 2rem; color: var(--muted); }
+.atlas-footer a { color: var(--metal); }
 @media (max-width: 760px) {
-  .home-header { height: auto; min-height: 60px; padding-block: .55rem; gap: .35rem; }
-  .home-header .brand { gap: .28rem; }
-  .home-header .brand-name { font-size: 1.22rem; }
-  .home-header .orbital-mark { width: 2rem; height: 1.8rem; }
-  .home-header .brand-sub { display: none; }
-  .home-header .header-actions { gap: .12rem; }
-  .home-header .header-actions .button, .home-header .header-actions button, .home-header .mobile-nav-toggle {
+  .atlas-header { height: auto; min-height: 60px; padding-block: .55rem; gap: .35rem; }
+  .atlas-header .brand { gap: .28rem; }
+  .atlas-header .brand-name { font-size: 1.22rem; }
+  .atlas-header .orbital-mark { width: 2rem; height: 1.8rem; }
+  .atlas-header .brand-sub { display: none; }
+  .atlas-header .header-actions { gap: .12rem; }
+  .atlas-header .header-actions .button, .atlas-header .header-actions button, .atlas-header .mobile-nav-toggle {
     min-height: 36px;
     padding: .35rem .63rem;
     font-size: .75rem;
   }
-  .home-header .header-actions .icon-button { width: 2rem; padding: .25rem; }
-  .home-header nav.open { justify-content: space-between; gap: .25rem; padding: .3rem 0 .45rem; border-top: 1px solid #bec6d326; }
-  .home-header nav a { padding: .66rem .25rem; }
+  .atlas-header .header-actions .icon-button { width: 2rem; padding: .25rem; }
+  .atlas-header nav.open { justify-content: space-between; gap: .25rem; padding: .3rem 0 .45rem; border-top: 1px solid #bec6d326; }
+  .atlas-header nav a { padding: .66rem .25rem; }
 }
 </style>

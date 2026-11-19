@@ -13,6 +13,11 @@
 
 ## [Unreleased]
 
+### 20261119-vue-sitewide | Vue 3 全站版式与逐页检查
+
+- 2026-11-19（Asia/Shanghai），Codex 与公开页、账号及工作台协作者完成 27 个前端页面改造。默认深色，浅色偏好可保存；改版涉及全宽栏目标题、图文和成员名录、账号表单、角色导航、工作台表格与异常恢复入口。[全站规格](specs/005-vue-sitewide-design/spec.md)
+- 构建、类型检查、ESLint、71 个 Vitest 与 20 个 Chromium 用例通过，包含 162 组逐页布局检查。3 个需要隔离账号的真实后端用例跳过。[变更、测试与回退](docs/change-records/2026-11-19-sitewide.md)
+
 ### 20261119-vue-observatory | Vue 3 宽屏首页与栏目星图
 
 - 2026-11-19（Asia/Shanghai），Codex 根据用户的宽屏截图重排首页。银河延伸至整屏，星环加入细环带和投影，时段与动效控件收进「星空设置」。五个公开栏目采用不同的粒子图案。[规格](specs/004-vue3-homepage/spec.md)

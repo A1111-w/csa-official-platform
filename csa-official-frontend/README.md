@@ -37,6 +37,8 @@ npm run test:e2e -- e2e/vue-home-design.spec.ts
 
 ## 页面与权限
 
+首次访问使用深色主题。页头按钮切换浅色或深色，后续访问沿用保存的选择。工作台在桌面使用角色侧栏，在窄屏使用「工作台导航」选择器。运行 `npm run test:e2e -- e2e/site-wide-layout.spec.ts` 可检查 27 个页面在三种宽度与两种主题下的布局、权限跳转和会话恢复。
+
 | 路径 | 最低角色 |
 | --- | --- |
 | /、/about、/contributors、/privacy、/competitions | 公开 |
