@@ -38,10 +38,15 @@ test('all migrated routes render without JavaScript errors or unhandled API requ
   const unexpected = await fixtures(page)
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
+  const publicMotifs: Record<string, string> = {
+    '/about': 'circuit', '/contributors': 'network', '/privacy': 'shield',
+    '/resources': 'layers', '/competitions': 'meteors',
+  }
   const paths = ['/', '/about', '/contributors', '/privacy', '/resources', '/competitions', '/login', '/register', '/forgot-password', '/reset-password', '/dashboard', '/dashboard/profile', '/dashboard/resources', '/dashboard/ai', '/dashboard/resume', '/dashboard/resume-reviews', '/dashboard/competitions', '/dashboard/vote', '/dashboard/departments', '/dashboard/audit', '/dashboard/contributions', '/dashboard/member-export', '/dashboard/carousels', '/dashboard/settings']
   for (const path of paths) {
     await page.goto(path)
     await expect(page.locator('main h1').first()).toBeVisible()
+    if (publicMotifs[path]) await expect(page.locator('main [data-motif]')).toHaveAttribute('data-motif', publicMotifs[path])
     await page.waitForLoadState('networkidle')
     await expect(page.locator('main [role="alert"]')).toHaveCount(0)
     expect(errors, path).toEqual([])

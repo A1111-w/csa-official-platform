@@ -57,6 +57,13 @@ function followClock() {
   synchronizeClock()
 }
 
+function closeSettings(event: KeyboardEvent) {
+  const settings = event.currentTarget
+  if (!(settings instanceof HTMLDetailsElement) || !settings.open) return
+  settings.open = false
+  settings.querySelector('summary')?.focus()
+}
+
 function paintScene() {
   if (!scene || !visible || document.hidden) return
   const gradeX = `${(view.parallaxX * -13).toFixed(2)}px`
@@ -269,102 +276,91 @@ onUnmounted(() => {
       @keydown="useKeyboard"
     >
       <div ref="landscape" class="hero-landscape" aria-hidden="true"></div>
-      <canvas ref="canvas" class="hero-planets" data-horizon-scene aria-hidden="true"></canvas>
       <div class="hero-mask" aria-hidden="true"></div>
-      <div class="hero-content">
-        <p class="hero-kicker">CSA 计算机协会</p>
-        <h1>点亮你的<br /><em>技术宇宙。</em></h1>
-        <p class="hero-summary">从竞赛、开源与实验室开始，找到一起把想法做成作品的人。</p>
-        <div class="hero-actions">
-          <RouterLink class="button hero-primary" :to="signedIn ? '/dashboard' : '/login'">
-            {{ signedIn ? '进入工作台' : '登录平台' }} <span aria-hidden="true">↗</span>
-          </RouterLink>
-          <RouterLink class="button hero-secondary" to="/about">认识 CSA</RouterLink>
+      <canvas ref="canvas" class="hero-planets" data-horizon-scene aria-hidden="true"></canvas>
+      <div class="hero-frame">
+        <div class="hero-content">
+          <p class="hero-english" lang="en">Computer Science <em>Association</em></p>
+          <h1>计算机协会</h1>
+          <p class="hero-summary">交流技术，组队参赛，<br class="mobile-break" />一起把开源项目做出来。</p>
+          <div class="hero-actions">
+            <RouterLink class="button hero-primary" :to="signedIn ? '/dashboard' : '/login'">
+              {{ signedIn ? '进入工作台' : '登录平台' }} <span aria-hidden="true">↗</span>
+            </RouterLink>
+            <RouterLink class="hero-secondary" to="/about">认识 CSA <span aria-hidden="true">→</span></RouterLink>
+          </div>
         </div>
       </div>
-      <a class="hero-jump" href="#home-activity">浏览协会动态 <span aria-hidden="true">↓</span></a>
     </div>
-    <div class="hero-controls">
-      <div class="hero-time">
-        <div class="hero-time-caption">
-          <label for="home-hero-time">时段预览</label>
-          <output for="home-hero-time">{{ theme.label }}</output>
-        </div>
-        <input id="home-hero-time" type="range" min="0" max="1439" :value="minute" :aria-valuetext="theme.label" @input="previewTime" />
+
+    <div class="hero-rail">
+      <a class="hero-jump" href="#home-activity">
+        <span class="jump-arrow" aria-hidden="true">↓</span><span>浏览协会动态</span>
+      </a>
+      <div class="hero-observe">
+        <span class="sky-clock">
+          <span>{{ followsClock ? '北京时间' : '预览时间' }}</span>
+          <time>{{ theme.label.split(' · ')[0] }}</time>
+        </span>
+        <details class="sky-settings" @keydown.esc="closeSettings">
+          <summary>
+            <span class="settings-mark" aria-hidden="true"></span>
+            <span>星空设置</span>
+          </summary>
+          <div class="settings-panel">
+            <div class="hero-time">
+              <div class="hero-time-caption">
+                <label for="home-hero-time">时段预览</label>
+                <output for="home-hero-time">{{ theme.label }}</output>
+              </div>
+              <input id="home-hero-time" type="range" min="0" max="1439" :value="minute" :aria-valuetext="theme.label" @input="previewTime" />
+            </div>
+            <div class="hero-buttons">
+              <button type="button" :aria-pressed="followsClock" @click="followClock">跟随北京时间</button>
+              <template v-if="sceneAvailable">
+                <button v-if="!reduceMotion" type="button" @click="paused = !paused">{{ paused ? '播放星空动效' : '暂停星空动效' }}</button>
+                <button type="button" :aria-pressed="constellation" @click="constellation = !constellation">聚成 CSA</button>
+                <button type="button" @click="resetView">重置视角</button>
+              </template>
+            </div>
+            <p v-if="sceneAvailable" id="home-sky-help" class="hero-help">
+              {{ moving ? '拖动或按方向键旋转星空，点击或按回车触发星波。' : '拖动或按方向键，手动调整视角。' }}
+            </p>
+          </div>
+        </details>
       </div>
-      <div class="hero-buttons">
-        <button type="button" :aria-pressed="followsClock" @click="followClock">跟随北京时间</button>
-        <template v-if="sceneAvailable">
-          <button v-if="!reduceMotion" type="button" @click="paused = !paused">{{ paused ? '播放星空动效' : '暂停星空动效' }}</button>
-          <button type="button" :aria-pressed="constellation" @click="constellation = !constellation">聚成 CSA</button>
-          <button type="button" @click="resetView">重置视角</button>
-        </template>
-      </div>
-      <p v-if="sceneAvailable" id="home-sky-help" class="hero-help">
-        {{ moving ? '拖动或按方向键旋转星空，点击或按回车触发星波。' : '拖动或按方向键，手动调整视角。' }}
-      </p>
     </div>
   </section>
 </template>
 
 <style scoped>
 .hero {
-  --instrument-bg: #0c1830;
-  --instrument-line: #486989;
-  --instrument-text: #f0f7ff;
-  --instrument-muted: #b4cbe3;
-  --instrument-key: #a1eaff;
-  --sky-highlight: color-mix(in srgb, var(--sky-color) 48%, #f2feff);
-  overflow: clip;
-  border: 1px solid var(--instrument-line);
-  border-radius: 1.35rem;
-  box-shadow: 0 25px 68px #122d482e;
-  background: var(--instrument-bg);
-  color: var(--instrument-text);
+  --sky-ink: #080e1c;
+  --sky-ice: #c6f6f1;
+  --sky-gutter: clamp(1rem, 5vw, 5rem);
+  --sky-inner: min(1480px, 100% - 2 * var(--sky-gutter));
+  position: relative;
+  isolation: isolate;
+  color: #f5f7ff;
+  background: var(--sky-ink);
   color-scheme: dark;
 }
 
-.hero[data-daypart='day'] {
-  --instrument-bg: #eaf8fc;
-  --instrument-line: #8bafc2;
-  --instrument-text: #123149;
-  --instrument-muted: #3a596e;
-  --instrument-key: #085474;
-  color-scheme: light;
-}
-
-.hero[data-daypart='dawn'] {
-  --instrument-bg: #fff0e8;
-  --instrument-line: #c59b9b;
-  --instrument-text: #3b2a44;
-  --instrument-muted: #62495f;
-  --instrument-key: #67406b;
-  color-scheme: light;
-}
-
-.hero[data-daypart='dusk'] {
-  --instrument-bg: #211b36;
-  --instrument-line: #745e91;
-  --instrument-text: #fff5fc;
-  --instrument-muted: #e1cfe7;
-  --instrument-key: #ffcfec;
-}
-
 .hero-sky {
-  min-block-size: clamp(28rem, 45vw, 36rem);
   display: grid;
   align-items: center;
+  min-block-size: clamp(34rem, 72svh, 49rem);
   position: relative;
-  isolation: isolate;
-  background: #15253f;
   overflow: hidden;
+  isolation: isolate;
+  background: var(--sky-ink);
 }
 
 .hero-sky[tabindex] { cursor: grab; touch-action: pan-y; }
 .hero-sky[tabindex]:active { cursor: grabbing; }
-.hero-sky:focus-visible { outline: 3px solid #d3f6ff; outline-offset: -5px; }
+.hero-sky:focus-visible { outline: 2px solid var(--sky-ice); outline-offset: -5px; }
 
-.hero-landscape, .hero-planets, .hero-mask {
+.hero-landscape, .hero-mask, .hero-planets {
   position: absolute;
   inset: 0;
   inline-size: 100%;
@@ -373,148 +369,210 @@ onUnmounted(() => {
 }
 
 .hero-landscape {
-  background:
-    url('/brand/csa-horizon-landscape.webp') center 54% / cover no-repeat,
-    linear-gradient(156deg, #132148, #315f7d 58%, #102b3a);
-  filter: var(--land-grade);
-  transform: translate(var(--art-x, 0), var(--art-y, 0)) scale(1.055);
-  transition: filter .22s ease;
+  background: url('/brand/csa-observatory-sky.webp') center 56% / cover no-repeat, #0b152b;
+  transform: translate(var(--art-x, 0), var(--art-y, 0)) scale(1.035);
+  filter: brightness(calc(1.04 + var(--daylight) * .17 + var(--twilight) * .12)) saturate(calc(1.02 + var(--twilight) * .13));
+  transition: filter .3s ease-out;
 }
-
 .hero-landscape::before, .hero-landscape::after {
   content: '';
   position: absolute;
   inset: 0;
+  pointer-events: none;
   mix-blend-mode: screen;
 }
-
 .hero-landscape::before {
-  background: radial-gradient(ellipse at var(--sun-x) 7%, var(--sky-highlight), var(--sky-color) 24%, transparent 68%);
-  opacity: calc(.15 + var(--daylight) * .29);
+  background: radial-gradient(ellipse at var(--sun-x) 79%, color-mix(in srgb, var(--sky-color) 62%, #fff), var(--sky-color) 16%, transparent 67%);
+  opacity: calc(.045 + var(--daylight) * .29 + var(--twilight) * .54);
 }
-
 .hero-landscape::after {
-  background: radial-gradient(ellipse at var(--sun-x) 60%, #ff9b89, var(--sky-color) 28%, transparent 59%);
-  opacity: calc(.55 * var(--twilight));
+  background: linear-gradient(165deg, transparent 15%, var(--sky-color) 82%, transparent 100%);
+  opacity: calc(.035 + var(--daylight) * .24 + var(--twilight) * .16);
 }
-
 .hero-mask {
   background:
-    linear-gradient(90deg, #08172beb, #0b1b35b8 27%, #10274542 52%, transparent 79%),
-    linear-gradient(0deg, #061729b8, transparent 34%);
+    linear-gradient(180deg, #080e1c51, transparent 17%, transparent 70%, #080e1cf7),
+    linear-gradient(90deg, #080e1c6e, #080e1c19 43%, transparent 62%);
 }
-
-.hero-content {
+.hero-frame {
   position: relative;
-  max-inline-size: min(54%, 40rem);
-  padding: 3.5rem 0 4.2rem;
-  margin-inline-start: clamp(1.5rem, 5vw, 4rem);
-  color: white;
+  width: var(--sky-inner);
+  margin-inline: auto;
+  padding: 4rem 0 6.25rem;
+  pointer-events: none;
 }
-
-.hero-kicker {
-  color: #c3f3ff;
-  font-size: .8rem;
-  font-weight: 750;
-  letter-spacing: .12em;
+.hero-content {
+  width: max-content;
+  max-width: min(55%, 45rem);
+  color: #faf8f4;
 }
-
+.hero-english {
+  display: flex;
+  align-items: baseline;
+  gap: .27em;
+  color: #d9eae7;
+  font-family: Baskervville, Georgia, 'Times New Roman', serif;
+  font-size: clamp(1.3rem, 2.2vw, 2.3rem);
+  line-height: 1.2;
+  letter-spacing: -.035em;
+}
+.hero-english em { color: #e6d6bc; font-synthesis: style; }
 .hero h1 {
-  margin: .7rem 0 0;
-  font-size: clamp(3.1rem, 7.2vw, 6.1rem);
-  font-weight: 850;
-  line-height: 1.01;
-  letter-spacing: -.065em;
-  text-shadow: 0 4px 26px #051127b9;
+  margin: .16em 0 0 -.045em;
+  font-family: 'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif;
+  font-weight: 650;
+  font-size: clamp(4rem, 6.1vw, 6.75rem);
+  line-height: 1.18;
+  letter-spacing: -.05em;
+  color: #faf8f4;
+  text-shadow: 0 2px 22px #080e1c54;
 }
-
-.hero h1 em { color: var(--sky-highlight); font-style: normal; }
-.hero-summary { max-inline-size: 31ch; margin-block: 1.0rem; color: #eef7ff; }
-.hero-actions { display: flex; gap: .65rem; flex-wrap: wrap; }
-.hero-actions .button { min-block-size: 44px; padding: .55rem .95rem; }
-.hero-primary { background: var(--sky-highlight); border-color: #fff9; color: #061e2d; }
-.hero-secondary { background: #08172acf; border-color: #bfdcf59c; color: #f2f9ff; }
-.hero-actions .button:focus-visible, .hero-jump:focus-visible { outline-color: #c7f6ff; }
-
-.hero-jump {
-  position: absolute;
-  inset: auto clamp(1.4rem, 4vw, 3.6rem) 1.35rem auto;
-  display: inline-flex;
-  gap: .55rem;
-  align-items: center;
+.hero-summary {
+  margin-block: clamp(.95rem, 1.8vw, 1.65rem) 1.65rem;
+  color: #e0e7eb;
+  font-size: clamp(.94rem, 1.25vw, 1.12rem);
+  line-height: 1.75;
+  letter-spacing: .045em;
+}
+.mobile-break { display: none; }
+.hero-actions { display: flex; align-items: center; gap: clamp(1.1rem, 2.2vw, 2.05rem); }
+.hero-actions a { pointer-events: auto; }
+.hero-primary {
   min-block-size: 44px;
-  color: #f5fcff;
-  font-size: .85rem;
-  font-weight: 700;
-  text-shadow: 0 1px 8px #071529, 0 1px 16px #071529;
+  gap: 1.15rem;
+  padding: .64rem 1.2rem;
+  border: 1px solid #defff7a3;
+  border-radius: 999px;
+  background: var(--sky-ice);
+  color: #101e26;
+  font-size: .91rem;
+  font-weight: 650;
 }
-
-.hero-controls {
-  display: grid;
-  grid-template-columns: minmax(12rem, 1fr) auto;
+.hero-primary span { font-size: 1.05em; line-height: 1; }
+.hero-primary:hover { background: #eafff9; }
+.hero-secondary {
+  display: inline-flex;
   align-items: center;
-  column-gap: 1.2rem;
-  row-gap: .3rem;
-  padding: .7rem clamp(1rem, 4.2vw, 3.25rem);
-  background: radial-gradient(ellipse at 70% -95%, color-mix(in srgb, var(--sky-color) 53%, transparent), transparent 72%);
+  min-height: 44px;
+  gap: .6rem;
+  color: #edf2f6;
+  font-size: .92rem;
+}
+.hero-secondary span { color: var(--sky-ice); }
+.hero-primary:focus-visible, .hero-secondary:focus-visible, .hero-jump:focus-visible,
+.sky-settings summary:focus-visible, .hero-buttons button:focus-visible, .hero-time input:focus-visible {
+  outline-color: var(--sky-ice);
 }
 
-.hero-time { min-inline-size: 0; }
-.hero-time-caption { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
-.hero-time-caption label, .hero-time-caption output { font-size: .78rem; font-variant-numeric: tabular-nums; }
-.hero-time-caption label { font-weight: 700; }
-.hero-time-caption output { color: var(--instrument-muted); }
-
+.hero-rail {
+  position: absolute;
+  z-index: 1;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: var(--sky-inner);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 4.75rem;
+  gap: 1rem;
+  border-top: 1px solid #c7e7e233;
+  pointer-events: none;
+}
+.hero-rail a, .sky-settings { pointer-events: auto; }
+.hero-jump, .hero-observe, .sky-clock, .sky-settings summary { display: inline-flex; align-items: center; }
+.hero-jump { gap: .65rem; min-height: 44px; color: #dce8ec; font-size: .82rem; }
+.jump-arrow { color: var(--sky-ice); font-size: 1.2rem; line-height: 1; }
+.hero-observe { gap: clamp(.8rem, 2vw, 1.7rem); }
+.sky-clock { gap: .58rem; color: #b8c8cf; font-size: .78rem; }
+.sky-clock time { font-family: 'IBM Plex Mono', Consolas, monospace; color: #eaf1ef; font-size: .89rem; letter-spacing: .055em; }
+.sky-settings { position: relative; color: #eef5f7; margin: 0; padding: 0; border: 0; }
+.sky-settings summary {
+  min-block-size: 44px;
+  margin: 0;
+  padding-inline: .8rem;
+  border: 1px solid #aec6df44;
+  border-radius: 2rem;
+  background: #0c162c70;
+  list-style: none;
+  gap: .55rem;
+  font-size: .8rem;
+  cursor: pointer;
+}
+.sky-settings summary::-webkit-details-marker { display: none; }
+.sky-settings summary:hover { color: var(--sky-ice); }
+.settings-mark {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  background:
+    radial-gradient(circle at 33% 31%, currentColor 0 2px, transparent 2.5px),
+    radial-gradient(circle at 72% 71%, currentColor 0 2px, transparent 2.5px),
+    linear-gradient(currentColor, currentColor) center 31% / 98% 1px no-repeat,
+    linear-gradient(currentColor, currentColor) center 71% / 98% 1px no-repeat;
+}
+.settings-panel {
+  position: absolute;
+  inset: auto 0 calc(100% + .45rem) auto;
+  width: min(20rem, calc(100vw - 2 * var(--sky-gutter)));
+  padding: 1.15rem;
+  border: 1px solid #6e909a8c;
+  border-radius: .8rem;
+  background: #0b1524f2;
+  box-shadow: 0 12px 40px #02061061;
+  backdrop-filter: blur(18px);
+}
+.hero-time-caption { display: flex; justify-content: space-between; gap: .5rem; align-items: baseline; }
+.hero-time-caption label { color: #f0f7fa; font-size: .84rem; font-weight: 650; }
+.hero-time-caption output { color: #cad8df; font-size: .78rem; font-variant-numeric: tabular-nums; }
 .hero-time input[type='range'] {
   display: block;
-  min-height: 26px;
+  min-height: 34px;
   margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
-  accent-color: var(--instrument-key);
+  accent-color: var(--sky-ice);
   cursor: pointer;
 }
-
-.hero-buttons { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .35rem; }
+.hero-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; }
 .hero-buttons button {
-  min-block-size: 42px;
-  padding: .37rem .7rem;
-  border: 1px solid var(--instrument-line);
-  background: color-mix(in srgb, var(--instrument-bg) 85%, var(--sky-color));
-  color: var(--instrument-text);
-  font-size: .78rem;
+  min-height: 40px;
+  padding: .3rem .4rem;
+  border: 1px solid #849fa650;
+  background: #ffffff09;
+  color: #e6eff2;
+  font-size: .76rem;
+  font-weight: 500;
 }
+.hero-buttons button[aria-pressed='true'] { background: #afdfd91c; border-color: #8bc5bf8a; }
+.hero-help { color: #b3c6ce; margin-top: .65rem; font-size: .72rem; line-height: 1.55; }
 
-.hero-buttons button[aria-pressed='true'] {
-  background: color-mix(in srgb, var(--instrument-bg) 75%, var(--instrument-key));
-  border-color: var(--instrument-key);
+@media (min-aspect-ratio: 5/2) {
+  .hero-sky { min-height: clamp(32rem, 75svh, 42rem); }
 }
-
-.hero-buttons button:focus-visible, .hero-time input:focus-visible { outline-color: var(--instrument-key); }
-.hero-help { grid-column: 1 / -1; color: var(--instrument-muted); font-size: .75rem; line-height: 1.55; }
-
 @media (max-width: 720px) {
-  .hero-sky { min-block-size: 32rem; align-items: end; }
-  .hero-landscape { background-position: 62% 54%; }
+  .hero-sky { align-items: end; min-height: clamp(35rem, 77svh, 42rem); }
+  .hero-landscape { background-position: 61% 50%; }
   .hero-mask {
-    background:
-      linear-gradient(0deg, #07162cf2, #0b1d37dc 25%, #0d233d5e 62%, transparent 83%),
-      linear-gradient(90deg, #0b1b3875, transparent 76%);
+    background: linear-gradient(180deg, #080e1c38, transparent 18%, transparent 42%, #080e1cc7 76%, #080e1c 100%);
   }
-  .hero-content { max-inline-size: none; margin-inline: 1.1rem; padding: 0 0 4.4rem; }
-  .hero h1 { font-size: clamp(2.7rem, 11.5vw, 4.8rem); }
-  .hero-summary { margin-block: .65rem .85rem; font-size: .9rem; }
-  .hero-jump { inset: auto auto .7rem 1.1rem; }
-  .hero-controls { grid-template-columns: minmax(0, 1fr); row-gap: .45rem; }
-  .hero-buttons { justify-content: flex-start; }
+  .hero-frame { padding: 0 0 6.3rem; }
+  .hero-content { width: 100%; max-width: none; }
+  .hero h1 { font-size: clamp(2.8rem, 12.8vw, 4.8rem); }
+  .hero-english { font-size: clamp(1.15rem, 4.7vw, 1.55rem); }
+  .hero-summary { margin: .85rem 0 1.15rem; font-size: .9rem; }
+  .hero-rail { min-height: 3.7rem; }
+  .hero-observe { gap: .8rem; }
+  .sky-clock { gap: .35rem; }
+  .hero-jump, .sky-settings summary, .sky-clock { font-size: .73rem; }
+  .hero-buttons button { min-height: 44px; }
 }
-
-@media (pointer: coarse) {
-  .hero-time input[type='range'] { min-block-size: 36px; }
-  .hero-buttons button { min-block-size: 44px; }
+@media (max-width: 370px) {
+  .mobile-break { display: initial; }
+  .sky-clock { flex-direction: column; align-items: end; gap: 0; line-height: 1.3; }
+  .sky-clock time { font-size: .8rem; }
 }
-
 @media (prefers-reduced-motion: reduce) {
   .hero-landscape, .hero-actions .button, .hero-buttons button { transition: none; }
 }

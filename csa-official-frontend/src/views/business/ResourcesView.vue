@@ -6,11 +6,13 @@ import { resourceService, type ResourceItem } from '@/services/resource'
 import { fileService } from '@/services/file'
 import { formatDateTime, resolveAssetUrl } from '@/lib/format'
 import { notify } from '@/lib/notify'
+import PublicSkyHeading from '@/views/public/PublicSkyHeading.vue'
 
 const auth = useAuthStore()
 const route = useRoute()
+const dashboard = computed(() => route.path.startsWith('/dashboard'))
 const canView = computed(() => (auth.user?.roleLevel ?? -1) >= 1)
-const canManage = computed(() => route.path.startsWith('/dashboard') && (auth.user?.roleLevel ?? -1) >= 3)
+const canManage = computed(() => dashboard.value && (auth.user?.roleLevel ?? -1) >= 3)
 const canManageItem = (item: ResourceItem) => canManage.value && ((auth.user?.roleLevel ?? -1) >= 4 || auth.profile?.id === item.uploaderId)
 const pageSize = 8
 const items = ref<ResourceItem[]>([])
@@ -82,7 +84,8 @@ async function download(item: ResourceItem) {
 
 <template>
   <section class="page stack">
-    <header><p class="eyebrow">RESOURCES</p><h1>资源库</h1><p class="muted">课程资料、比赛题解与项目模板，让每一次积累都能被找到。</p></header>
+    <header v-if="dashboard"><p class="eyebrow">RESOURCES</p><h1>资源库</h1><p class="muted">课程资料、比赛题解与项目模板，让每一次积累都能被找到。</p></header>
+    <PublicSkyHeading v-else motif="layers" title="资源库" description="查找课程资料、比赛题解、项目模板和工具。" />
     <div v-if="!canView" class="panel empty"><h2>资源库需要会员身份</h2><p>登录会员账号后即可浏览与下载资料。</p><RouterLink v-if="!auth.user" class="button" to="/login?redirect=%2Fresources">登录后查看</RouterLink><p v-else>当前账号尚未达到会员等级，请联系协会负责人。</p></div>
     <template v-else>
       <form v-if="canManage" class="panel stack" @submit.prevent="save">

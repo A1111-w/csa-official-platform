@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { publicService, type PrivacyNotice } from '@/services/public'
+import PublicSkyHeading from './PublicSkyHeading.vue'
 const notice = ref<PrivacyNotice | null>(null)
 const loading = ref(true)
 const error = ref('')
@@ -20,7 +21,9 @@ onMounted(load)
 onUnmounted(() => { alive = false })
 </script>
 <template><div class="page stack">
-  <header><h1>隐私说明</h1><p class="muted">了解平台收集哪些信息、使用目的、保存期限，以及你可以行使的权利。</p><p v-if="notice">当前版本：{{ notice.policyVersion }}</p></header>
+  <PublicSkyHeading motif="shield" title="隐私说明" description="了解平台收集哪些信息、使用目的、保存期限，以及你可以行使的权利。">
+    <p v-if="notice">当前版本：{{ notice.policyVersion }}</p>
+  </PublicSkyHeading>
   <p v-if="loading" role="status">正在加载隐私说明…</p>
   <div v-if="error" role="alert" class="error toolbar">{{ error }}<button class="secondary" :disabled="loading" @click="load">重新加载</button></div>
   <div v-if="notice" class="privacy-grid">

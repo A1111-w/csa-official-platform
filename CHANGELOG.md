@@ -13,6 +13,11 @@
 
 ## [Unreleased]
 
+### 20261119-vue-observatory | Vue 3 宽屏首页与栏目星图
+
+- 2026-11-19（Asia/Shanghai），Codex 根据用户的宽屏截图重排首页。银河延伸至整屏，星环加入细环带和投影，时段与动效控件收进「星空设置」。五个公开栏目采用不同的粒子图案。[规格](specs/004-vue3-homepage/spec.md)
+- 使用原有接口和 Vue 分支。ESLint、类型检查、生产构建、71 个 Vitest 和 13 个浏览器回归用例通过，3 个真实账号流程因缺少隔离账号而跳过。[改动与回退](docs/change-records/2026-11-19-vue-observatory.md)
+
 ### 20261118-vue3-homepage | Vue 3 官网星环首页
 
 - 2026-11-18（Asia/Shanghai），Codex 主任务协调星环、星图和浏览器验收。关联 [首页改版规格](specs/004-vue3-homepage/spec.md)。

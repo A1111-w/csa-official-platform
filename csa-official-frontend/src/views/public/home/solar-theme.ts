@@ -39,9 +39,6 @@ export function solarTheme(minute: number) {
   const [end, evening] = skyColors[colorIndex]
   const colorProgress = ease((minute - start) / (end - start))
   const color = morning.map((channel, index) => Math.round(channel + (evening[index] - channel) * colorProgress))
-  const brightness = (.50 + daylight * .49 + twilight * .34).toFixed(3)
-  const saturation = (1.11 + twilight * .30 + daylight * .06).toFixed(3)
-  const hue = (-12 * (1 - daylight) + sunset * 11 - sunrise * 5).toFixed(2)
 
   return {
     daypart,
@@ -51,7 +48,6 @@ export function solarTheme(minute: number) {
       '--sun-x': `${Math.round(17 + limit((minute - 360) / 840, 0, 1) * 69)}%`,
       '--daylight': daylight.toFixed(3),
       '--twilight': twilight.toFixed(3),
-      '--land-grade': `brightness(${brightness}) saturate(${saturation}) hue-rotate(${hue}deg)`,
     },
   }
 }

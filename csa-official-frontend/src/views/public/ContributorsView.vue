@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { publicService, type ContributorVo } from '@/services/public'
 import MemberCards from './MemberCards.vue'
+import PublicSkyHeading from './PublicSkyHeading.vue'
 const members = ref<ContributorVo[]>([])
 const loading = ref(true)
 const error = ref('')
@@ -17,7 +18,7 @@ onMounted(load)
 onUnmounted(() => { alive = false })
 </script>
 <template><div class="page stack">
-  <header><p class="muted">OUR COMMUNITY</p><h1>核心成员与公开贡献者</h1><p class="muted">认识一起参与建设的伙伴，发现相同的兴趣与方向。</p></header>
+  <PublicSkyHeading motif="network" title="核心成员与公开贡献者" description="认识一起参与建设的伙伴，发现相同的兴趣与方向。" />
   <div v-if="error" class="error toolbar" role="alert">{{ error }}<button class="secondary" :disabled="loading" @click="load">重新加载</button></div>
   <div v-if="!loading && !error" class="toolbar panel"><span>公开成员 <strong>{{ members.length }}</strong> 人</span><span>涉及部门 <strong>{{ departments }}</strong> 个</span></div>
   <MemberCards :members="members" :loading="loading" />

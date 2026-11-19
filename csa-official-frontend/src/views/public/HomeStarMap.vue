@@ -14,21 +14,17 @@ const destinations = [
   <section class="star-map" aria-labelledby="home-star-map-title">
     <div class="map-copy">
       <h2 id="home-star-map-title">协会功能星图</h2>
-      <p>从一个节点出发，找资料、参加竞赛，或和同伴一起做项目。</p>
+      <p>选择星点，进入对应的协会服务。</p>
     </div>
 
     <div class="constellation">
-      <div class="map-core" aria-hidden="true">
-        <span class="core-label">CSA</span>
-      </div>
+      <div class="atlas-orbits" aria-hidden="true"></div>
       <ul class="map-links" role="list">
         <li v-for="destination in destinations" :key="destination.id" class="map-node" :class="`node-${destination.id}`">
-          <span class="node-wire" aria-hidden="true"></span>
-          <span class="node-signal" aria-hidden="true"></span>
-          <RouterLink class="node-link" :to="destination.to">
-            <span class="node-light" aria-hidden="true"></span>
-            <span>{{ destination.label }}</span>
-            <span class="node-arrow" aria-hidden="true">↗</span>
+          <span class="trace" aria-hidden="true"></span>
+          <RouterLink :to="destination.to" class="node-link">
+            <span class="star" aria-hidden="true"></span>
+            <span class="node-label">{{ destination.label }}</span>
           </RouterLink>
         </li>
       </ul>
@@ -38,263 +34,148 @@ const destinations = [
 
 <style scoped>
 .star-map {
-  position: relative;
-  isolation: isolate;
   display: grid;
-  grid-template-columns: minmax(13rem, .75fr) minmax(0, 1.65fr);
+  grid-template-columns: minmax(12.5rem, .44fr) minmax(0, 1fr);
   align-items: center;
-  gap: .75rem;
-  padding: 1.15rem clamp(1rem, 3.6vw, 2.75rem);
-  border: 1px solid #2b4d5e;
-  border-radius: 1.5rem;
-  background:
-    radial-gradient(ellipse at 7% 95%, #b552352d, transparent 49%),
-    radial-gradient(ellipse at 70% 12%, #22655268, transparent 55%),
-    #0b1a2c;
-  color: #ecffff;
-  box-shadow: 0 1.15rem 2.2rem #07142127;
+  gap: clamp(.5rem, 3vw, 3rem);
+  border-block-end: 1px solid #8496b02c;
+  padding-block: clamp(.35rem, 1.5vw, 1.4rem);
+  color: #f1ede4;
 }
-
-.star-map::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  border-radius: inherit;
-  background:
-    radial-gradient(circle at 17% 31%, #acf8ed76 0 1px, transparent 1.6px) 0 0 / 93px 67px,
-    radial-gradient(circle at 68% 57%, #add4f03c 0 1px, transparent 1.6px) 18px 7px / 71px 87px,
-    linear-gradient(#8bcadd12 1px, transparent 1px) 50% 50% / 2rem 2rem,
-    linear-gradient(90deg, #8bcadd12 1px, transparent 1px) 50% 50% / 2rem 2rem;
-  mask-image: radial-gradient(ellipse at 69% 54%, #000 20%, #0007 65%, transparent 91%);
-  content: '';
-  pointer-events: none;
-}
-
 .map-copy h2 {
-  color: #f2ffff;
-  font-size: clamp(1.65rem, 3.6vw, 3.4rem);
-  line-height: 1.15;
-  letter-spacing: -.045em;
+  font-size: clamp(1.65rem, 2.5vw, 2.8rem);
+  font-weight: 550;
+  letter-spacing: -.035em;
+  line-height: 1.25;
 }
-
 .map-copy p {
-  max-width: 20em;
-  margin-top: .9rem;
-  color: #bbd7dd;
+  margin-top: .7rem;
+  color: #b3bccd;
+  font-size: .9rem;
 }
-
 .constellation {
   position: relative;
   isolation: isolate;
-  min-width: 0;
-  min-height: 21.5rem;
+  min-height: clamp(14.5rem, 19vw, 18rem);
 }
-
-.map-core {
+.atlas-orbits {
   position: absolute;
-  z-index: 1;
-  top: 48%;
-  left: 50%;
-  display: grid;
-  place-items: center;
-  width: clamp(8.5rem, 18vw, 12.5rem);
-  aspect-ratio: 1;
-  border: 1px solid #7bfada60;
-  border-radius: 50%;
-  background: radial-gradient(circle, #0f4241 0 38%, #1a79663b 39% 53%, #24866d1c 54%, transparent 71%);
-  box-shadow: 0 0 2rem #3edfbe30;
-  translate: -50% -50%;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
   pointer-events: none;
+  background:
+    radial-gradient(circle at 27% 72%, #e4e6ff85 0 1px, transparent 1.5px),
+    radial-gradient(circle at 76% 41%, #e4e6ff75 0 1.3px, transparent 2px),
+    radial-gradient(circle at 48% 21%, #e4e6ffaa 0 .75px, transparent 1.5px),
+    radial-gradient(circle at 15% 41%, #e4e6ff8a 0 .8px, transparent 1.5px),
+    radial-gradient(circle at 86% 22%, #e4e6ff75 0 1px, transparent 1.5px),
+    radial-gradient(circle at 60% 67%, #e4e6ffaa 0 .7px, transparent 1.4px),
+    radial-gradient(ellipse at 53% 52%, #26395e30, transparent 68%);
 }
-
-.map-core::before,
-.map-core::after {
+.atlas-orbits::before, .atlas-orbits::after {
   position: absolute;
-  border-radius: 50%;
   content: '';
-}
-
-.map-core::before {
-  inset: 2%;
-  background: repeating-conic-gradient(from 1deg, #a0ffeaa3 0 1deg, transparent 1deg 12deg);
-  mask-image: radial-gradient(circle, transparent 66%, #000 68.5%, transparent 74%);
-}
-
-.map-core::after {
-  inset: 12%;
-  border: 1px dashed #8bf7d06d;
-  box-shadow: inset 0 0 1rem #4cfbc126;
-}
-
-.core-label {
-  color: #c9fff2;
-  font: 700 clamp(1.2rem, 3.4vw, 2rem) / 1 'Cascadia Code', Consolas, monospace;
-  letter-spacing: .16em;
-  text-indent: .16em;
-  text-shadow: 0 0 .8rem #82ffc59c;
-}
-
-.map-links {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.map-node {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.node-competitions {
-  --node-x: 15%;
-  --node-y: 22%;
-  --bend-x: 33%;
-  --bend-y: 22%;
-  --node-color: #ffcb92;
-  --wire-shape: polygon(15% 21.8%, 33% 21.8%, 50% 47.8%, 50% 48.2%, 33% 22.2%, 15% 22.2%);
-}
-
-.node-resources {
-  --node-x: 85%;
-  --node-y: 17%;
-  --bend-x: 68%;
-  --bend-y: 17%;
-  --node-color: #a2ffe6;
-  --wire-shape: polygon(50% 47.8%, 68% 16.8%, 85% 16.8%, 85% 17.2%, 68% 17.2%, 50% 48.2%);
-}
-
-.node-resume {
-  --node-x: 15%;
-  --node-y: 75%;
-  --bend-x: 34%;
-  --bend-y: 75%;
-  --node-color: #a9dcff;
-  --wire-shape: polygon(15% 74.8%, 34% 74.8%, 50% 47.8%, 50% 48.2%, 34% 75.2%, 15% 75.2%);
-}
-
-.node-agent {
-  --node-x: 85%;
-  --node-y: 72%;
-  --bend-x: 68%;
-  --bend-y: 72%;
-  --node-color: #ddc1ff;
-  --wire-shape: polygon(50% 47.8%, 68% 71.8%, 85% 71.8%, 85% 72.2%, 68% 72.2%, 50% 48.2%);
-}
-
-.node-contributors {
-  --node-x: 50%;
-  --node-y: 90%;
-  --bend-x: 50%;
-  --bend-y: 75%;
-  --node-color: #91f0ff;
-  --wire-shape: polygon(49.9% 48%, 50.1% 48%, 50.1% 90%, 49.9% 90%);
-}
-
-.node-wire {
-  position: absolute;
-  inset: 0;
-  background: var(--node-color);
-  clip-path: var(--wire-shape);
-  opacity: .48;
-  transition: opacity .2s ease;
-}
-
-.node-signal {
-  position: absolute;
-  z-index: 2;
-  top: 48%;
-  left: 50%;
-  width: .36rem;
-  aspect-ratio: 1;
+  border: 1px solid #aeaecc21;
   border-radius: 50%;
-  background: var(--node-color);
-  box-shadow: 0 0 .65rem var(--node-color);
-  opacity: 0;
-  translate: -50% -50%;
+  rotate: -9deg;
 }
-
+.atlas-orbits::before { inset: 22% -8% 23% -9%; border-style: dashed; opacity: .62; }
+.atlas-orbits::after { inset: 17% -12% 11% -17%; border-color: #aeaecc14; }
+.map-links { margin: 0; padding: 0; list-style: none; }
+.map-node { position: absolute; inset: 0; pointer-events: none; }
+.node-competitions { --x: 9%; --y: 58%; --starlight: #f3c19c; }
+.node-resources { --x: 28%; --y: 26%; --from-x: 9%; --from-y: 58%; --starlight: #b9ece2; }
+.node-resume { --x: 47%; --y: 52%; --from-x: 28%; --from-y: 26%; --starlight: #c2d6fa; }
+.node-agent { --x: 68%; --y: 23%; --from-x: 47%; --from-y: 52%; --starlight: #ddc5f6; }
+.node-contributors { --x: 86%; --y: 56%; --from-x: 68%; --from-y: 23%; --starlight: #f1d5b6; }
+.trace {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #c6c5df33, #d1d6e38c 50%, #d9d5e54a);
+  clip-path: polygon(
+    var(--from-x) calc(var(--from-y) - .23%), var(--x) calc(var(--y) - .23%),
+    var(--x) calc(var(--y) + .23%), var(--from-x) calc(var(--from-y) + .23%)
+  );
+}
+.node-competitions .trace { display: none; }
 .node-link {
   position: absolute;
-  z-index: 3;
-  top: var(--node-y);
-  left: var(--node-x);
+  top: var(--y);
+  left: var(--x);
   display: flex;
-  min-height: 2.95rem;
+  min-height: 46px;
   align-items: center;
-  gap: .56rem;
-  padding: .52rem .7rem;
-  border: 1px solid color-mix(in srgb, var(--node-color) 39%, #253947);
-  border-radius: .53rem;
-  background: #112a38;
-  color: #f3fdff;
-  box-shadow: 0 .3rem 1rem #02111b75;
-  font-size: .9rem;
-  font-weight: 650;
+  flex-direction: column;
+  gap: .62rem;
+  padding: 4px .25rem .35rem;
+  border-radius: .25rem;
+  color: #dfe3eb;
+  font-size: clamp(.78rem, .92vw, .95rem);
+  font-weight: 500;
   line-height: 1.35;
   white-space: nowrap;
-  translate: -50% -50%;
-  pointer-events: auto;
-  transition: border-color .2s ease, background .2s ease, box-shadow .2s ease, scale .13s ease;
-}
-
-.node-light {
-  width: .36rem;
-  aspect-ratio: 1;
-  flex: none;
-  border-radius: 2px;
-  background: var(--node-color);
-  box-shadow: 0 0 .45rem var(--node-color);
-}
-
-.node-arrow { margin-left: auto; color: var(--node-color); }
-
-.map-node:has(.node-link:is(:hover, :focus-visible)) .node-wire { opacity: 1; }
-
-.map-node:has(.node-link:is(:hover, :focus-visible)) .node-signal {
-  animation: star-route-signal 1s ease-out 2;
-}
-
-.node-link:is(:hover, :focus-visible) {
-  border-color: var(--node-color);
-  background: color-mix(in srgb, #112a38 82%, var(--node-color));
-  box-shadow: 0 .35rem 1.1rem #02111b80, 0 0 1rem color-mix(in srgb, var(--node-color) 25%, transparent);
   text-decoration: none;
+  translate: -50% -11px;
+  pointer-events: auto;
 }
-
-.node-link:focus-visible { outline-color: var(--node-color); }
-
-.node-link:active {
-  background: color-mix(in srgb, #112a38 72%, var(--node-color));
-  scale: .97;
+.star {
+  position: relative;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fffaf2 0 8%, var(--starlight) 12% 23%, transparent 31%);
+  filter: drop-shadow(0 0 3px var(--starlight));
 }
-
-@keyframes star-route-signal {
-  0% { top: 48%; left: 50%; opacity: 0; }
-  18% { opacity: 1; }
-  59% { top: var(--bend-y); left: var(--bend-x); opacity: 1; }
-  100% { top: var(--node-y); left: var(--node-x); opacity: .1; }
+.star::before, .star::after { position: absolute; content: ''; }
+.star::before {
+  inset: -17%;
+  background: var(--starlight);
+  clip-path: polygon(50% 0, 57% 42%, 100% 50%, 57% 57%, 50% 100%, 42% 57%, 0 50%, 42% 42%);
+  opacity: .9;
 }
-
-@media (max-width: 860px) {
-  .star-map { grid-template-columns: 1fr; padding: 1.5rem 1.15rem 1rem; }
-  .map-copy p { margin-top: .5rem; }
+.star::after {
+  inset: -5px;
+  border: 1px solid var(--starlight);
+  border-radius: 50%;
+  opacity: 0;
+  scale: .6;
+  transition: scale .24s ease, opacity .24s ease;
 }
-
+.node-link:is(:hover, :focus-visible) { color: var(--starlight); text-decoration: none; }
+.node-link:is(:hover, :focus-visible) .star::after { scale: 1; opacity: .7; }
+.node-link:focus-visible { outline: 2px solid var(--starlight); outline-offset: 4px; }
+.map-node:has(.node-link:is(:hover, :focus-visible)) .trace { background: var(--starlight); }
+:root[data-theme=dark] .atlas-orbits { opacity: .8; }
+@media (min-width: 621px) and (max-width: 880px) {
+  .star-map { grid-template-columns: 1fr; gap: 0; }
+  .constellation { min-height: 12rem; }
+}
 @media (max-width: 620px) {
-  .star-map { gap: .9rem; padding: 1.25rem .9rem 1rem; }
-  .constellation { min-height: 0; }
-  .map-core { position: relative; top: auto; left: auto; width: 7.4rem; margin: 0 auto 1rem; translate: none; }
-  .map-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
-  .map-node { position: static; display: flex; }
+  .star-map { display: block; padding-block: 1rem 1.2rem; }
+  .constellation { min-height: 0; margin-top: 1.2rem; }
+  .atlas-orbits { opacity: .66; }
+  .map-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 1rem; }
+  .map-node { position: relative; }
+  .node-link {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    flex-direction: row;
+    gap: .55rem;
+    border-radius: 0;
+    border-top: 1px solid #aab5c533;
+    padding: .85rem 0;
+    translate: none;
+    font-size: .82rem;
+    white-space: normal;
+  }
   .node-contributors { grid-column: 1 / -1; }
-  .node-wire, .node-signal { display: none; }
-  .node-link { position: static; width: 100%; font-size: .8rem; white-space: normal; translate: none; }
+  .trace { display: none; }
+  .star { width: .7rem; height: .7rem; }
 }
-
 @media (prefers-reduced-motion: reduce) {
-  .node-wire, .node-link { transition: none; }
-  .map-node:has(.node-link:is(:hover, :focus-visible)) .node-signal { animation: none; }
-  .node-link:active { scale: none; }
+  .star::after { transition: none; }
 }
 </style>

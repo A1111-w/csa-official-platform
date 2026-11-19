@@ -4,6 +4,7 @@ import { RouterLink } from 'vue-router'
 import { sanitizeHtml } from '@/lib/sanitize-html'
 import { publicService, type ContributorVo } from '@/services/public'
 import MemberCards from './MemberCards.vue'
+import PublicSkyHeading from './PublicSkyHeading.vue'
 const about = ref('')
 const members = ref<ContributorVo[]>([])
 const loading = ref(true)
@@ -24,7 +25,7 @@ onUnmounted(() => { alive = false })
 </script>
 <template>
   <div class="page stack">
-    <header><p class="muted">ABOUT CSA</p><h1>关于 CSA，也关于推动它的人</h1><p class="muted">把学习、实践与协作连接起来，让每个想法都有成长的空间。</p></header>
+    <PublicSkyHeading motif="circuit" title="关于 CSA" description="了解协会的日常，也认识参与建设的核心成员。" />
     <p v-if="loading" role="status">正在加载协会介绍…</p>
     <div v-if="error" role="alert" class="error toolbar">{{ error }}<button class="secondary" :disabled="loading" @click="load">重试</button></div>
     <section v-if="html" class="panel prose" v-html="html" />

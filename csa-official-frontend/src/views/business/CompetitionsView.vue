@@ -9,6 +9,7 @@ import { formatDateTime, resolveAssetUrl } from '@/lib/format'
 import { sanitizeHtml } from '@/lib/sanitize-html'
 import { notify } from '@/lib/notify'
 import { ApiError } from '@/types/api'
+import PublicSkyHeading from '@/views/public/PublicSkyHeading.vue'
 
 const route = useRoute(), auth = useAuthStore()
 const dashboard = computed(() => route.path.startsWith('/dashboard'))
@@ -90,7 +91,8 @@ async function grant() {
 
 <template>
   <section class="page stack">
-    <header><p class="eyebrow">COMPETITIONS</p><h1>{{ dashboard ? '比赛管理' : '比赛与活动' }}</h1><p class="muted">发现比赛、参与训练，在真实项目中共同成长。</p></header>
+    <header v-if="dashboard"><p class="eyebrow">COMPETITIONS</p><h1>比赛管理</h1><p class="muted">发现比赛、参与训练，在真实项目中共同成长。</p></header>
+    <PublicSkyHeading v-else motif="meteors" title="比赛与活动" description="发现比赛、参与训练，在真实项目中共同成长。" />
     <form v-if="canManage" class="panel stack" @submit.prevent="save"><h2>{{ draft.id ? '编辑比赛' : '发布比赛' }}</h2><div class="form-grid"><label class="field">比赛标题<input v-model="draft.title" :disabled="saving || uploading || detailBusy" required /></label><label class="field">状态<select v-model.number="draft.status" :disabled="saving || uploading || detailBusy"><option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option></select></label></div><label class="field">比赛详情<textarea v-model="draft.content" :disabled="saving || uploading || detailBusy" rows="7" required /></label><div class="form-grid"><label class="field">开始时间<input v-model="draft.startTime" :disabled="saving || uploading || detailBusy" type="datetime-local" /></label><label class="field">结束时间<input v-model="draft.endTime" :disabled="saving || uploading || detailBusy" type="datetime-local" /></label></div><label class="field">封面地址<input v-model="draft.coverImg" :disabled="saving || uploading || detailBusy" /></label><label class="field">上传封面<input type="file" accept="image/*" :disabled="uploading || saving" @change="upload" /></label><img v-if="resolveAssetUrl(draft.coverImg)" :src="resolveAssetUrl(draft.coverImg)" class="cover" alt="比赛封面预览" /><div class="actions"><button :disabled="saving || uploading">{{ saving ? '保存中…' : draft.id ? '保存修改' : '发布比赛' }}</button><button type="button" class="secondary" :disabled="saving || uploading" @click="draft = empty()">取消 / 清空</button></div></form>
     <form v-if="canManage && grantTarget" class="panel stack" @submit.prevent="grant"><h2>协作者授权：{{ grantTarget.title }}</h2><label class="field">搜索成员<input v-model="keyword" placeholder="姓名、账号、邮箱或部门" /></label><label class="field">选择协作者<select v-model.number="editorId" required><option :value="null" disabled>请选择</option><option v-for="m in filteredMembers" :key="m.id" :value="m.id">{{ m.realName || m.username }} · @{{ m.username }} · {{ m.departmentName || '未分配部门' }}</option></select></label><p v-if="!filteredMembers.length" class="muted">没有匹配的成员。</p><div class="actions"><button :disabled="granting || !editorId">确认授权</button><button type="button" class="secondary" :disabled="granting" @click="grantTarget = null">取消</button></div></form>
     <p v-if="error" class="error" role="alert">{{ error }} <button class="secondary" @click="load()">重试</button></p>
