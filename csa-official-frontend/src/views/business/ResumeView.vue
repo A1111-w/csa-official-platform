@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useAuthStore } from '@/store/useAuthStore'
 import { resumeService, RESUME_STATUS, type ResumeData, type ResumeGitSyncData } from '@/services/resume'
 import { formatDateTime } from '@/lib/format'
@@ -17,6 +17,19 @@ const syncLabel = computed(() => ({ NOT_SYNCED: '尚未同步', SYNCING: '同步
 const syncErrors: Record<string, string> = { GIT_REPOSITORY_TOO_LARGE: '仓库超过服务器允许的大小。', GIT_SYNC_QUEUE_FULL: '同步任务较多，请稍后重试。', UPSTREAM_ERROR: '远程仓库暂时无法访问。' }
 const syncError = computed(() => syncErrors[gitSync.value?.errorCode || ''] || `同步失败（${gitSync.value?.errorCode || '未知原因'}），请稍后重试。`)
 function validGitUrl(value: string) { try { const url = new URL(value); return value.length <= 255 && url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash } catch { return false } }
+const projectOutline = '## 项目经历\n- 项目名称：\n- 解决的问题：\n- 我的职责：\n- 实现与结果：\n- 作品或仓库：'
+const outlineText = computed(() => content.value + (content.value ? '\n\n' : '') + projectOutline)
+const editor = ref<HTMLTextAreaElement | null>(null)
+function appendProject() {
+  if (!editable.value || saving.value || syncing.value || outlineText.value.length > 50000) return
+  const firstField = outlineText.value.indexOf('项目名称：', content.value.length) + '项目名称：'.length
+  content.value = outlineText.value
+  const field = editor.value
+  if (field) {
+    field.focus()
+    void nextTick(() => field.setSelectionRange(firstField, firstField))
+  }
+}
 function validate() {
   if (gitUrl.value.trim() && !validGitUrl(gitUrl.value.trim())) { notify.error('请填写有效的 HTTPS 仓库地址'); return false }
   if (!content.value.trim() && !gitUrl.value.trim()) { notify.error('请至少填写简历内容或仓库链接'); return false }
@@ -87,7 +100,11 @@ async function refreshSync() {
       <p v-if="!editable && !pending" class="error">简历状态未知，暂不能修改。请刷新后确认状态。</p>
       <form class="panel stack" @submit.prevent="save(false)">
         <label class="field">项目仓库链接<input v-model="gitUrl" maxlength="255" placeholder="https://github.com/yourname/project" :disabled="!editable || saving || syncing" /></label><a v-if="validGitUrl(gitUrl.trim())" :href="gitUrl.trim()" target="_blank" rel="noopener noreferrer">打开项目仓库 ↗</a>
-        <label class="field">详细介绍（Markdown）<textarea v-model="content" maxlength="50000" rows="16" :disabled="!editable || saving || syncing" placeholder="# 个人简介&#10;- 擅长方向&#10;&#10;# 项目经历&#10;- 你解决了什么问题，承担了哪些工作&#10;&#10;# 比赛与协作" /></label>
+        <label class="field">详细介绍（Markdown）<textarea ref="editor" v-model="content" maxlength="50000" rows="16" :disabled="!editable || saving || syncing" placeholder="# 个人简介&#10;- 擅长方向&#10;&#10;# 项目经历&#10;- 你解决了什么问题，承担了哪些工作&#10;&#10;# 比赛与协作" /></label>
+        <div class="toolbar">
+          <button type="button" class="secondary" :disabled="!editable || saving || syncing || outlineText.length > 50000" @click="appendProject">追加项目提纲</button>
+          <small class="muted">正文 {{ content.length }} / 50000 字符</small>
+        </div>
         <p class="muted">优先写清最能代表技术深度的项目、个人职责与结果；仓库需对审核人可访问。</p>
         <div class="actions"><button class="secondary" :disabled="saving || syncing || !editable">保存草稿</button><button type="button" :disabled="saving || syncing || !editable" @click="save(true)">{{ saving ? '处理中…' : '提交审核' }}</button></div>
       </form>

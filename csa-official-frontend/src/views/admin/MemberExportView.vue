@@ -15,6 +15,12 @@ const availableColumns = [
 ] as const
 const defaultColumns = () => availableColumns.slice(0, 6).map(([key]) => key) as string[]
 const columns = ref(defaultColumns())
+const presets = [
+  { name: '联络名单', keys: ['realName', 'username', 'phone', 'contact'] },
+  { name: '学籍核对', keys: ['college', 'className', 'realName', 'studentId'] },
+]
+const columnLabels = new Map<string, string>(availableColumns)
+const headerPreview = computed(() => columns.value.map(key => columnLabels.get(key)).join('  /  '))
 const emptyFilters = () => ({ startDate: '', endDate: '', college: '', className: '', realName: '', studentId: '', roleLevel: '', inviteCode: '' })
 const filters = reactive(emptyFilters())
 const exporting = ref(false)
@@ -50,7 +56,12 @@ async function exportMembers() {
     <p v-if="!canExport" class="panel">该页面仅向会长及以上开放。</p>
     <form v-else class="stack" @submit.prevent="exportMembers">
       <p class="muted">导出操作会写入管理审计日志。密码、Token 和验证码不在可选列中。</p>
-      <fieldset class="panel export-columns" :disabled="exporting"><legend>导出列（已选 {{ columns.length }} 列）</legend><div class="form-grid"><label v-for="[key, label] in availableColumns" :key="key"><input v-model="columns" type="checkbox" :value="key" /> {{ label }}</label></div></fieldset>
+      <fieldset class="panel export-columns" :disabled="exporting"><legend>导出列（已选 {{ columns.length }} 列）</legend><div class="actions" aria-label="导出列预设">
+        <button v-for="preset in presets" :key="preset.name" class="secondary" type="button" @click="columns = [...preset.keys]">{{ preset.name }}</button>
+      </div>
+      <div class="form-grid"><label v-for="[key, label] in availableColumns" :key="key"><input v-model="columns" type="checkbox" :value="key" /> {{ label }}</label></div>
+      <p aria-live="polite" class="column-preview"><strong>表头预览</strong> {{ headerPreview || '尚未选择列' }}</p>
+      </fieldset>
       <fieldset class="panel" :disabled="exporting"><legend>筛选条件</legend><div class="form-grid">
         <label class="field">开始日期<input v-model="filters.startDate" type="date" /></label><label class="field">结束日期<input v-model="filters.endDate" type="date" /></label>
         <label class="field">角色等级<select v-model="filters.roleLevel"><option value="">全部成员</option><option v-for="level in [0, 1, 2, 3, 4, 5, 99]" :key="level" :value="String(level)">{{ getRoleLabel(level) }} (Level {{ level }})</option></select></label>
@@ -60,3 +71,8 @@ async function exportMembers() {
     </form>
   </section>
 </template>
+<style scoped>
+.export-columns .actions { margin-bottom: 1rem; }
+.column-preview { margin-top: 1rem; padding-top: .75rem; border-top: 1px solid var(--border); color: var(--muted); overflow-wrap: anywhere; }
+.column-preview strong { color: var(--text); margin-right: .5rem; }
+</style>

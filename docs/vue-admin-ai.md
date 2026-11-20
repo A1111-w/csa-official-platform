@@ -1,5 +1,7 @@
 # Vue 3 管理页面与 Agent 实验室
 
+个人资料里的联系方式和学号可手动展开；知识库文档可加入尚未发送的问题。审计详情可按同一请求 ID 追踪，贡献流水可汇总本页各类型的次数与分值。导出页面提供列预设和表头预览，轮播草稿可切换桌面与手机裁切，账号设置会在输入时核对新密码。
+
 此说明对应 `codex/vue3-frontend` 分支，核对日期 2026-11-08。React 对照源码保留在 `codex/agent-rag-evaluation` 分支。新界面使用 Vue 3 单文件组件、Composition API 和 TypeScript，继续通过 `src/services/` 调用原 Spring Boot API。
 
 ## 入口与使用

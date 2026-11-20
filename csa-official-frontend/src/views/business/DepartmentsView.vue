@@ -11,7 +11,8 @@ const departments = ref<DeptItem[]>([]), members = ref<UserDirectoryItem[]>([]),
 const loading = ref(false), appointing = ref<number | null>(null), error = ref(''), keyword = ref('')
 const selected = computed(() => departments.value.find(d => d.id === selectedId.value))
 const leaderMap = computed(() => new Map(members.value.map(m => [m.id, m])))
-const filtered = computed(() => [...members.value].sort((a, b) => (b.roleLevel ?? -1) - (a.roleLevel ?? -1) || a.username.localeCompare(b.username)).filter(m => [m.realName, m.username, m.email, m.departmentName].some(v => v?.toLowerCase().includes(keyword.value.trim().toLowerCase()))))
+const eligibleOnly = ref(false)
+const filtered = computed(() => [...members.value].sort((a, b) => (b.roleLevel ?? -1) - (a.roleLevel ?? -1) || a.username.localeCompare(b.username)).filter(m => (!eligibleOnly.value || !restriction(m)) && [m.realName, m.username, m.email, m.departmentName].some(v => v?.toLowerCase().includes(keyword.value.trim().toLowerCase()))))
 function restriction(member: UserDirectoryItem) {
   if (member.roleLevel == null || !Number.isFinite(member.roleLevel)) return '角色信息不完整，请刷新后再任命'
   if ((member.roleLevel ?? 0) >= 4) return '会长或 Root 不参与部长任命'
@@ -44,9 +45,14 @@ async function appoint(member: UserDirectoryItem) {
 <template>
   <section class="page stack"><header><p class="eyebrow">DEPARTMENTS</p><h1>部门人事</h1><p class="muted">查看部门负责人，并为合适的成员分配管理职责。</p></header>
     <div v-if="!canManage" class="panel">部门人事页仅向会长及以上角色开放。</div>
-    <template v-else><div class="toolbar"><span>{{ departments.length }} 个部门 · 当前载入 {{ members.length }} 名成员</span><button class="secondary" :disabled="loading || appointing !== null" @click="load">刷新</button></div><p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="loading" role="status">正在加载部门与成员…</p><div v-else-if="!departments.length && !error" class="panel empty">暂无部门。</div>
+    <template v-else><div class="toolbar"><span>{{ departments.length }} 个部门 · 当前载入 {{ members.length }} 名成员</span><button class="secondary" :disabled="loading || appointing !== null" @click="load">刷新</button></div><p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="loading" role="status">正在加载部门与成员…</p><div v-else-if="!departments.length && !error" class="panel empty">暂无部门。部门建立后可在此分配负责人。</div>
       <div class="grid department-grid"><article v-for="dept in departments" :key="dept.id" class="panel stack" :class="{ selected: selectedId === dept.id }"><h2>{{ dept.name }}</h2><p>{{ dept.intro || '暂无部门简介' }}</p><p class="muted">当前负责人：{{ dept.leaderId ? (leaderMap.get(dept.leaderId)?.realName || leaderMap.get(dept.leaderId)?.username || `成员 #${dept.leaderId}`) : '暂未任命' }}</p><button class="secondary" :aria-pressed="selectedId === dept.id" :disabled="appointing !== null" @click="selectedId = dept.id">{{ selectedId === dept.id ? '已选择此部门' : '选择部门' }}</button></article></div>
-      <section v-if="selected" class="panel stack"><h2>{{ selected.name }} · 部长候选成员</h2><p class="muted">任命时会处理原部长卸任与部门归属变更；已担任其他部门部长的成员需先卸任。搜索范围为本次加载的最多 150 名成员。</p><label class="field">搜索成员<input v-model="keyword" placeholder="姓名、账号、邮箱或部门" /></label><div class="table-wrap" role="region" aria-label="部门候选成员表" tabindex="0"><table><thead><tr><th>成员</th><th>当前角色</th><th>部门</th><th>任命</th></tr></thead><tbody><tr v-for="member in filtered" :key="member.id"><td>{{ member.realName || member.username }}<br /><small class="muted">@{{ member.username }}</small></td><td>{{ getRoleLabel(member.roleLevel) }}</td><td>{{ member.departmentName || '未分配' }}</td><td><span v-if="restriction(member)" class="muted">{{ restriction(member) }}</span><button v-else :disabled="appointing !== null || loading" @click="appoint(member)">{{ appointing === member.id ? '任命中…' : '任命为部长' }}</button></td></tr></tbody></table></div><p v-if="!filtered.length" class="empty">没有匹配的成员。</p></section>
+      <section v-if="selected" class="panel stack"><h2>{{ selected.name }} · 部长候选成员</h2><p class="muted">任命时会处理原部长卸任与部门归属变更；已担任其他部门部长的成员需先卸任。搜索范围为本次加载的最多 150 名成员。</p><label class="field">搜索成员<input v-model="keyword" placeholder="姓名、账号、邮箱或部门" /></label>
+        <div class="toolbar">
+          <label><input v-model="eligibleOnly" type="checkbox" /> 只看可任命成员</label>
+          <span class="muted" role="status">当前显示 {{ filtered.length }} 人</span>
+        </div>
+        <div class="table-wrap" role="region" aria-label="部门候选成员表" tabindex="0"><table><thead><tr><th>成员</th><th>当前角色</th><th>部门</th><th>任命</th></tr></thead><tbody><tr v-for="member in filtered" :key="member.id"><td>{{ member.realName || member.username }}<br /><small class="muted">@{{ member.username }}</small></td><td>{{ getRoleLabel(member.roleLevel) }}</td><td>{{ member.departmentName || '未分配' }}</td><td><span v-if="restriction(member)" class="muted">{{ restriction(member) }}</span><button v-else :disabled="appointing !== null || loading" @click="appoint(member)">{{ appointing === member.id ? '任命中…' : '任命为部长' }}</button></td></tr></tbody></table></div><p v-if="!filtered.length" class="empty">{{ eligibleOnly ? '当前范围内没有可任命的候选人。取消勾选可查看限制原因。' : '没有匹配的成员。' }}</p></section>
     </template>
   </section>
 </template>

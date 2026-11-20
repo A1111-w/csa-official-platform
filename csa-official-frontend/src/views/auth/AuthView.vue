@@ -27,12 +27,35 @@ const countdown = ref(0)
 const privacyLoading = ref(false)
 const privacyVersion = ref<string | null>(null)
 const privacyError = ref('')
+const loginTarget = ref('/dashboard')
+const requestedTarget = computed(() => typeof route.query.redirect === 'string' ? getSafeRedirect(route.query.redirect, '') : '')
+const loginTargetTitle = computed(() => String(router.resolve(requestedTarget.value || loginTarget.value).meta.title || '工作台'))
+const usernameRule = /^[A-Za-z0-9_]{4,20}$/
+const registrationPassword = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,20}$/
+const resetPassword = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,64}$/
+const codeRule = /^\d{6}$/
+const matchesPassword = computed(() => Boolean(form.password && form.confirmPassword && form.password === form.confirmPassword))
+const missingCredential = computed(() => {
+  if (!usernameRule.test(form.username)) return 'username'
+  if (!registrationPassword.test(form.password)) return 'password'
+  return matchesPassword.value ? '' : 'confirmPassword'
+})
+const registrationSteps = computed(() => [
+  { label: '账号与密码', field: missingCredential.value || 'username', done: !missingCredential.value },
+  { label: '邮箱与验证码', field: validEmail() && !codeRule.test(form.code) ? 'code' : 'email', done: validEmail() && codeRule.test(form.code) },
+  { label: '隐私确认', field: 'privacyConsent', done: Boolean(privacyVersion.value && form.privacyConsent) },
+])
+const stepsComplete = computed(() => registrationSteps.value.filter(step => step.done).length)
 let generation = 0
 let countdownTimer: ReturnType<typeof setInterval> | undefined
 let alive = true
 
 function clearErrors() { for (const key of Object.keys(errors)) delete errors[key] }
 function validEmail() { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()) }
+function focusField(name: string) {
+  const field = formElement.value?.elements.namedItem(name)
+  if (field instanceof HTMLInputElement) field.focus()
+}
 async function loadPrivacy() {
   const current = generation
   privacyLoading.value = true; privacyError.value = ''; privacyVersion.value = null
@@ -63,13 +86,13 @@ function validate() {
   }
   if (!validEmail()) errors.email = '请输入有效邮箱'
   if (mode.value === 'forgot') return !Object.keys(errors).length
-  if (!/^\d{6}$/.test(form.code)) errors.code = '验证码必须是 6 位数字'
+  if (!codeRule.test(form.code)) errors.code = '验证码必须是 6 位数字'
   if (mode.value === 'register') {
-    if (!/^[A-Za-z0-9_]{4,20}$/.test(form.username)) errors.username = '用户名需为 4–20 位字母、数字或下划线'
-    if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,20}$/.test(form.password)) errors.password = '密码需包含字母和数字，长度 6–20 位'
+    if (!usernameRule.test(form.username)) errors.username = '用户名需为 4–20 位字母、数字或下划线'
+    if (!registrationPassword.test(form.password)) errors.password = '密码需包含字母和数字，长度 6–20 位'
     if (!form.privacyConsent) errors.privacy = '请先阅读并同意隐私政策'
     if (!privacyVersion.value) errors.privacy = '隐私政策版本尚未加载，请重试'
-  } else if (!/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,64}$/.test(form.password)) errors.password = '密码需包含字母和数字，长度 8–64 位'
+  } else if (!resetPassword.test(form.password)) errors.password = '密码需包含字母和数字，长度 8–64 位'
   if (form.password !== form.confirmPassword) errors.confirmPassword = '两次输入的密码不一致'
   return !Object.keys(errors).length
 }
@@ -105,7 +128,7 @@ async function submit() {
       if (!alive || current !== generation) return
       auth.setLogin(user)
       notify.success(`欢迎回来，${user.username}`)
-      await router.push(getSafeRedirect(typeof route.query.redirect === 'string' ? route.query.redirect : undefined))
+      await router.push(requestedTarget.value || loginTarget.value)
     } else if (submittedMode === 'register') {
       await authService.register({
         username: form.username, password: form.password, email: form.email.trim(), code: form.code,
@@ -147,6 +170,14 @@ onUnmounted(() => { alive = false; generation++; clearInterval(countdownTimer) }
       <p class="muted">{{ mode === 'register' ? '带 * 的为必填项，其他资料可以稍后补充。' : mode === 'forgot' ? '输入绑定邮箱，获取重置验证码。' : mode === 'reset' ? '输入邮箱中的验证码和新密码。' : '使用协会账号进入成员工作台。' }}</p>
       <div v-if="error" role="alert" class="error">{{ error }}</div>
       <p v-if="success" role="status" class="success">{{ success }}</p>
+      <section v-if="mode === 'register'" class="account-assist" aria-labelledby="registration-list">
+        <div class="assist-head"><h2 id="registration-list">注册清单</h2><span aria-live="polite">{{ stepsComplete }} / 3 项已填写</span></div>
+        <div class="step-links">
+          <button v-for="step in registrationSteps" :key="step.label" type="button" class="secondary" :class="{ complete: step.done }" :disabled="busy || (step.field === 'privacyConsent' && !privacyVersion)" :aria-label="step.label + (step.done ? '，已填写' : '，待填写')" @click="focusField(step.field)">
+            <span aria-hidden="true">{{ step.done ? '✓' : '○' }}</span> {{ step.label }}
+          </button>
+        </div>
+      </section>
       <form ref="formElement" class="stack" novalidate :aria-busy="busy" @submit.prevent="submit">
         <fieldset :disabled="busy" class="auth-fields">
           <label v-if="mode === 'login' || mode === 'register'" class="field">{{ mode === 'register' ? '用户名 *' : '账号' }}<input v-model="form.username" name="username" autocomplete="username" :maxlength="mode === 'register' ? 20 : 100" :aria-invalid="!!errors.username" aria-required="true" :aria-describedby="errors.username ? 'username-error' : undefined" /><small v-if="errors.username" id="username-error" class="error">{{ errors.username }}</small></label>
@@ -158,12 +189,30 @@ onUnmounted(() => { alive = false; generation++; clearInterval(countdownTimer) }
             <label class="field">真实姓名（选填）<input v-model="form.realName" name="realName" autocomplete="name" /></label>
             <label class="field">注册方式<select v-model="registerType" name="registerType"><option value="invite">邀请码注册</option><option value="guest">普通注册</option></select></label>
             <label v-if="registerType === 'invite'" class="field">邀请码（选填）<input v-model="form.inviteCode" name="inviteCode" /><small class="muted">协会邀请码可用于开通相应会员身份。</small></label>
-            <template v-else><label class="field">支付单号（选填）<input v-model="form.merchantNo" name="merchantNo" /><small class="muted">仅用于辅助人工核验。未填写则默认创建游客账号。</small></label><div class="form-grid"><label class="field">学院<input v-model="form.college" name="college" /></label><label class="field">班级<input v-model="form.className" name="className" /></label><label class="field">学号<input v-model="form.studentId" name="studentId" /></label></div></template>
+            <template v-else><label class="field">支付单号（选填）<input v-model="form.merchantNo" name="merchantNo" /><small class="muted">普通注册会创建游客账号，有效的邀请码可开通会员身份。</small></label><div class="form-grid"><label class="field">学院<input v-model="form.college" name="college" /></label><label class="field">班级<input v-model="form.className" name="className" /></label><label class="field">学号<input v-model="form.studentId" name="studentId" /></label></div></template>
             <div class="privacy-consent"><label class="checkbox-row"><input v-model="form.privacyConsent" name="privacyConsent" type="checkbox" aria-required="true" :aria-invalid="!!errors.privacy" :aria-describedby="errors.privacy ? 'privacy-error' : undefined" :disabled="privacyLoading || !privacyVersion" />我已阅读并同意 <RouterLink to="/privacy" target="_blank" rel="noopener">隐私政策</RouterLink></label><small class="muted">当前版本：{{ privacyLoading ? '加载中…' : privacyVersion || '暂未加载' }}</small><p v-if="privacyError" class="error" role="alert">{{ privacyError }} <button type="button" class="secondary" @click="loadPrivacy">重试加载</button></p><small v-if="errors.privacy" id="privacy-error" class="error">{{ errors.privacy }}</small></div>
           </template>
+          <label v-if="mode === 'login' && !requestedTarget" class="field">登录后前往
+            <select v-model="loginTarget" name="loginTarget">
+              <option value="/dashboard">工作台概览</option><option value="/dashboard/profile">我的个人资料</option><option value="/competitions">比赛与活动</option>
+            </select>
+          </label>
+          <p v-else-if="mode === 'login'" class="return-destination">登录后返回 <strong>{{ loginTargetTitle }}</strong></p>
+          <div v-if="mode === 'reset'" class="account-assist password-check" aria-live="polite">
+            <h2>新密码核对</h2>
+            <ul>
+              <li :class="{ complete: resetPassword.test(form.password) }"><span aria-hidden="true">{{ resetPassword.test(form.password) ? '✓' : '○' }}</span> {{ resetPassword.test(form.password) ? '长度和字符符合要求' : '需要 8–64 位字母和数字' }}</li>
+              <li :class="{ complete: matchesPassword }"><span aria-hidden="true">{{ matchesPassword ? '✓' : '○' }}</span> {{ matchesPassword ? '两次输入一致' : form.confirmPassword ? '两次输入不同，请再核对' : '等待再次确认新密码' }}</li>
+            </ul>
+          </div>
           <button type="submit" :disabled="busy || (mode === 'register' && (privacyLoading || !privacyVersion))">{{ busy ? '处理中…' : submits[mode] }}</button>
         </fieldset>
       </form>
+      <details v-if="mode === 'forgot'" class="mail-help">
+        <summary>没有收到重置邮件？</summary>
+        <ol><li>核对上方地址是否为账号绑定的邮箱。</li><li>检查垃圾邮件和订阅邮件文件夹，查找密码重置验证码。</li><li>若已重新申请，请使用最近一封重置邮件里的六位数字。</li></ol>
+        <button type="button" class="secondary" @click="focusField('email')">回到邮箱输入框</button>
+      </details>
       <nav class="auth-links" aria-label="账号帮助"><template v-if="mode === 'login'"><RouterLink to="/register">注册新账号</RouterLink><RouterLink to="/forgot-password">忘记密码？</RouterLink></template><template v-else><RouterLink to="/login">返回登录</RouterLink><RouterLink v-if="mode === 'forgot'" to="/reset-password">已收到验证码，重置密码</RouterLink><RouterLink v-if="mode === 'reset'" to="/forgot-password">重新发送验证码</RouterLink></template></nav>
     </section>
   </div>
@@ -236,6 +285,20 @@ onUnmounted(() => { alive = false; generation++; clearInterval(countdownTimer) }
 .auth-links a { display: inline-flex; align-items: center; min-height: 44px; }
 .field .error { padding: 0; background: none; border: 0; }
 .auth-card > .error { margin-block: .8rem; }
+.account-assist { border-block: 1px solid var(--border); padding: .9rem 0; margin-bottom: 1.1rem; }
+.account-assist h2 { margin: 0; font-size: .99rem; }
+.assist-head { display: flex; align-items: baseline; gap: .45rem 1rem; flex-wrap: wrap; justify-content: space-between; }
+.assist-head > span, .return-destination, .mail-help li, .password-check li { color: var(--muted); font-size: .86rem; }
+.step-links { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .7rem; }
+.step-links button { padding: .4rem .65rem; font-size: .84rem; min-height: 2.5rem; }
+.account-assist .complete { color: var(--accent); }
+.password-check { margin: 0; }
+.password-check ul { padding: 0; list-style: none; margin: .5rem 0 0; display: grid; gap: .35rem; }
+.password-check li span { margin-right: .25rem; }
+.return-destination strong { color: var(--text); }
+.mail-help { border-top: 1px solid var(--border); margin-top: 1.4rem; padding-top: .45rem; }
+.mail-help summary { padding: .65rem 0; cursor: pointer; color: var(--accent); }
+.mail-help ol { padding-left: 1.35rem; margin: 0 0 .75rem; line-height: 1.75; }
 @media (max-width: 720px) {
   .auth-layout { grid-template-columns: minmax(0, 1fr); gap: 1rem; max-width: 39rem; padding-block: 1rem 2rem; }
   .auth-intro { position: relative; top: auto; min-height: clamp(10rem, 37vw, 12rem); padding: .65rem 1.25rem 1rem; }

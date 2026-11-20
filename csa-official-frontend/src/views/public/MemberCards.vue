@@ -18,7 +18,8 @@ function initial(name: string) {
       <div class="member-copy">
         <h3>{{ member.realName || '未公开姓名' }}</h3>
         <p>{{ member.title || getRoleLabel(member.roleLevel) }}</p>
-        <p class="muted">{{ member.deptName || '协会协作组' }}<template v-if="member.title"> · {{ getRoleLabel(member.roleLevel) }}</template></p>
+        <p class="muted">{{ member.deptName || '部门未公开' }}<template v-if="member.title"> · {{ getRoleLabel(member.roleLevel) }}</template></p>
+        <slot name="contribution" :member="member" />
       </div>
     </article>
   </div>

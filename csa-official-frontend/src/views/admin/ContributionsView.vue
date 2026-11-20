@@ -20,6 +20,17 @@ const submitting = ref(false), loading = ref(false), error = ref('')
 const items = ref<ContributionAwardItem[]>([]), page = ref(1), pages = ref(1), total = ref(0)
 const filters = reactive({ keyword: '', type: '' as '' | ContributionType, source: 'MANUAL' as '' | ContributionSource })
 const applied = ref({ ...filters })
+const showSummary = ref(false)
+const pageSummary = computed(() => {
+  const totals = new Map<string, { label: string; count: number; cents: number }>()
+  for (const item of items.value) {
+    const entry = totals.get(item.type) ?? { label: item.typeLabel || item.type, count: 0, cents: 0 }
+    entry.count++
+    entry.cents += Math.round(Number(item.score) * 100)
+    totals.set(item.type, entry)
+  }
+  return [...totals.values()].sort((a, b) => b.cents - a.cents)
+})
 async function load(requestedPage = page.value) {
   if (!canManage.value) return
   loading.value = true; error.value = ''
@@ -71,10 +82,21 @@ onMounted(() => load())
         <form class="panel stack" @submit.prevent="submitAward"><div class="toolbar"><h2>记录贡献</h2><button v-if="selected" type="button" class="secondary" :disabled="submitting" @click="selected = null">清除选择</button></div><p v-if="selected">当前成员：<strong>{{ selected.realName || selected.username }}</strong>（ID {{ selected.id }}）</p><p v-else class="muted">先搜索并选择一名成员。</p><label class="field">贡献类型<select v-model="award.type" :disabled="submitting" @change="changeType"><option v-for="item in types" :key="item.value" :value="item.value">{{ item.label }}</option></select></label><label class="field">贡献分值<input v-model.number="award.score" type="number" min="0.01" max="99999999.99" step="0.01" required :disabled="submitting" /></label><label class="field">贡献说明<textarea v-model="award.reason" required maxlength="500" rows="3" :disabled="submitting" /></label><button :disabled="submitting || !selected">{{ submitting ? '提交中…' : '记录贡献' }}</button></form>
       </div>
       <section class="panel stack"><div class="toolbar"><h2>贡献历史</h2><button class="secondary" :disabled="loading" @click="load()">刷新记录</button></div><form class="form-grid" @submit.prevent="search"><label class="field">成员或说明关键词<input v-model="filters.keyword" maxlength="64" /></label><label class="field">类型<select v-model="filters.type"><option value="">全部类型</option><option v-for="item in types" :key="item.value" :value="item.value">{{ item.label }}</option></select></label><label class="field">来源<select v-model="filters.source"><option value="">全部来源</option><option value="MANUAL">手动记录</option><option value="AUTO">自动记录</option><option value="LEGACY">历史记录</option></select></label><div class="actions"><button :disabled="loading">查询</button><button class="secondary" type="button" :disabled="loading" @click="reset">重置</button></div></form>
-        <p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="loading" role="status">正在加载记录…</p><div v-else class="table-wrap" role="region" aria-label="贡献历史表" tabindex="0"><table><thead><tr><th>成员</th><th>类型 / 来源</th><th>分值</th><th>说明</th><th>记录人 / 时间</th></tr></thead><tbody><tr v-for="item in items" :key="item.id"><td>{{ item.realName || item.username || item.userId }}<small>{{ item.departmentName || '未分配部门' }}</small></td><td>{{ item.typeLabel }}<small>{{ item.sourceLabel }}</small></td><td>{{ item.score }}</td><td>{{ item.reason || '—' }}</td><td>{{ item.awardedByUsername || '系统' }}<small>{{ formatDateTime(item.createTime) }}</small></td></tr><tr v-if="!items.length"><td colspan="5" class="empty">暂无符合条件的贡献记录。</td></tr></tbody></table></div>
+        <p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="loading" role="status">正在加载记录…</p><div v-else-if="!error" class="stack">
+          <button v-if="items.length" type="button" class="secondary summary-switch" :aria-expanded="showSummary" aria-controls="contribution-summary" @click="showSummary = !showSummary">本页按类型汇总</button>
+          <section v-if="showSummary && items.length" id="contribution-summary" class="stack" aria-label="本页类型汇总">
+            <p class="muted">第 {{ page }} 页共 {{ items.length }} 条，按当前筛选结果计算。</p>
+            <dl class="type-summary"><div v-for="row in pageSummary" :key="row.label"><dt>{{ row.label }}</dt><dd>{{ row.count }} 条 · {{ (row.cents / 100).toLocaleString('zh-CN') }} 分</dd></div></dl>
+          </section>
+          <div class="table-wrap" role="region" aria-label="贡献历史表" tabindex="0"><table><thead><tr><th>成员</th><th>类型 / 来源</th><th>分值</th><th>说明</th><th>记录人 / 时间</th></tr></thead><tbody><tr v-for="item in items" :key="item.id"><td>{{ item.realName || item.username || item.userId }}<small>{{ item.departmentName || '未分配部门' }}</small></td><td>{{ item.typeLabel }}<small>{{ item.sourceLabel }}</small></td><td>{{ item.score }}</td><td>{{ item.reason || '—' }}</td><td>{{ item.awardedByUsername || '系统' }}<small>{{ formatDateTime(item.createTime) }}</small></td></tr><tr v-if="!items.length"><td colspan="5" class="empty">暂无符合条件的贡献记录。</td></tr></tbody></table></div></div>
         <nav class="toolbar" aria-label="贡献记录分页"><button class="secondary" :disabled="loading || page <= 1" @click="load(page - 1)">上一页</button><span>第 {{ page }} / {{ pages }} 页</span><button class="secondary" :disabled="loading || page >= pages" @click="load(page + 1)">下一页</button></nav>
       </section>
     </template>
   </section>
 </template>
-<style scoped>.member-results { max-height: 20rem; overflow-y: auto; } .member-option { text-align: left; } .member-option[aria-pressed="true"] { outline: 2px solid var(--accent); } small { display: block; }</style>
+<style scoped>
+.summary-switch { justify-self: start; }
+.type-summary { display: flex; flex-wrap: wrap; gap: .8rem 2rem; margin: 0; }
+.type-summary dt { color: var(--muted); font-size: .88rem; }
+.type-summary dd { margin: 0; font-weight: 650; }
+.member-results { max-height: 20rem; overflow-y: auto; } .member-option { text-align: left; } .member-option[aria-pressed="true"] { outline: 2px solid var(--accent); } small { display: block; }</style>

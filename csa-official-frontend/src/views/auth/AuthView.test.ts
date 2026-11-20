@@ -35,6 +35,37 @@ beforeEach(() => {
 afterEach(() => { mounted.splice(0).forEach(wrapper => wrapper.unmount()); vi.useRealTimers() })
 
 describe('Vue authentication workflows', () => {
+  it('uses the selected landing page for a direct login and preserves a protected deep link', async () => {
+    vi.mocked(authService.login).mockResolvedValue({ username: 'member', roleLevel: 1 })
+    const { wrapper, router } = await setup('/login')
+    await wrapper.get('[name="loginTarget"]').setValue('/competitions')
+    await wrapper.get('[name="username"]').setValue('member')
+    await wrapper.get('[name="password"]').setValue('abc12345')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/competitions')
+
+    await router.push('/login?redirect=%2Fdashboard%2Fai%3Ftab%3Dlibrary')
+    expect(wrapper.find('[name="loginTarget"]').exists()).toBe(false)
+    await wrapper.get('[name="username"]').setValue('member')
+    await wrapper.get('[name="password"]').setValue('abc12345')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/dashboard/ai?tab=library')
+  })
+
+  it('keeps the registration checklist in sync with field validation and the accepted policy', async () => {
+    const { wrapper } = await setup('/register')
+    expect(wrapper.get('.assist-head').text()).toContain('0 / 3')
+    await fillRegistration(wrapper)
+    expect(wrapper.get('.assist-head').text()).toContain('2 / 3')
+    await wrapper.get('[name="privacyConsent"]').setValue(true)
+    expect(wrapper.get('.assist-head').text()).toContain('3 / 3')
+    await wrapper.get('[name="password"]').setValue('bad')
+    expect(wrapper.get('.assist-head').text()).toContain('2 / 3')
+    expect(authService.register).not.toHaveBeenCalled()
+  })
+
   it('requires privacy consent and submits the server policy version with the selected registration mode', async () => {
     const { wrapper, router } = await setup('/register')
     await fillRegistration(wrapper)
@@ -118,10 +149,13 @@ describe('Vue authentication workflows', () => {
     await wrapper.get('[name="code"]').setValue('123456')
     await wrapper.get('[name="password"]').setValue('abc123')
     await wrapper.get('[name="confirmPassword"]').setValue('abc123')
+    expect(wrapper.get('.password-check').text()).toContain('需要 8–64 位字母和数字')
     await wrapper.get('form').trigger('submit')
     expect(authService.resetPassword).not.toHaveBeenCalled()
     await wrapper.get('[name="password"]').setValue('abcdefgh1234')
+    expect(wrapper.get('.password-check').text()).toContain('两次输入不同')
     await wrapper.get('[name="confirmPassword"]').setValue('abcdefgh1234')
+    expect(wrapper.get('.password-check').text()).toContain('两次输入一致')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
     expect(authService.resetPassword).toHaveBeenCalledWith({ email: 'member@example.test', code: '123456', newPassword: 'abcdefgh1234' })

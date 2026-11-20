@@ -12,6 +12,11 @@ const auth = useAuthStore()
 const router = useRouter()
 const canEdit = computed(() => (auth.user?.roleLevel ?? 0) >= 4)
 const passwords = reactive({ current: '', next: '', confirm: '' })
+const passwordRules = [
+  { label: '长度 8–64 位', valid: (s: string) => s.length >= 8 && s.length <= 64 },
+  { label: '包含英文字母和数字', valid: (s: string) => /[A-Za-z]/.test(s) && /\d/.test(s) },
+  { label: '仅使用英文字母和数字', valid: (s: string) => /^[A-Za-z\d]+$/.test(s) },
+]
 const pending = ref('')
 const content = ref('')
 const loadingAbout = ref(false)
@@ -23,7 +28,7 @@ async function finishSession() {
 }
 async function changePassword() {
   if (pending.value) return
-  if (!passwords.current || !/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,64}$/.test(passwords.next)) {
+  if (!passwords.current || !passwordRules.every(rule => rule.valid(passwords.next))) {
     notify.error('新密码需包含字母和数字，长度 8–64 位'); return
   }
   if (passwords.next !== passwords.confirm) { notify.error('两次输入的新密码不一致'); return }
@@ -84,9 +89,12 @@ onMounted(loadAbout)
       <form class="panel stack" @submit.prevent="changePassword">
         <h2>修改密码</h2><p class="muted">修改密码会立即吊销旧会话。</p>
         <label class="field">当前密码<input v-model="passwords.current" type="password" autocomplete="current-password" required :disabled="!!pending" /></label>
-        <label class="field">新密码<input v-model="passwords.next" type="password" autocomplete="new-password" minlength="8" maxlength="64" required :disabled="!!pending" /></label>
-        <p class="muted">8–64 位，只包含字母和数字，且两者都必须有。</p>
+        <label class="field">新密码<input v-model="passwords.next" type="password" autocomplete="new-password" minlength="8" maxlength="64" aria-describedby="password-checks" required :disabled="!!pending" /></label>
+        <ul id="password-checks" class="password-checks" aria-label="新密码要求">
+          <li v-for="rule in passwordRules" :key="rule.label" :class="{ met: rule.valid(passwords.next) }"><span>{{ rule.valid(passwords.next) ? '✓ 已满足' : '○ 待满足' }}</span> {{ rule.label }}</li>
+        </ul>
         <label class="field">确认新密码<input v-model="passwords.confirm" type="password" autocomplete="new-password" required :disabled="!!pending" /></label>
+        <p v-if="passwords.confirm" role="status" class="muted">{{ passwords.confirm === passwords.next ? '两次输入一致' : '两次输入尚未一致' }}</p>
         <button :disabled="!!pending">{{ pending === 'password' ? '正在修改…' : '修改密码' }}</button>
       </form>
       <div class="stack">
@@ -108,3 +116,8 @@ onMounted(loadAbout)
     <p v-else class="panel muted">协会介绍编辑器仅向会长及以上开放。</p>
   </section>
 </template>
+<style scoped>
+.password-checks { display: flex; flex-wrap: wrap; gap: .35rem 1rem; padding: 0; margin: 0; list-style: none; font-size: .84rem; color: var(--muted); }
+.password-checks .met { color: var(--accent); }
+.password-checks span { font-weight: 650; }
+</style>

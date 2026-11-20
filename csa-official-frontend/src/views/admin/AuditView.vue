@@ -28,6 +28,10 @@ async function load(requestedPage = page.value) {
   } catch (e) { if (current === requestId) { error.value = errorText(e); items.value = []; total.value = 0; pages.value = 1 } }
   finally { if (current === requestId) loading.value = false }
 }
+function traceRequest(id: string) {
+  Object.assign(filters, { action: '', result: '', requestId: id })
+  search()
+}
 function search() { applied.value = { action: filters.action.trim(), result: filters.result, requestId: filters.requestId.trim() }; void load(1) }
 function reset() { Object.assign(filters, { action: '', result: '', requestId: '' }); search() }
 function details(value: string | null) { try { return JSON.stringify(JSON.parse(value || '{}'), null, 2) } catch { return value } }
@@ -47,8 +51,10 @@ onMounted(() => load())
       </form>
       <p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="loading" role="status">正在加载日志…</p>
       <div v-else class="panel table-wrap" role="region" aria-label="审计日志表" tabindex="0"><table><thead><tr><th>时间</th><th>操作人</th><th>操作</th><th>对象</th><th>结果</th><th>详情</th></tr></thead><tbody>
-        <tr v-for="item in items" :key="item.id"><td>{{ formatDateTime(item.createTime) }}</td><td>{{ item.actorUsername || '—' }}<small>ID {{ item.actorUserId ?? '—' }}</small></td><td>{{ item.action }}</td><td>{{ item.targetType || '—' }} / {{ item.targetId || '—' }}</td><td><span class="badge">{{ item.result }}</span></td><td><details><summary>查看详情 #{{ item.id }}</summary><dl><dt>请求 ID</dt><dd>{{ item.requestId || '—' }}</dd><dt>IP 地址</dt><dd>{{ item.ipAddress || '—' }}</dd><dt>User-Agent</dt><dd>{{ item.userAgent || '—' }}</dd></dl><pre>{{ details(item.detailsJson) }}</pre></details></td></tr>
-        <tr v-if="!items.length"><td colspan="6" class="empty">没有符合条件的日志。</td></tr>
+        <tr v-for="item in items" :key="item.id"><td>{{ formatDateTime(item.createTime) }}</td><td>{{ item.actorUsername || '—' }}<small>ID {{ item.actorUserId ?? '—' }}</small></td><td>{{ item.action }}</td><td>{{ item.targetType || '—' }} / {{ item.targetId || '—' }}</td><td><span class="badge">{{ item.result }}</span></td><td><details><summary>查看详情 #{{ item.id }}</summary><dl><dt>请求 ID</dt><dd>{{ item.requestId || '—' }}
+          <button v-if="item.requestId" type="button" class="button-link" @click="traceRequest(item.requestId)">追踪同一请求</button>
+          </dd><dt>IP 地址</dt><dd>{{ item.ipAddress || '—' }}</dd><dt>User-Agent</dt><dd>{{ item.userAgent || '—' }}</dd></dl><pre>{{ details(item.detailsJson) }}</pre></details></td></tr>
+        <tr v-if="!items.length"><td colspan="6" class="empty">没有符合条件的日志。可清空筛选，或用完整请求 ID 追踪一次操作。</td></tr>
       </tbody></table></div>
       <nav class="toolbar" aria-label="审计日志分页"><button class="secondary" :disabled="loading || page <= 1" @click="load(page - 1)">上一页</button><span>第 {{ page }} / {{ pages }} 页</span><button class="secondary" :disabled="loading || page >= pages" @click="load(page + 1)">下一页</button></nav>
     </template>

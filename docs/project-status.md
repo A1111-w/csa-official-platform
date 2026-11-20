@@ -13,6 +13,8 @@
 
 ## 当前实现
 
+2026-11-20 完成 Vue 3 的 27 个页面的内容与交互更新，包括公开目录、学习练习、账号恢复与角色工作台。[逐页范围与验证](change-records/2026-11-20-page-interactions.md)
+
 前端为 Vue3.5.45 / Vue Router4.6.4 / Pinia3.0.4 / Vite8.3.6 / TypeScript，后端为 Spring Boot3.5.14 / Java17。保留公开官网、认证、安全、全部工作台和Agent实验室业务契约。Flyway V1–V8，不新增数据库迁移。
 
 2026-11-18 的首页改版基于 Vue 3 分支开发，可在 `codex/vue3-homepage-redesign` 查看。变更范围和当次前端验证见 [首页改版记录](change-records/2026-11-18-vue3-homepage.md)。

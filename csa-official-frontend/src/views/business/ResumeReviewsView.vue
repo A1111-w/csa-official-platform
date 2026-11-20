@@ -9,6 +9,15 @@ const auth = useAuthStore(), canReview = computed(() => (auth.user?.roleLevel ??
 const status = ref<ResumeReviewStatus>(RESUME_STATUS.PENDING), page = ref(1), pages = ref(1), total = ref(0)
 const items = ref<ResumeReviewListItem[]>([]), detail = ref<ResumeReviewDetail | null>(null), reason = ref('')
 const loading = ref(false), detailLoading = ref(false), reviewing = ref(false), error = ref('')
+const reviewOrder = ref('server')
+const orderedItems = computed(() => {
+  if (reviewOrder.value === 'server') return items.value
+  return [...items.value].sort((a, b) => {
+    if (!a.updateTime) return b.updateTime ? 1 : 0
+    if (!b.updateTime) return -1
+    return a.updateTime.localeCompare(b.updateTime)
+  })
+})
 const filters: { value: ResumeReviewStatus; label: string }[] = [{ value: RESUME_STATUS.PENDING, label: '待审核' }, { value: RESUME_STATUS.APPROVED, label: '已通过' }, { value: RESUME_STATUS.REJECTED, label: '已驳回' }]
 const label = (value: number) => filters.find(f => f.value === value)?.label || '未知'
 const name = (item: ResumeReviewListItem) => item.realName || item.username || '未命名成员'
@@ -56,8 +65,11 @@ async function decide(pass: boolean) {
     <div v-if="!canReview" class="panel">该页面仅对部长及以上角色开放。</div>
     <template v-else>
       <div class="toolbar"><label>审核状态 <select v-model.number="status" :disabled="loading || reviewing" @change="detail = null; load(1)"><option v-for="filter in filters" :key="filter.value" :value="filter.value">{{ filter.label }}</option></select></label><span class="muted">共 {{ total }} 份</span><button class="secondary" :disabled="loading" @click="load()">刷新队列</button></div>
-      <p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="loading" role="status">正在加载审核队列…</p><div v-else-if="!items.length && !error" class="panel empty">当前状态下没有简历。</div>
-      <div v-else class="grid reviews-grid"><article v-for="item in items" :key="item.id" class="panel stack"><span class="badge">{{ label(item.status) }}</span><h2>{{ name(item) }}</h2><p class="muted">@{{ item.username }} · {{ item.departmentName || '未分配部门' }}</p><p>{{ item.contentSummary || '未填写正文，请查看仓库信息。' }}</p><p class="muted">更新时间：{{ formatDateTime(item.updateTime) }}</p><button class="secondary" :disabled="detailLoading || reviewing" @click="openDetail(item)">查看详情</button></article></div>
+      <label class="field">本页审核顺序
+        <select v-model="reviewOrder"><option value="server">按队列原序</option><option value="oldest">较早更新优先</option></select>
+      </label>
+      <p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="loading" role="status">正在加载审核队列…</p><div v-else-if="!items.length && !error" class="panel empty">{{ status === RESUME_STATUS.PENDING ? '待审核队列为空。成员提交后，可在这里核对项目经历和仓库，并填写反馈。' : '当前状态下没有简历。' }}</div>
+      <div v-else class="grid reviews-grid"><article v-for="item in orderedItems" :key="item.id" class="panel stack"><span class="badge">{{ label(item.status) }}</span><h2>{{ name(item) }}</h2><p class="muted">@{{ item.username }} · {{ item.departmentName || '未分配部门' }}</p><p>{{ item.contentSummary || '未填写正文，请查看仓库信息。' }}</p><p class="muted">更新时间：{{ formatDateTime(item.updateTime) }}</p><button class="secondary" :disabled="detailLoading || reviewing" @click="openDetail(item)">查看详情</button></article></div>
       <nav class="toolbar" aria-label="简历分页"><button class="secondary" :disabled="page <= 1 || loading" @click="load(page - 1)">上一页</button><span>第 {{ page }} / {{ pages }} 页</span><button class="secondary" :disabled="page >= pages || loading" @click="load(page + 1)">下一页</button></nav>
       <p v-if="detailLoading" role="status">正在读取完整简历…</p>
       <section v-if="detail" class="panel stack" aria-label="简历详情"><div class="toolbar"><h2>{{ name(detail) }} 的简历</h2><button class="secondary" :disabled="reviewing" @click="detail = null">关闭详情</button></div><span class="badge">{{ label(detail.status) }}</span><dl class="form-grid"><div><dt>邮箱</dt><dd>{{ detail.email || '—' }}</dd></div><div><dt>学号</dt><dd>{{ detail.studentId || '—' }}</dd></div><div><dt>学院 / 班级</dt><dd>{{ detail.college || '—' }} / {{ detail.className || '—' }}</dd></div><div><dt>部门</dt><dd>{{ detail.departmentName || '—' }}</dd></div></dl><h3>简历正文</h3><pre class="resume-content">{{ detail.content || '未填写正文' }}</pre><h3>仓库信息</h3><a v-if="safeRepository(detail.gitRepoUrl)" :href="safeRepository(detail.gitRepoUrl)" target="_blank" rel="noopener noreferrer">打开仓库 ↗</a><p v-else class="muted">未提供有效的 HTTPS 仓库链接。</p><dl class="form-grid"><div><dt>同步状态</dt><dd>{{ detail.gitSyncStatus || 'NOT_SYNCED' }}</dd></div><div><dt>同步分支</dt><dd>{{ detail.gitSyncBranch || '—' }}</dd></div><div><dt>提交版本</dt><dd class="commit">{{ detail.gitSyncCommit || '—' }}</dd></div><div><dt>仓库大小</dt><dd>{{ detail.gitSyncSizeBytes == null ? '—' : `${detail.gitSyncSizeBytes} B` }}</dd></div><div><dt>同步完成</dt><dd>{{ formatDateTime(detail.gitSyncCompletedAt) }}</dd></div></dl><p v-if="detail.gitSyncErrorCode" class="error">仓库同步错误：{{ detail.gitSyncErrorCode }}</p>

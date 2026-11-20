@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/store/useAuthStore'
 import { dashboardMenu } from '@/config/menu'
 import { getRoleDescription, getRoleLabel } from '@/lib/access'
 const auth = useAuthStore()
 const actions = computed(() => dashboardMenu.filter(item => item.href !== '/dashboard' && (auth.user?.roleLevel ?? -1) >= item.minLevel))
+const query = ref('')
+const matches = computed(() => {
+  const term = query.value.trim().toLocaleLowerCase()
+  return actions.value.filter(item => (item.title + item.description).toLocaleLowerCase().includes(term))
+})
 const groups = computed(() => [
-  { title: '个人与学习', items: actions.value.filter(item => item.minLevel < 3) },
-  { title: '项目协作', items: actions.value.filter(item => item.minLevel === 3) },
-  { title: '协会管理', items: actions.value.filter(item => item.minLevel > 3) },
+  { title: '个人与学习', items: matches.value.filter(item => item.minLevel < 3) },
+  { title: '项目协作', items: matches.value.filter(item => item.minLevel === 3) },
+  { title: '协会管理', items: matches.value.filter(item => item.minLevel > 3) },
 ].filter(group => group.items.length))
 </script>
 <template>
@@ -22,6 +27,10 @@ const groups = computed(() => [
         <div><dt>可用入口</dt><dd>{{ actions.length }}</dd></div>
       </dl>
     </header>
+    <div class="panel stack" role="search" aria-label="工作台入口">
+      <label class="field">查找工作台功能<input v-model="query" type="search" placeholder="输入任务，如审核、名单或问答" /></label>
+      <p v-if="query.trim()" role="status" class="muted">{{ matches.length ? '找到 ' + matches.length + ' 个可用入口' : '没有匹配的入口，试试功能名或操作关键词。' }}</p>
+    </div>
     <section v-for="group in groups" :key="group.title" class="overview-group">
       <h2>{{ group.title }}</h2>
       <div class="grid quick-links">

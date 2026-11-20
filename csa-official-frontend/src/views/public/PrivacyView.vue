@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { publicService, type PrivacyNotice } from '@/services/public'
 import PublicSkyHeading from './PublicSkyHeading.vue'
@@ -9,6 +9,17 @@ const error = ref('')
 let alive = true
 const fields: Record<string, string> = { username: '登录账号', realName: '真实姓名', email: '邮箱', studentId: '学号', college: '学院', className: '班级', phone: '手机号', contact: '其他联系方式', avatar: '头像', resume: '简历内容和仓库地址', uploadedFiles: '上传文件元数据', securityEvents: '安全与管理事件' }
 const rights: Record<string, string> = { access: '查阅个人信息', export: '导出个人数据', correction: '申请更正信息', sessionRevocation: '吊销全部会话', deactivation: '停用账号', deletionRequest: '提交删除申请' }
+const rightActions: Record<string, { detail: string; to: string; label: string }> = {
+  access: { detail: '个人资料页列出了账号当前保存的基本信息。', to: '/dashboard/profile', label: '查看个人资料' },
+  correction: { detail: '先核对个人资料，再向本政策列出的联系邮箱说明需要更正的字段。', to: '/dashboard/profile', label: '核对个人资料' },
+  export: { detail: '登录后可从账户设置发起个人数据导出。', to: '/dashboard/settings', label: '前往导出设置' },
+  sessionRevocation: { detail: '账户设置中的会话管理可用于吊销已登录会话。', to: '/dashboard/settings', label: '前往会话管理' },
+  deactivation: { detail: '进入账户设置查看停用说明与确认步骤。', to: '/dashboard/settings', label: '查看停用选项' },
+  deletionRequest: { detail: '账户设置提供删除申请入口。申请前可查看本页公布的保存期限。', to: '/dashboard/settings', label: '查看删除申请' },
+}
+const selectedRight = ref('')
+const activeRight = computed(() => notice.value?.userRights.includes(selectedRight.value) ? selectedRight.value : notice.value?.userRights[0] || '')
+const action = computed(() => rightActions[activeRight.value])
 const purposes: Record<string, string> = { account: '账号与权限', operations: '协会业务', security: '安全保障' }
 const retention: Record<string, string> = { activeAccount: '正常账号', deletionRequest: '删除申请', audit: '审计记录', backup: '备份副本' }
 async function load() {
@@ -36,7 +47,14 @@ onUnmounted(() => { alive = false })
         <section id="policy-collect"><h2>收集的信息</h2><ul class="policy-tags"><li v-for="field in notice.collectedFields" :key="field">{{ fields[field] || field }}</li></ul><p v-if="!notice.collectedFields.length">当前政策未列出具体信息项。</p></section>
         <section id="policy-use"><h2>使用目的</h2><dl v-if="Object.keys(notice.purposes).length"><template v-for="(value, key) in notice.purposes" :key="key"><dt>{{ purposes[key] || key }}</dt><dd>{{ value }}</dd></template></dl><p v-else>当前政策未列出具体用途。</p></section>
         <section id="policy-keep"><h2>保存期限</h2><dl v-if="Object.keys(notice.retention).length"><template v-for="(value, key) in notice.retention" :key="key"><dt>{{ retention[key] || key }}</dt><dd>{{ value }}</dd></template></dl><p v-else>当前政策未列出具体期限。</p></section>
-        <section id="policy-rights"><h2>你的权利</h2><ul class="policy-tags"><li v-for="right in notice.userRights" :key="right">{{ rights[right] || right }}</li></ul><p v-if="!notice.userRights.length">当前政策未列出具体权利项。</p></section>
+        <section id="policy-rights"><h2>你的权利</h2>
+          <template v-if="notice.userRights.length"><div class="rights-picker" role="group" aria-label="选择隐私权利">
+            <button v-for="right in notice.userRights" :key="right" class="secondary" :aria-pressed="activeRight === right" @click="selectedRight = right">{{ rights[right] || right }}</button>
+          </div><div class="right-action" aria-live="polite">
+            <p>{{ action?.detail || '可通过本政策列出的联系方式询问具体办理方式。' }}</p>
+            <RouterLink v-if="action" :to="action.to">{{ action.label }} ↗</RouterLink><a v-else href="#policy-contact">查看联系方式 ↓</a>
+          </div></template><p v-else>当前政策未列出具体权利项。</p>
+        </section>
         <section id="policy-contact"><h2>联系与操作</h2><p>隐私相关问题请联系：{{ notice.contactEmail }}。登录后可以在账户设置中导出数据、吊销会话、停用账号或提交删除申请。</p><RouterLink class="button secondary" to="/dashboard/settings">打开账户设置</RouterLink></section>
       </div>
     </div>
@@ -54,6 +72,10 @@ onUnmounted(() => { alive = false })
 .policy-tags { list-style: none; display: flex; flex-wrap: wrap; gap: .45rem; margin: 0; padding: 0; }
 .policy-tags li { font-size: .92rem; color: var(--text); background: var(--soft); border-radius: .22rem; padding: .2rem .65rem; }
 .policy-text .button { margin-top: .8rem; }
+.rights-picker { display: flex; gap: .45rem; flex-wrap: wrap; }
+.rights-picker button[aria-pressed=true] { color: var(--accent); border-color: var(--accent); }
+.right-action { padding: 1rem; margin-top: .8rem; border-left: 2px solid var(--accent); background: var(--surface); }
+.right-action a { display: inline-block; margin-top: .4rem; }
 @media (max-width: 680px) {
   .policy { grid-template-columns: minmax(0,1fr); gap: 1.5rem; }
   .policy-nav { display: flex; flex-wrap: wrap; position: static; gap: .25rem 1rem; }

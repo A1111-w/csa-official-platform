@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { aiService, parseEvaluationCases, type AgentRun, type AiStatus, type DocumentInput, type EvaluationReport, type KnowledgeDocument } from '@/services/ai'
 import { useAuthStore } from '@/store/useAuthStore'
 import { getRoleLabel } from '@/lib/access'
@@ -107,6 +107,21 @@ async function evaluate() {
 function downloadReport() {
   if (report.value) downloadJson({ dataset: JSON.parse(evaluatedDataset.value), report: report.value }, `agent-evaluation-${report.value.id}.json`)
 }
+const questionField = ref<HTMLTextAreaElement | null>(null)
+function questionFor(doc: KnowledgeDocument) {
+  const reference = '《' + doc.title + '》'
+  const current = question.value.trim()
+  if (!current) return '请结合' + reference + '整理主要内容，并给出相关来源。'
+  return current.includes(reference) ? current : current + '\n请结合' + reference + '回答。'
+}
+async function useDocument(doc: KnowledgeDocument) {
+  const next = questionFor(doc)
+  if (asking.value || next.length > 2000) return
+  question.value = next
+  tab.value = 'ask'
+  await nextTick()
+  questionField.value?.focus()
+}
 function chooseTab(value: 'ask' | 'knowledge' | 'evaluation') { tab.value = value }
 function tabKey(event: KeyboardEvent) {
   const tabs: ('ask' | 'knowledge' | 'evaluation')[] = canManage.value ? ['ask', 'knowledge', 'evaluation'] : ['ask', 'knowledge']
@@ -136,7 +151,7 @@ onMounted(load)
         <button v-if="canManage" id="tab-evaluation" role="tab" :aria-selected="tab === 'evaluation'" aria-controls="panel-evaluation" :tabindex="tab === 'evaluation' ? 0 : -1" @click="chooseTab('evaluation')">评测</button>
       </nav>
       <section v-show="tab === 'ask'" id="panel-ask" role="tabpanel" aria-labelledby="tab-ask" class="stack">
-        <form class="panel stack" @submit.prevent="ask"><label for="agent-question"><strong>今天想了解什么？</strong></label><textarea id="agent-question" v-model="question" maxlength="2000" rows="4" required :disabled="asking" placeholder="例如：Java 后端应该怎么学？有哪些相关资料和比赛？" /><div class="toolbar"><small class="muted">独立单轮问答 · {{ question.length }}/2000</small><button :disabled="asking || !question.trim()">{{ asking ? '正在检索与执行…' : '发送问题' }}</button></div><div v-if="!run && !asking" class="actions"><button v-for="item in sampleQuestions" :key="item" type="button" class="secondary" @click="question = item">{{ item }} ↗</button></div></form>
+        <form class="panel stack" @submit.prevent="ask"><label for="agent-question"><strong>今天想了解什么？</strong></label><textarea ref="questionField" id="agent-question" v-model="question" maxlength="2000" rows="4" required :disabled="asking" placeholder="例如：Java 后端应该怎么学？有哪些相关资料和比赛？" /><div class="toolbar"><small class="muted">独立单轮问答 · {{ question.length }}/2000</small><button :disabled="asking || !question.trim()">{{ asking ? '正在检索与执行…' : '发送问题' }}</button></div><div v-if="!run && !asking" class="actions"><button v-for="item in sampleQuestions" :key="item" type="button" class="secondary" @click="question = item">{{ item }} ↗</button></div></form>
         <p v-if="askError" class="error" role="alert">{{ askError }}</p><p v-if="asking" class="panel" role="status">正在执行，完成后展示回答、引用与轨迹。</p>
         <div v-if="run" class="stack" aria-live="polite"><article class="panel"><div class="toolbar"><h2>回答</h2><small>{{ run.mode === 'offline' ? '离线摘录' : run.model }} · {{ (run.durationMs / 1000).toFixed(2) }} 秒</small></div><p v-if="run.question" class="muted">问题：{{ run.question }}</p><p class="answer">{{ run.answer }}</p><small class="break-all">Run {{ run.id }}</small></article>
           <div class="grid"><section class="panel stack"><h2>参考来源 <span class="muted">{{ run.citations.length }}</span></h2><p v-if="!run.citations.length" class="muted">本次没有知识库引用。可先添加相关资料再提问。</p><details v-for="(citation, index) in run.citations" :key="`${citation.chunkId}-${index}`"><summary>[{{ index + 1 }}] {{ citation.title }}</summary><p class="answer">{{ citation.text }}</p><p class="muted break-all">{{ citation.source || '未标注来源' }} · 分数 {{ citation.score.toFixed(4) }}</p><small class="break-all">{{ citation.chunkId }}</small></details></section>
@@ -145,7 +160,7 @@ onMounted(load)
         <div v-else-if="!asking && !askError" class="empty panel"><h2>从一个问题开始</h2><p>回答完成后，可以展开来源并检查每一步工具调用。</p></div>
       </section>
       <section v-show="tab === 'knowledge'" id="panel-knowledge" role="tabpanel" aria-labelledby="tab-knowledge" class="grid">
-        <section class="panel stack"><h2>知识资料</h2><p class="muted">仅显示当前身份可以访问的内容。</p><p v-if="loading" role="status">正在加载资料…</p><p v-else-if="!documents.length" class="empty">知识库暂无资料。部长及以上可添加 Markdown 或纯文本。</p><ul v-else class="document-list stack"><li v-for="doc in documents" :key="doc.id"><div class="toolbar"><h3>{{ doc.title }}</h3><button v-if="canManage" class="danger" :disabled="deleting !== null || saving" :aria-label="`删除 ${doc.title}`" @click="removeDocument(doc)">{{ deleting === doc.id ? '删除中…' : '删除' }}</button></div><p class="muted">{{ doc.source || '未标注来源' }} · {{ doc.chunkCount }} 个分片 · Level {{ doc.minRoleLevel }} 起</p><small class="break-all">文档 ID：{{ doc.id }}</small></li></ul></section>
+        <section class="panel stack"><h2>知识资料</h2><p class="muted">仅显示当前身份可以访问的内容。</p><p v-if="loading" role="status">正在加载资料…</p><p v-else-if="!documents.length" class="empty">知识库暂无资料。部长及以上可添加 Markdown 或纯文本。</p><ul v-else class="document-list stack"><li v-for="doc in documents" :key="doc.id"><div class="toolbar"><h3>{{ doc.title }}</h3><button v-if="canManage" class="danger" :disabled="deleting !== null || saving" :aria-label="`删除 ${doc.title}`" @click="removeDocument(doc)">{{ deleting === doc.id ? '删除中…' : '删除' }}</button></div><p class="muted">{{ doc.source || '未标注来源' }} · {{ doc.chunkCount }} 个分片 · Level {{ doc.minRoleLevel }} 起</p><small class="break-all">文档 ID：{{ doc.id }}</small><div><button type="button" class="secondary" :disabled="asking || questionFor(doc).length > 2000" @click="useDocument(doc)">围绕这份资料提问</button></div></li></ul></section>
         <form v-if="canManage" class="panel stack" @submit.prevent="saveDocument"><div class="toolbar"><h2>添加资料</h2><button type="button" class="secondary" :disabled="saving || readingFile" @click="fillSample">填入演示资料</button></div><p class="muted">保存后自动切片并建立检索索引。演示资料明确标注来源。</p><fieldset class="stack" :disabled="saving || readingFile">
           <label class="field">标题<input id="doc-title" v-model="draft.title" required maxlength="200" /></label><label class="field">来源标注<input id="doc-source" v-model="draft.source" required maxlength="500" placeholder="例如：协会手册 / 文档地址" /></label><label class="field">最低可访问等级<select id="doc-role" v-model.number="draft.minRoleLevel"><option v-for="level in levels" :key="level" :value="level">{{ getRoleLabel(level) }}及以上</option></select></label><label class="field">从本地文本文件填入<input id="doc-file" type="file" accept=".md,.txt" @change="readFile" /></label><label class="field">正文<textarea id="doc-content" v-model="draft.content" required maxlength="30000" rows="8" /></label><small class="muted">{{ draft.content.length }}/30000</small><button :disabled="!draft.content.trim() || !draft.title.trim() || !draft.source.trim()">{{ saving ? '正在建立索引…' : '加入知识库' }}</button>
         </fieldset></form><div v-else class="panel"><h2>资料维护</h2><p class="muted">部长及以上可添加和删除资料。你可以在问答页检索现有知识。</p></div>

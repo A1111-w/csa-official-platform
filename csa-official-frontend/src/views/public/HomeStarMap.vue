@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import { ref } from 'vue'
 
 const destinations = [
   { id: 'competitions', to: '/competitions', label: '竞赛活动' },
@@ -8,19 +9,29 @@ const destinations = [
   { id: 'agent', to: '/dashboard/ai', label: 'Agent 实验室' },
   { id: 'contributors', to: '/contributors', label: '公开成员与贡献榜' },
 ] as const
+const routesByGoal = [
+  { label: '查看全部入口', ids: [], hint: '选择星点，进入对应的协会服务。' },
+  { label: '学习与练习', ids: ['resources', 'agent'], hint: '从资源库找学习资料，或进入 Agent 实验室查询知识库。' },
+  { label: '组队参赛', ids: ['competitions', 'contributors'], hint: '先看比赛安排，再按成员的部门和分工寻找搭档。' },
+  { label: '整理实践经历', ids: ['resume'], hint: '在简历工作区整理项目经历，准备提交审核。' },
+]
+const goalIndex = ref(0)
 </script>
 
 <template>
   <section class="star-map" aria-labelledby="home-star-map-title">
     <div class="map-copy">
       <h2 id="home-star-map-title">协会功能星图</h2>
-      <p>选择星点，进入对应的协会服务。</p>
+      <label class="goal-picker">按目标探索
+        <select v-model.number="goalIndex"><option v-for="(goal, i) in routesByGoal" :key="goal.label" :value="i">{{ goal.label }}</option></select>
+      </label>
+      <p aria-live="polite">{{ routesByGoal[goalIndex]!.hint }}</p>
     </div>
 
     <div class="constellation">
       <div class="atlas-orbits" aria-hidden="true"></div>
       <ul class="map-links" role="list">
-        <li v-for="destination in destinations" :key="destination.id" class="map-node" :class="`node-${destination.id}`">
+        <li v-for="destination in destinations" :key="destination.id" class="map-node" :class="[`node-${destination.id}`, { suggested: routesByGoal[goalIndex]!.ids.includes(destination.id) }]">
           <span class="trace" aria-hidden="true"></span>
           <RouterLink :to="destination.to" class="node-link">
             <span class="star" aria-hidden="true"></span>
@@ -53,6 +64,8 @@ const destinations = [
   color: var(--muted);
   font-size: .9rem;
 }
+.goal-picker { display: grid; gap: .2rem; max-width: 17rem; margin-top: .9rem; font-size: .82rem; color: var(--muted); }
+.map-node.suggested .node-link { border-color: var(--accent); background: var(--soft); box-shadow: 0 0 0 1px var(--accent); }
 .constellation {
   position: relative;
   isolation: isolate;

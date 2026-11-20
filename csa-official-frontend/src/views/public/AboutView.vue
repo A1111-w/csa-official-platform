@@ -6,6 +6,13 @@ import { publicService, type ContributorVo } from '@/services/public'
 import MemberCards from './MemberCards.vue'
 import PublicSkyHeading from './PublicSkyHeading.vue'
 const projectLabImage = '/brand/csa-project-lab.webp'
+const paths = [
+  { label: '参加竞赛', title: '从一场活动开始', steps: ['在竞赛栏目查看活动时间和介绍，确认自己的空闲时段。', '带着感兴趣的赛题，在成员名录中按分工寻找队友。'], href: '/competitions', action: '查看比赛与活动' },
+  { label: '一起做项目', title: '给想法找一位协作者', steps: ['先写下想解决的问题、已有进度和需要的帮助。', '在成员名录中按部门或技术方向查找可能的协作伙伴。'], href: '/contributors', action: '查找公开成员' },
+  { label: '学习技术', title: '选一份资料，做一个小练习', steps: ['从课程资料、项目模板或工具中选一个与目标相关的分类。', '用会员账号打开资源，把想练习的部分整理成自己的项目。'], href: '/resources', action: '浏览资源分类' },
+]
+const pathIndex = ref(0)
+const chosenPath = computed(() => paths[pathIndex.value]!)
 const about = ref('')
 const members = ref<ContributorVo[]>([])
 const loading = ref(true)
@@ -40,12 +47,26 @@ onUnmounted(() => { alive = false })
         <div class="section-rule"><h2 id="association-team">核心成员</h2><RouterLink to="/contributors">查看全部成员 →</RouterLink></div>
         <MemberCards :members="members" :loading="loading" />
       </section>
+      <section class="getting-started" aria-labelledby="getting-started-title">
+        <div><h2 id="getting-started-title">怎样参与协会？</h2>
+          <div class="choices" role="group" aria-label="选择参与方向">
+            <button v-for="(path, i) in paths" :key="path.label" class="secondary" :aria-pressed="pathIndex === i" @click="pathIndex = i">{{ path.label }}</button>
+          </div>
+        </div>
+        <div class="path-detail" aria-live="polite"><h3>{{ chosenPath.title }}</h3><ol><li v-for="step in chosenPath.steps" :key="step">{{ step }}</li></ol><RouterLink :to="chosenPath.href">{{ chosenPath.action }} ↗</RouterLink></div>
+      </section>
     </div>
   </div>
 </template>
 <style scoped>
 .about-spread { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(18rem, 1fr); gap: clamp(2.3rem, 6vw, 7rem); align-items: start; }
 .about-spread > .error { grid-column: 1 / -1; }
+.getting-started { grid-column: 1/-1; display: grid; grid-template-columns: minmax(0,.75fr) minmax(0,1.25fr); gap: 1.25rem 3rem; padding: clamp(1rem, 2.5vw, 2.5rem); border-block: 1px solid var(--border); background: var(--surface); }
+.choices { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: 1rem; }
+.choices button[aria-pressed=true] { color: var(--accent); border-color: var(--accent); }
+.path-detail ol { padding-left: 1.3rem; color: var(--muted); }
+.path-detail li { margin-bottom: .45rem; }
+@media(max-width: 720px) { .getting-started { grid-template-columns: 1fr; } }
 .about-story, .about-people { min-width: 0; }
 .story-image { display: block; width: 100%; aspect-ratio: 2.4; object-fit: cover; object-position: center 50%; margin-top: 1.15rem; }
 .prose { padding-top: clamp(1.25rem, 3vw, 2.5rem); overflow-wrap: anywhere; max-width: 44em; }

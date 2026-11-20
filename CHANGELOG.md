@@ -13,6 +13,10 @@
 
 ## [Unreleased]
 
+### 20261120-page-interactions | 全站内容与分页面交互
+
+- 2026-11-20（Asia/Shanghai），Codex 将公开名录与贡献榜关联，加入四项开放练习及分页面的查询、预览、填表与恢复操作。前端使用原有接口，隔离预览展示示例数据。[27 个页面、验证与回退](docs/change-records/2026-11-20-page-interactions.md)
+
 ### 20261119-sky-art | 九幅星空背景
 
 - 2026-11-19（Asia/Shanghai），Codex 按「星环地平线」方向用 ImageGen 生成九幅 WebP 背景。首页按北京时间混合晨夜场景，公开栏目、账号、工作台和状态页按内容选择图像。[用途、验证和回退](docs/change-records/2026-11-19-sky-art.md)

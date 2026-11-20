@@ -1,5 +1,7 @@
 # CSA Vue 3 前端
 
+27 个路由的内容和交互清单见[逐页记录](../docs/change-records/2026-11-20-page-interactions.md)。工作台专项浏览器用例在 `e2e/workspace-interactions.spec.ts`，对应手机和桌面两个视口。
+
 Vue 基线 `codex/vue3-frontend` 和首页改版 `codex/vue3-homepage-redesign` 使用 Vue 3 + Vite + TypeScript + Vue Router + Pinia。React 版保存在 `codex/agent-rag-evaluation`（`bf1415c`）。
 
 ## 启动与验证

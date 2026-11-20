@@ -15,6 +15,7 @@ const mutating = ref<number | null>(null)
 const emptyDraft = (): SaveCarouselPayload => ({ title: '', imgUrl: '', targetUrl: '', sortOrder: 0, status: 1 })
 const draft = ref(emptyDraft())
 const busy = computed(() => saving.value || uploading.value || mutating.value !== null)
+const previewFrame = ref<'wide' | 'narrow'>('wide')
 const enabledCount = computed(() => items.value.filter(item => item.status === 1).length)
 function safeTarget(value?: string | null) {
   if (!value?.trim()) return ''
@@ -100,11 +101,20 @@ onMounted(load)
             <div class="actions"><button>{{ saving ? '保存中…' : '保存轮播图' }}</button><button type="button" class="secondary" @click="draft = emptyDraft()">重置</button></div>
           </fieldset>
         </form>
-        <section class="panel stack"><h2>图片预览</h2><img v-if="resolveAssetUrl(draft.imgUrl)" class="preview-image" :src="resolveAssetUrl(draft.imgUrl)" :alt="draft.title || '轮播图片预览'" /><div v-else class="empty">上传图片或填写图片地址后预览。</div><h3>{{ draft.title || '轮播标题' }}</h3><a v-if="safeTarget(draft.targetUrl)" :href="safeTarget(draft.targetUrl)" target="_blank" rel="noopener noreferrer">打开目标页面 ↗</a><p v-else class="muted">不设置跳转</p></section>
+        <section class="panel stack"><h2>图片预览</h2>
+          <div class="actions" role="group" aria-label="预览裁切画幅">
+            <button type="button" class="secondary" :aria-pressed="previewFrame === 'wide'" @click="previewFrame = 'wide'">宽屏裁切</button>
+            <button type="button" class="secondary" :aria-pressed="previewFrame === 'narrow'" @click="previewFrame = 'narrow'">手机裁切</button>
+          </div>
+          <div class="crop-frame" :data-frame="previewFrame"><img v-if="resolveAssetUrl(draft.imgUrl)" class="preview-image" :src="resolveAssetUrl(draft.imgUrl)" :alt="draft.title || '轮播图片预览'" /><div v-else class="empty">上传图片或填写图片地址后预览。</div></div><h3>{{ draft.title || '轮播标题' }}</h3><a v-if="safeTarget(draft.targetUrl)" :href="safeTarget(draft.targetUrl)" target="_blank" rel="noopener noreferrer">打开目标页面 ↗</a><p v-else class="muted">不设置跳转</p></section>
       </div>
       <p v-if="error" class="error" role="alert">{{ error }}</p><p v-if="loading" role="status">正在加载轮播列表…</p>
       <section v-else class="panel table-wrap" aria-label="轮播列表" tabindex="0"><h2>轮播列表</h2><table><thead><tr><th>图片 / 标题</th><th>跳转</th><th>排序</th><th>状态</th><th>更新时间</th><th>操作</th></tr></thead><tbody><tr v-for="item in items" :key="item.id"><td><img v-if="resolveAssetUrl(item.imgUrl)" class="thumbnail" :src="resolveAssetUrl(item.imgUrl)" :alt="item.title" />{{ item.title }}</td><td><a v-if="safeTarget(item.targetUrl)" :href="safeTarget(item.targetUrl)" target="_blank" rel="noopener noreferrer">{{ item.targetUrl }}</a><span v-else>不设置跳转</span></td><td>{{ item.sortOrder }}</td><td>{{ item.status === 1 ? '启用' : '停用' }}</td><td>{{ formatDateTime(item.updateTime || item.createTime) }}</td><td><div class="actions"><button class="secondary" :disabled="busy" @click="edit(item)">编辑</button><button class="secondary" :disabled="busy" @click="mutate(item, 'toggle')">{{ item.status === 1 ? '停用' : '启用' }}</button><button class="danger" :disabled="busy" @click="mutate(item, 'delete')">删除</button></div></td></tr><tr v-if="!items.length"><td colspan="6" class="empty">尚未添加轮播图。</td></tr></tbody></table></section>
     </template>
   </section>
 </template>
-<style scoped>.preview-image { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 12px; } .thumbnail { width: 110px; height: 64px; object-fit: cover; display: block; margin-bottom: 8px; border-radius: 6px; } #carousel-editor { scroll-margin-top: 2rem; }</style>
+<style scoped>
+.crop-frame { aspect-ratio: 2 / 1; inline-size: 100%; overflow: hidden; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.crop-frame[data-frame="narrow"] { aspect-ratio: 4 / 3; max-inline-size: 22rem; justify-self: center; }
+.crop-frame .empty { border: 0; }
+.crop-frame .preview-image { width: 100%; height: 100%; object-fit: cover; } .thumbnail { width: 110px; height: 64px; object-fit: cover; display: block; margin-bottom: 8px; border-radius: 6px; } #carousel-editor { scroll-margin-top: 2rem; }</style>

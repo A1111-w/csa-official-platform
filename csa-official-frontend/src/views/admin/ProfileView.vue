@@ -15,6 +15,8 @@ const displayName = computed(() => profile.value?.realName || auth.user?.usernam
 const avatar = computed(() => resolveAssetUrl(profile.value?.avatar))
 const loading = ref(false)
 const error = ref('')
+const showPrivate = ref(false)
+const privateLabels = new Set(['邮箱', '手机号', 'QQ / 微信', '学号'])
 const fields = computed(() => profile.value ? [
   ['账号', profile.value.username], ['邮箱', profile.value.email], ['余额', formatBalance(profile.value.balance)],
   ['用户 ID', profile.value.id], ['手机号', profile.value.phone], ['QQ / 微信', profile.value.contact],
@@ -51,10 +53,16 @@ onMounted(load)
     </header>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="loading" role="status">正在加载资料…</p>
-    <dl v-else-if="profile" class="profile-facts">
-      <div v-for="[label, value] in fields" :key="String(label)" class="panel">
-        <dt class="muted">{{ label }}</dt><dd>{{ value || '—' }}</dd>
+    <section v-else-if="profile" class="stack">
+      <div class="toolbar">
+        <h2>我的资料</h2>
+        <button type="button" class="secondary" :aria-pressed="showPrivate" aria-controls="profile-fields" @click="showPrivate = !showPrivate">{{ showPrivate ? '隐藏联系方式与学号' : '显示联系方式与学号' }}</button>
       </div>
-    </dl>
+      <dl id="profile-fields" class="profile-facts">
+      <div v-for="[label, value] in fields" :key="String(label)" class="panel">
+        <dt class="muted">{{ label }}</dt><dd>{{ value == null || value === '' ? '未填写' : privateLabels.has(String(label)) && !showPrivate ? '已隐藏' : value }}</dd>
+      </div>
+      </dl>
+    </section>
   </section>
 </template>

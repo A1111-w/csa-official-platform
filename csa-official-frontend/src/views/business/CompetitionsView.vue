@@ -20,6 +20,14 @@ const empty = () => ({ id: undefined as number | undefined, title: '', content: 
 const draft = ref(empty()), grantTarget = ref<CompetitionItem | null>(null), editorId = ref<number | null>(null), keyword = ref('')
 const detail = ref<CompetitionDetailItem | null>(null), detailBusy = ref(false)
 const detailHeading = ref<HTMLElement | null>(null)
+const presentation = ref<'cards' | 'schedule'>('cards')
+const schedule = computed(() => {
+  function timestamp(item: CompetitionItem) {
+    const value = Date.parse(item.startTime?.replace(' ', 'T') || '')
+    return Number.isFinite(value) ? value : Infinity
+  }
+  return [...items.value].sort((a, b) => timestamp(a) - timestamp(b))
+})
 let detailsTrigger: HTMLElement | null = null
 const filteredMembers = computed(() => members.value.filter(m => (m.roleLevel ?? 0) >= 1 && [m.realName, m.username, m.email, m.departmentName].some(v => v?.toLowerCase().includes(keyword.value.trim().toLowerCase()))))
 const statuses = [{ value: 0, label: '未发布' }, { value: 1, label: '进行中' }, { value: 2, label: '已结束' }]
@@ -103,10 +111,28 @@ async function grant() {
     <div :class="dashboard ? 'workspace-flow' : 'page atlas-body stack'">
     <form v-if="canManage" class="panel stack" @submit.prevent="save"><h2>{{ draft.id ? '编辑比赛' : '发布比赛' }}</h2><div class="form-grid"><label class="field">比赛标题<input v-model="draft.title" :disabled="saving || uploading || detailBusy" required /></label><label class="field">状态<select v-model.number="draft.status" :disabled="saving || uploading || detailBusy"><option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option></select></label></div><label class="field">比赛详情<textarea v-model="draft.content" :disabled="saving || uploading || detailBusy" rows="7" required /></label><div class="form-grid"><label class="field">开始时间<input v-model="draft.startTime" :disabled="saving || uploading || detailBusy" type="datetime-local" /></label><label class="field">结束时间<input v-model="draft.endTime" :disabled="saving || uploading || detailBusy" type="datetime-local" /></label></div><label class="field">封面地址<input v-model="draft.coverImg" :disabled="saving || uploading || detailBusy" /></label><label class="field">上传封面<input type="file" accept="image/*" :disabled="uploading || saving" @change="upload" /></label><img v-if="resolveAssetUrl(draft.coverImg)" :src="resolveAssetUrl(draft.coverImg)" class="cover" alt="比赛封面预览" /><div class="actions"><button :disabled="saving || uploading">{{ saving ? '保存中…' : draft.id ? '保存修改' : '发布比赛' }}</button><button type="button" class="secondary" :disabled="saving || uploading" @click="draft = empty()">取消 / 清空</button></div></form>
     <form v-if="canManage && grantTarget" class="panel stack" @submit.prevent="grant"><h2>协作者授权：{{ grantTarget.title }}</h2><label class="field">搜索成员<input v-model="keyword" placeholder="姓名、账号、邮箱或部门" /></label><label class="field">选择协作者<select v-model.number="editorId" required><option :value="null" disabled>请选择</option><option v-for="m in filteredMembers" :key="m.id" :value="m.id">{{ m.realName || m.username }} · @{{ m.username }} · {{ m.departmentName || '未分配部门' }}</option></select></label><p v-if="!filteredMembers.length" class="muted">没有匹配的成员。</p><div class="actions"><button :disabled="granting || !editorId">确认授权</button><button type="button" class="secondary" :disabled="granting" @click="grantTarget = null">取消</button></div></form>
+    <details v-if="canManage" class="draft-preview"><summary>预览当前比赛草稿</summary><div class="draft-body">
+      <span class="event-status" :data-status="draft.status">{{ statusLabel(draft.status) }}</span>
+      <h3>{{ draft.title || '尚未填写比赛标题' }}</h3><p>{{ formatDateTime(draft.startTime) }} 至 {{ formatDateTime(draft.endTime) }}</p>
+      <div v-if="draft.content" class="prose" v-html="sanitizeHtml(draft.content)" /><p v-else>填写比赛详情后可在此预览。</p>
+    </div></details>
+    <div v-if="!needsLogin && !error && items.length" class="schedule-bar">
+      <h2>{{ dashboard ? '已录入的比赛' : '活动安排' }}</h2>
+      <div role="group" aria-label="活动展示方式"><button class="secondary" :aria-pressed="presentation === 'cards'" @click="presentation = 'cards'">活动海报</button>
+        <button class="secondary" :aria-pressed="presentation === 'schedule'" @click="presentation = 'schedule'">时间表</button></div>
+    </div>
     <p v-if="error" class="error" role="alert">{{ error }} <button class="secondary" @click="load()">重试</button></p>
     <div v-if="needsLogin" class="panel"><p>当前服务要求登录后查看比赛。</p><RouterLink class="button" to="/login?redirect=%2Fcompetitions">登录后查看</RouterLink></div>
     <p v-else-if="loading" role="status">正在加载比赛…</p>
     <div v-else-if="!items.length && !error" class="panel empty">暂无比赛与活动。</div>
+    <section v-else-if="presentation === 'schedule' && items.length" class="schedule" aria-label="本页活动时间表">
+      <p>按本页活动开始时间排列，未定时间置于末尾。</p>
+      <ol><li v-for="item in schedule" :key="item.id">
+        <p>{{ item.startTime ? formatDateTime(item.startTime) : '时间待定' }}</p>
+        <div><strong>{{ item.title }}</strong><p>{{ statusLabel(item.status) }}<template v-if="item.endTime"> · {{ formatDateTime(item.endTime) }} 结束</template></p></div>
+        <button class="secondary" :disabled="detailBusy" :aria-label="'查看详情：' + item.title" @click="openDetail(item)">查看详情</button>
+      </li></ol>
+    </section>
     <div v-else class="competition-grid">
       <article v-for="item in items" :key="item.id" class="event" :class="{ 'with-cover': resolveAssetUrl(item.coverImg) }">
         <img v-if="resolveAssetUrl(item.coverImg)" :src="resolveAssetUrl(item.coverImg)" :alt="item.title" class="cover" loading="lazy" />
@@ -136,6 +162,17 @@ async function grant() {
 
 <style scoped>
 .workspace-flow { display: contents; }
+.schedule-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .8rem; border-bottom: 1px solid var(--border); padding-block: .4rem .9rem; }
+.schedule-bar [role=group] { display: flex; gap: .4rem; }
+.schedule-bar button[aria-pressed=true] { color: var(--accent); border-color: var(--accent); }
+.schedule ol { padding: 0; margin: .5rem 0; list-style: none; }
+.schedule li { padding: 1rem .25rem; border-block-start: 1px solid var(--border); display: grid; grid-template-columns: minmax(9rem, .5fr) minmax(0, 1.5fr) auto; gap: .6rem 1rem; align-items: center; overflow-wrap: anywhere; }
+.schedule li > p { font-variant-numeric: tabular-nums; color: var(--metal); }
+.schedule li div p, .schedule > p { font-size: .85rem; }
+.draft-preview { border-block: 1px solid var(--border); padding: .7rem .2rem; }
+.draft-preview summary { color: var(--accent); cursor: pointer; }
+.draft-body { padding: 1rem; background: var(--surface); display: grid; gap: .45rem; margin-top: .7rem; overflow-wrap: anywhere; }
+@media(max-width: 600px) { .schedule li { grid-template-columns: minmax(0,1fr) auto; } .schedule li > p { grid-column: 1/-1; } }
 .competition-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 25rem), 1fr)); gap: clamp(1rem, 3vw, 2.5rem); }
 .event { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; border-block: 1px solid var(--border); }
 .event-copy { display: grid; gap: .6rem; align-content: center; justify-items: start; padding: 1.1rem .2rem; }
